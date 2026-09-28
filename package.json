@@ -1,0 +1,21 @@
+{
+  "name": "inspector-platform",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "workspaces": ["packages/web", "packages/api"],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint packages",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present && npm run smoke",
+    "smoke": "node --test tests/smoke.test.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "@types/node": "^24.0.0",
+    "eslint": "^9.39.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.46.0"
+  }
+}

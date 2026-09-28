@@ -1,0 +1,41 @@
+# API Contracts v0.1
+
+HTTP JSON `/api/v1`. هذه عقود الموارد والسلوك؛ schemas التفصيلية تتبع حقول [DATABASE](DATABASE.md)، ولا يجوز للمنفذ اختراع حقول بيداغوجية رسمية. كل request/response متحقق بـZod؛ unknown input rejected أو stripped وفق schema منشور، لا mass assignment. `Id` UUID، تواريخ ISO 8601 UTC، `weekday` محلي 0..6 محدد في العقد التنفيذي. الحقول الناقصة في API تُعالج بإصدار contract موثق، لا بافتراض صامت.
+
+## غلاف واستعمال مشترك
+
+نجاح القراءة: `{data, page?: {limit,nextCursor,total?}}`. خطأ: `{error:{code,message,fields?,requestId}}` بلا بيانات شخصية في الرسائل العامة. القائمة `limit` افتراضي 25 وأقصى 100، cursor ثابت وsort allowlist، query `q` مطبّع محدود الطول. رموز: 400 validation، 401 unauthenticated، 403 forbidden، 404 not found within authorized scope (لا يكشف cross-district)، 409 state conflict، 429 rate limit، 500 generic. جميع mutations المسجلة تحمل requestId؛ `Idempotency-Key` مطلوب لقبول submission وللعمليات القابلة للتكرار.
+
+جلسة المفتش في cookie آمنة HttpOnly/Secure/SameSite؛ `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`. CSRF token لطلبات mutation ذات cookie. فحص district membership وملكية كل مورد في service. لا JWT/teacher session ولا endpoints عامة لملفات Teacher. حماية public intake من spam بمحدد معدل ووسيلة تحدٍ قابلة للضبط؛ لا تعرض duplicate candidates للمُرسل.
+
+## الموارد
+
+| Endpoint | العمليات | نطاق الإدخال/الإخراج والحماية |
+|---|---|---|
+| `/public/districts/:districtId/submissions` | POST | Public minimal profile + institution selections/notes وفق نموذج معتمد؛ يرجع receipt ID فقط و202؛ لا lookup شخصي |
+| `/submissions` | GET | inspector، `status`, `districtId`, `q`, cursor؛ لا قبول آلي |
+| `/submissions/:id` | GET | البيانات والمرشحات المحتملة للمفتش فقط |
+| `/submissions/:id/decision` | POST | `{action:ACCEPT/REJECT/INTERNAL_REVIEW, expectedStatus, reason?}`؛ ACCEPT ينشئ Teacher مرة واحدة مع AuditLog؛ 409 عند السباق |
+| `/institutions` | GET/POST | district-scoped، q/pagination؛ create للمفتش المصرح |
+| `/institutions/:id` | GET/PATCH | نسخة جزئية مصرح بها؛ archive endpoint منفصل |
+| `/teachers` | GET | q, district, institution, professionalStatus, recordStatus, visited/from/to, weekday/time filters؛ indexed/server-side |
+| `/teachers/:id` | GET/PATCH | ملف مهني، الإسنادات/الزيارات روابط موارد؛ لا حساب مستخدم |
+| `/teachers/:id/assignments` | GET/POST | kind, workloadMinutes, validity؛ تحقق من district وhistorical overlap |
+| `/assignments/:id` | PATCH/POST archive | change بإغلاق interval/نسخة جديدة عند اللزوم، لا rewrite للتاريخ |
+| `/teachers/:id/schedules` | GET/POST | academicYear/revision؛ GET structured slots |
+| `/schedules/:id/slots` | POST | assignmentId, weekday, start/endMinute, level/group label؛ يتحقق من الصلاحية والتداخل |
+| `/slots/:id` | PATCH/DELETE | تعديل draft schedule فقط؛ النسخ المعتمدة لا تُمسح بصمت |
+| `/visits` | GET/POST | teacherId, institutionId, scheduledAt، status، filter by date |
+| `/visits/:id` | GET/PATCH | وصف هيكلي؛ لا حقول تقييم رسمية |
+| `/visits/:id/report` | GET/PUT | draft فقط؛ finalization endpoint مستقل يحفظ snapshot |
+| `/reports/:id/finalize` | POST | optimistic version، audit، لا تعديل لاحق للتقرير النهائي |
+| `/reports/:id/follow-ups` | GET/POST | recommendation reference/note/dueAt؛ permission |
+| `/follow-ups/:id` | PATCH | state transition وaudit |
+| `/reference/sources`, `/reference/items` | GET | verified provenance وtaxonomy، read-only في MVP |
+| `/proposals` | GET/POST | kind, status، inspector owner، title، content validated by kind |
+| `/proposals/:id` | GET/PATCH/POST clone/POST archive | owner/district guard؛ تعديل ينتج ProposalRevision جديدًا |
+| `/proposals/:id/revisions` | GET | history metadata/immutable content للمصرح |
+| `/dashboard/summary` | GET | counts/period مع تعريف وtimestamp؛ no unscoped aggregate |
+| `/audit-events` | GET | inspector-authorized, filtered; redacted; no public route |
+
+الطباعة: `/print` route داخل الواجهة يجلب snapshot موثقًا من endpoints أعلاه؛ `@media print` A4، حفظ PDF من المتصفح. لا يُعلن عن API لملف PDF مولد على الخادم قبل إثبات الحاجة. رفع الملفات وTrainingEvent CRUD عقود مؤجلة؛ foundations في [DATABASE](DATABASE.md) لا تعني endpoints عاملة. تفاصيل الحالة في [UI_MAP](UI_MAP.md).

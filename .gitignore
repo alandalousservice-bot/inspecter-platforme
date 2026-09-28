@@ -1,0 +1,38 @@
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs and temporary files
+*.log
+*.tmp
+tmp/
+temp/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Build and coverage outputs
+dist/
+build/
+coverage/
+out/
+.cache/
+
+# Dependency directories (stack-agnostic)
+node_modules/
+vendor/
+__pycache__/
+.venv/
+venv/
+
+# Local tooling and databases
+.DS_Store
+*.db
+*.sqlite
+*.sqlite3

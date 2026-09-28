@@ -1,0 +1,116 @@
+* {
+  box-sizing: border-box;
+}
+
+html {
+  direction: rtl;
+}
+
+body {
+  margin: 0;
+  min-width: 18rem;
+  background: var(--color-canvas);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+}
+
+a {
+  color: inherit;
+}
+
+a:focus-visible {
+  outline: 3px solid var(--color-focus-ring);
+  outline-offset: 3px;
+}
+
+.skip-link {
+  position: absolute;
+  inset-block-start: -5rem;
+  inset-inline-start: var(--space-4);
+  z-index: 1;
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.skip-link:focus-visible {
+  inset-block-start: var(--space-2);
+}
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.app-header {
+  padding: var(--space-3) var(--space-6);
+  border-block-end: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+}
+
+.app-header__title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.app-shell__body {
+  display: grid;
+  grid-template-columns: 14rem minmax(0, 1fr);
+  min-height: calc(100vh - 4rem);
+}
+
+.app-sidebar {
+  padding: var(--space-6) var(--space-4);
+  border-inline-end: 1px solid var(--color-border);
+}
+
+.app-sidebar a {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  text-decoration: none;
+  transition: background-color var(--motion-short) ease;
+}
+
+.app-sidebar a:hover,
+.app-sidebar a[aria-current='page'] {
+  background: var(--color-surface-raised);
+}
+
+.app-main {
+  min-width: 0;
+  padding: var(--space-8);
+}
+
+.app-main h1 {
+  margin-block-start: 0;
+  font-size: var(--font-size-page);
+}
+
+@media (max-width: 48rem) {
+  .app-shell__body {
+    display: block;
+  }
+
+  .app-sidebar {
+    padding: var(--space-2) var(--space-4);
+    border-inline-end: 0;
+    border-block-end: 1px solid var(--color-border);
+  }
+
+  .app-sidebar a {
+    display: inline-block;
+  }
+
+  .app-main {
+    padding: var(--space-6) var(--space-4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-sidebar a {
+    transition: none;
+  }
+}
