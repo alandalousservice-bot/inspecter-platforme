@@ -6,10 +6,12 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "tsc",
+    "test": "npm run build && node --test test/*.test.mjs",
     "start": "node dist/main.js"
   },
   "dependencies": {
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "@types/express": "^5.0.0"

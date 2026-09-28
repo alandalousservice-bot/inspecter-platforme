@@ -20,7 +20,7 @@ G0: Master/audit/contracts متسقة؛ TASK-000 مكتمل؛ لا تفتح feat
 | TASK-010 COMPLETED | Bootstrap TypeScript workspace، scripts/typecheck/lint/build/CI | G0؛ root config, `packages/web`, `packages/api` | clean install/build/typecheck/lint succeeds؛ smoke | feature code؛ G1 |
 | TASK-011 COMPLETED | Shared design tokens وRTL shell | 010؛ `packages/web/src/ui`, styles | Arabic/RTL base، token roles، focus states؛ visual/keyboard | branding نهائي؛ G1 |
 | TASK-012 COMPLETED | Shared Button/Input/Card/Dialog/State/Table primitives | 011؛ `packages/web/src/ui` | variants/states accessible، no feature colors؛ component/UI tests | feature screens؛ G1 |
-| TASK-013 | API skeleton, requestId, error envelope, Zod boundary | 010؛ `src/server/http`, shared schemas | contract errors, health, no PII logs؛ API tests | business endpoints؛ G1 |
+| TASK-013 COMPLETED | API skeleton, requestId, error envelope, Zod boundary | 010؛ `packages/api/src/http`, shared schemas | contract errors, health, no PII logs؛ API tests | business endpoints؛ G1 |
 
 G1: build/typecheck/lint وRTL/keyboard baseline وAPI error tests ناجحة.
 

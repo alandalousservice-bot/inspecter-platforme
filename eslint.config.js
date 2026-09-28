@@ -5,4 +5,10 @@ export default tseslint.config(
   { ignores: ['**/dist/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  {
+    files: ['packages/api/test/**/*.mjs'],
+    languageOptions: {
+      globals: { fetch: 'readonly' },
+    },
+  },
 );

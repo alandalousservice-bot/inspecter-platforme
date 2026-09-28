@@ -1,6 +1,5 @@
-import express from 'express';
+import { createApp } from './app.js';
 
-const app = express();
 const port = Number(process.env.PORT ?? 3001);
 
-app.listen(port);
+createApp().listen(port);
