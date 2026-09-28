@@ -28,9 +28,9 @@ G1: build/typecheck/lint وRTL/keyboard baseline وAPI error tests ناجحة.
 
 | ID | Objective; Scope | Dependencies; Expected areas | Acceptance Criteria; Tests | Out of Scope; Gate |
 |---|---|---|---|---|
-| TASK-020 | Migration District/Inspector/Membership/Session | G1؛ `prisma`, identity | FK/index/clean migration؛ DB integration | teacher account؛ G2 |
-| TASK-021 | Login/logout/session revoke/CSRF | 020,013؛ identity routes/client login | cookie flags, revoke, failures؛ integration/E2E | OAuth؛ G2 |
-| TASK-022 | District scope policy helper + denial tests | 021؛ server policy | cross-district 404/403 appropriately؛ integration | broad RBAC UI؛ G2 |
+| TASK-020 COMPLETED | Migration District/Inspector/Membership/Session | G1؛ `prisma`, identity | FK/index/clean migration؛ DB integration | teacher account؛ G2 |
+| TASK-021 COMPLETED | Login/logout/session revoke/CSRF | 020,013؛ identity routes/client login | fixed 8h ACTIVE-only sessions, CSRF, cookie flags and logout; isolated DB integration + UI tests | OAuth؛ G2 |
+| TASK-022 COMPLETED | District scope policy helper + Inspector membership date/overlap constraints | 021؛ server policy, Prisma migration | current membership scope; cross-district 404; history/overlap integration tests PASS | broad RBAC UI, Teacher transfer؛ G2 |
 | TASK-023 | Migration Institution + scoped list/create | 022؛ prisma/institutions | q/pagination/validation; integration | bulk geo import؛ G2 |
 | TASK-024 | Institution list/form UI | 023,012؛ client institutions | RTL states and CRUD per API; UI/E2E | map integration؛ G2 |
 | TASK-025 | AuditLog migration + append service | 020؛ prisma/audit | sensitive action logged transactionally, redaction; integration | analytics log pipeline؛ G2 |

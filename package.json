@@ -9,6 +9,7 @@
     "lint": "eslint packages",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
+    "test:db": "npm run test:db --workspace @inspector/api",
     "smoke": "node --test tests/smoke.test.mjs"
   },
   "devDependencies": {

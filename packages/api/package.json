@@ -7,13 +7,16 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc",
     "test": "npm run build && node --test test/*.test.mjs",
+    "test:db": "npm run build && node --test --test-concurrency=1 test/task020-db.integration.mjs test/task021-auth.integration.mjs test/task022-policy.integration.mjs",
     "start": "node dist/main.js"
   },
   "dependencies": {
+    "@prisma/client": "6.12.0",
     "express": "^5.1.0",
     "zod": "^4.1.12"
   },
   "devDependencies": {
-    "@types/express": "^5.0.0"
+    "@types/express": "^5.0.0",
+    "prisma": "6.12.0"
   }
 }

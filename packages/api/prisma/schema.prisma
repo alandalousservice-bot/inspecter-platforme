@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model District {
+  id           String                        @id @default(uuid()) @db.Uuid
+  name         String
+  externalCode String?
+  createdAt    DateTime                      @default(now())
+  updatedAt    DateTime                      @updatedAt
+  memberships  InspectorDistrictMembership[]
+}
+
+model Inspector {
+  id           String                        @id @default(uuid()) @db.Uuid
+  email        String                        @unique
+  passwordHash String
+  status       String
+  createdAt    DateTime                      @default(now())
+  updatedAt    DateTime                      @updatedAt
+  memberships  InspectorDistrictMembership[]
+  sessions     Session[]
+}
+
+model InspectorDistrictMembership {
+  id          String    @id @default(uuid()) @db.Uuid
+  inspectorId String    @db.Uuid
+  districtId  String    @db.Uuid
+  role        String
+  validFrom   DateTime
+  validTo     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  inspector   Inspector @relation(fields: [inspectorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  district    District  @relation(fields: [districtId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([inspectorId])
+  @@index([districtId])
+}
+
+model Session {
+  id          String    @id @default(uuid()) @db.Uuid
+  inspectorId String    @db.Uuid
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  inspector   Inspector @relation(fields: [inspectorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([inspectorId])
+}

@@ -24,8 +24,22 @@
 | ADR-018 | REJECTED | نسخ teacher-as-user وteacher.schoolId الوحيد من ArenaSPEX؛ يخالف Master ويكسر التاريخ والصلاحيات |
 | ADR-019 | REJECTED | بناء Windows/Mobile/offline sync في MVP؛ كلفة ومخاطر قبل ثبات API |
 | ADR-020 | REJECTED | استيراد مواد ArenaSPEX باعتبارها «رسمية» دون provenance مستقل؛ خطر دقة وحقوق |
+| ADR-021 | ACCEPTED | مدة Session في MVP ثابتة 8 ساعات من `createdAt`؛ `expiresAt = createdAt + 8h`، بلا sliding expiration أو Remember Me، والـcookie لا تتجاوز `expiresAt` |
+| ADR-022 | ACCEPTED | حالات Inspector المسموحة للمصادقة `ACTIVE/INACTIVE`؛ ACTIVE فقط ينشئ Session أو يستخدمها، وINACTIVE لا يؤدي إلى bulk revocation ضمن TASK-021 |
+| ADR-023 | ACCEPTED | InspectorDistrictMembership تاريخية بفترات `[validFrom, validTo)`؛ يسمح بتكرار Inspector/District تاريخيًا ويمنع تداخل فترتين لهما بقيد DB؛ NULL نهاية مفتوحة، ولا يفرض حصرية District للمفتش |
 
 الأمور OPEN لا توقف المهام التي تقتصر على foundations ولا تخمّن ما وراءها. [IMPLEMENTATION_PLAN](IMPLEMENTATION_PLAN.md) يحدد gates التي تحتاجها.
+
+### ADR-023 — Inspector ↔ District membership policy
+
+القرار المعتمد:
+
+1. `InspectorDistrictMembership` سجل تاريخي مؤرخ، و`validFrom` إلزامي.
+2. `validTo = NULL` تعني فترة عضوية مفتوحة حاليًا؛ وعند وجودها لا يجوز أن تسبق `validFrom`.
+3. الفترات نصف مفتوحة `[validFrom, validTo)`؛ يسمح بأكثر من سجل تاريخي لنفس Inspector وDistrict إذا لم تتداخل الفترات.
+4. يمنع تداخل فترتين للزوج نفسه بقيد قاعدة بيانات، لا بـ`unique(inspectorId, districtId)`؛ وعند انتهاء التكليف يُغلق السجل بـ`validTo` ولا يُحذف.
+5. لا يمنع إسناد Inspector إلى Districts متعددة في الفترة نفسها.
+6. نقل Teacher بين districts خارج هذا القرار وScope التنفيذ؛ ADR-017 يبقى OPEN.
 
 ## TASK-001 — سجل مراجعة G0
 

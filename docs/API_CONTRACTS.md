@@ -6,7 +6,9 @@ HTTP JSON `/api/v1`. هذه عقود الموارد والسلوك؛ schemas ا�
 
 نجاح القراءة: `{data, page?: {limit,nextCursor,total?}}`. خطأ: `{error:{code,message,fields?,requestId}}` بلا بيانات شخصية في الرسائل العامة. القائمة `limit` افتراضي 25 وأقصى 100، cursor ثابت وsort allowlist، query `q` مطبّع محدود الطول. رموز: 400 validation، 401 unauthenticated، 403 forbidden، 404 not found within authorized scope (لا يكشف cross-district)، 409 state conflict، 429 rate limit، 500 generic. جميع mutations المسجلة تحمل requestId؛ `Idempotency-Key` مطلوب لقبول submission وللعمليات القابلة للتكرار.
 
-جلسة المفتش في cookie آمنة HttpOnly/Secure/SameSite؛ `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`. CSRF token لطلبات mutation ذات cookie. فحص district membership وملكية كل مورد في service. لا JWT/teacher session ولا endpoints عامة لملفات Teacher. حماية public intake من spam بمحدد معدل ووسيلة تحدٍ قابلة للضبط؛ لا تعرض duplicate candidates للمُرسل.
+جلسة المفتش في cookie آمنة `HttpOnly`, و`Secure` في production، و`SameSite=Strict`. يقبل `POST /auth/login` جسم `{email,password}`؛ الحساب `ACTIVE` فقط يستطيع الدخول. تنشأ Session ثابتة لمدة 8 ساعات من `createdAt` (`expiresAt = createdAt + 8h`) دون sliding expiration أو Remember Me، وعمر cookie لا يتجاوز `expiresAt`. يخزن الخادم hashًا لرمز الجلسة مع `tokenHash` فريد؛ `GET /auth/me` يتحقق من عدم انتهاء الجلسة أو إبطالها ومن بقاء Inspector بحالة `ACTIVE`. `POST /auth/logout` يبطل الجلسة الحالية فقط.
+
+تتطلب cookie mutations قيمة CSRF في cookie `inspector_csrf` ورأس `X-CSRF-Token` مطابق. `GET /auth/me` غير المصادق عليه يهيئ CSRF cookie ثم يعيد 401؛ بعد login ترتبط قيمة CSRF بالجلسة. لا تميّز ردود فشل login بين حساب مفقود أو كلمة مرور خاطئة أو حساب `INACTIVE`. فحص district membership وملكية كل مورد في service. لا JWT/teacher session ولا endpoints عامة لملفات Teacher. حماية public intake من spam بمحدد معدل ووسيلة تحدٍ قابلة للضبط؛ لا تعرض duplicate candidates للمُرسل.
 
 ## الموارد
 
