@@ -23,6 +23,8 @@ build/
 coverage/
 out/
 .cache/
+playwright-report/
+test-results/
 
 # Dependency directories (stack-agnostic)
 node_modules/

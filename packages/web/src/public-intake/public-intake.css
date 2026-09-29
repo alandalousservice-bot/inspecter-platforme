@@ -1,0 +1,119 @@
+.public-intake-page {
+  min-height: 100vh;
+  padding: var(--space-6) var(--space-4);
+  background: var(--color-canvas);
+}
+
+.public-intake-card {
+  width: min(100%, 56rem);
+  margin-inline: auto;
+}
+
+.public-intake-heading {
+  display: grid;
+  gap: var(--space-2);
+  margin-block-end: var(--space-6);
+}
+
+.public-intake-heading h1,
+.public-intake-heading p,
+.public-intake-success h1,
+.public-intake-success p {
+  margin: 0;
+}
+
+.public-intake-heading h1,
+.public-intake-success h1 {
+  font-size: var(--font-size-page);
+}
+
+.public-intake-heading p,
+.public-intake-fieldset-hint,
+.public-intake-eyebrow {
+  color: var(--color-text-muted);
+}
+
+.public-intake-eyebrow {
+  margin: 0;
+  font-size: var(--font-size-small);
+}
+
+.public-intake-form {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.public-intake-form fieldset {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+.public-intake-form legend {
+  padding-inline: var(--space-2);
+  font-size: var(--font-size-card);
+  font-weight: 700;
+}
+
+.public-intake-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.public-intake-grid__wide {
+  grid-column: 1 / -1;
+}
+
+.public-intake-fieldset-hint {
+  margin: 0;
+}
+
+.public-intake-textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+
+.public-intake-additional {
+  display: flex;
+  align-items: end;
+  gap: var(--space-3);
+}
+
+.public-intake-additional .ui-field {
+  flex: 1;
+}
+
+.public-intake-error {
+  padding: var(--space-3);
+  border-inline-start: 0.25rem solid var(--color-danger);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-danger);
+}
+
+.public-intake-success {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-inline-start: 0.25rem solid var(--color-success);
+}
+
+@media (max-width: 42rem) {
+  .public-intake-page {
+    padding: var(--space-4) var(--space-3);
+  }
+
+  .public-intake-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .public-intake-additional {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

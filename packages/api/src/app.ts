@@ -1,14 +1,19 @@
-import express, { type Express } from 'express';
+import express, { type Express, type RequestHandler } from 'express';
 import { errorHandler } from './http/error-handler.js';
 import { ApiError } from './http/api-error.js';
 import { requestIdMiddleware } from './http/request-id.js';
+import { createPublicSubmissionRateLimiter } from './intake/rate-limit.js';
 
 export type RouteRegistrar = (app: Express) => void;
 
-export function createApp(registerRoutes?: RouteRegistrar): Express {
+export function createApp(
+  registerRoutes?: RouteRegistrar,
+  options: { publicSubmissionRateLimiter?: RequestHandler } = {},
+): Express {
   const app = express();
   app.disable('x-powered-by');
   app.use(requestIdMiddleware);
+  app.use(options.publicSubmissionRateLimiter ?? createPublicSubmissionRateLimiter());
   app.use(express.json({ limit: '32kb' }));
 
   app.get('/api/v1/health', (_request, response) => {

@@ -172,7 +172,7 @@ test('TASK-023 migration chain installs Institution fields, FK and district/name
   const fks = await db.$queryRaw`SELECT confdeltype, confupdtype FROM pg_catalog.pg_constraint WHERE conrelid=to_regclass(${`${schemaName}."Institution"`}) AND contype='f'`;
   assert.deepEqual(fks.map(({ confdeltype, confupdtype }) => ({ confdeltype, confupdtype })), [{ confdeltype: 'r', confupdtype: 'c' }]);
   const history = await db.$queryRawUnsafe(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL)::int AS applied FROM "${schemaName}"."_prisma_migrations"`);
-  assert.deepEqual(history[0], { total: 4, applied: 4 });
+  assert.deepEqual(history[0], { total: 6, applied: 6 });
 });
 
 test('authenticated District context returns only current memberships for the session owner', async () => {

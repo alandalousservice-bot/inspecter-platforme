@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api/v1': 'http://127.0.0.1:3001',
+      '/api/v1': process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:3001',
     },
   },
 });

@@ -1,0 +1,45 @@
+.submission-decision {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-4);
+}
+
+.submission-decision__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.submission-decision__advisory,
+.submission-decision__dialog-advisory {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-inline-start-width: 0.25rem;
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.submission-decision__dialog-advisory {
+  margin-block-start: var(--space-3);
+}
+
+@media (max-width: 40rem) {
+  .submission-decision__actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .submission-decision__actions > button {
+    width: 100%;
+  }
+
+  .submission-decision .ui-dialog__actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .submission-decision .ui-dialog__actions > button {
+    width: 100%;
+  }
+}

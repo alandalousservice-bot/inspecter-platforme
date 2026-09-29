@@ -127,6 +127,11 @@
   font-size: var(--font-size-card);
 }
 
+.ui-dialog__description {
+  margin: 0;
+  line-height: var(--line-height-body);
+}
+
 .ui-card__description {
   margin: var(--space-2) 0 0;
   color: var(--color-text-muted);

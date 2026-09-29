@@ -41,14 +41,18 @@ G2: scoped auth, institution CRUD, audit tests and migration check pass.
 
 | ID | Objective; Scope | Dependencies; Expected areas | Acceptance Criteria; Tests | Out of Scope; Gate |
 |---|---|---|---|---|
-| TASK-030 | TeacherSubmission migration/public POST with rate limit | G2 + ADR-015 for required fields؛ prisma/intake | 202 receipt, no lookup/leak, input limits; abuse/integration | teacher creation؛ G3 |
-| TASK-031 | Public form RTL + receipt state | 030,012؛ client/public | validation, submit/loading/error/success; E2E | teacher login؛ G3 |
-| TASK-032 | Inspector submissions list/detail and duplicate candidates | 030,022؛ server/intake | scoped list, candidates only inspector, no merge; integration | auto decision؛ G3 |
-| TASK-033 | Review UI with explicit decision confirmation | 032； client/intake | statuses, candidate warning, 409 feedback; UI/E2E | mass approval؛ G3 |
-| TASK-034 | Teacher migration + atomic accept/reject/internal review | 032,025； prisma/intake/teacher | one teacher for accepted request, audit, concurrency safe; integration | assignment creation؛ G3 |
-| TASK-035 | Teacher profile GET/PATCH + read UI | 034； server/teacher, client/teacher | district scope, history visible, fields contract; integration/UI | formal fields not approved؛ G3 |
+| TASK-030 COMPLETED | TeacherSubmission migration/public POST with rate limit | G2 + ADR-015 for required fields؛ prisma/intake | 202 receipt, no lookup/leak, input limits; abuse/integration؛ clean isolated migration + all TASK-030 checks PASS | teacher creation؛ G3 |
+| TASK-031 COMPLETED | Public form RTL + receipt state | 030,012؛ client/public | validation, submit/loading/error/success; E2E | teacher login؛ G3 |
+| TASK-032 COMPLETED | Inspector submissions list/detail and duplicate candidates | 030,022؛ server/intake + client/intake | scoped list, candidates only inspector, no merge; unit/UI/integration PASS | auto decision؛ G3 |
+| TASK-033 COMPLETED | Reusable review decision UI/client contract; explicit confirmations | 032,026； client/intake | status/action matrix, duplicate warning, 409 feedback, component/UI tests PASS | no production activation before TASK-034; no mass approval؛ G3 |
+| TASK-034 COMPLETED | Teacher migration + decision API + atomic accept/reject/internal review; integrate/enable TASK-033 controls | 032,025,026,027؛ prisma/intake/teacher + client integration | Teacher mapping/nullable fields and one Teacher on accept، exact transitions، `409` stale/repeated/concurrent، audit rollback، DB/API integration؛ remove TASK-033 client's ACCEPT `Idempotency-Key` header؛ isolated clean migration, integration/UI/regression PASS | no Assignment/Institution creation, idempotency storage/replay, Teacher profile CRUD or Teacher duplicate-comparison engine؛ G3 |
+| TASK-035 COMPLETED | Teacher profile GET/PATCH + Arabic RTL read/edit UI؛ رابط من تفصيل الطلب المقبول | 034,027,028؛ server/teacher، authorized submission detail، client/teacher | current district scope، exact profile/declared-intake read model، strict partial PATCH/null/date/contact rules، audit rollback، source snapshot unchanged؛ DB/API/UI + G3 flow | Teacher list/search (044/045)، status/archive/transfer/assignment/visit، migration؛ G3 |
 
-G3: public→review→accept E2E، race/duplicate/privacy checks pass. Tasks 030/035 wait for relevant OPEN fields if required.
+G3: **CLOSED / PASS** بعد نجاح `npm run e2e:g3` في Chromium: browser → Vite web → local API → PostgreSQL المعزولة، على schema مؤقتة تطبق migration chain وتُحذف بعد التشغيل. غطى التدفق الإرسال العام، دخول المفتش ومراجعة الطلب والتنبيه غير الحاجب للتشابه، القبول وإنشاء Teacher واحد، فتح الملف وتعديله وتحقق audit وثبات snapshot وإعادة التحميل، ثم الرفض والإحالة للمراجعة الداخلية فالقبول. كما نجحت اختبارات regression بما فيها 72 قاعدة بيانات/تكاملية. TASK-030/031/032/033/034/035 تبقى COMPLETED؛ لا يغيّر ذلك حدود TASK-040 أو أي قرار منتج. `DECISION_UI_RELEASE_GATE = OPEN` مستقل عن G3 ولا يُغلق بهذا الدليل. عقد PATCH في [API_CONTRACTS](API_CONTRACTS.md#teacher-profile-task-035).
+
+TASK-034 migration محدودة بجدول Teacher وعلاقته بـDistrict وFK/uniqueness لرابط `TeacherSubmission.acceptedTeacherId` والفهارس اللازمة للنطاق؛ لم تُعدّل migrations سابقة ولم يُضف جدول idempotency أو مجالات مستقبلية. مصدر المقارنة الحالي في ADR-011 يبقى الطلبات `PENDING/INTERNAL_REVIEW`؛ المقبول مستبعد، وإضافة Teacher إلى مرشحي التشابه تحتاج مهمة وعقد قراءة مستقلين حتى لا يظهر المصدر ونتيجته مرتين. TASK-035 يملك GET/PATCH وواجهة الملف، لا TASK-034؛ `districtId` غير قابل للتعديل والتصريحات المؤسسية سياق intake للقراءة فقط إن عُرضت، وتُحسم حقول PATCH الدقيقة قبل التنفيذ.
+
+ADR-015 ACCEPTED: قرار Product Owner لحقول public intake والتوجيه والتحقق والتكرار والتصحيح وحدود إدخال MVP موثق في [DECISIONS](DECISIONS.md#adr-015--public-teacher-intake-fields-and-handling) و[API_CONTRACTS](API_CONTRACTS.md#public-teacher-intake-task-030). TASK-030 اكتملت بعد clean isolated migration وكل التحققات، وTASK-031 اكتملت كواجهة عامة؛ لا يعني ذلك إغلاق G3. يُراجع مسار مطابقة/اعتماد أسماء المؤسسات المعلنة قبل TASK-034/TASK-040 دون تغيير نطاقهما الآن.
 
 ## Phase 4 — assignments, schedule, search gate G4
 

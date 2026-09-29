@@ -18,6 +18,10 @@ Stack المفضل: TypeScript؛ React + Vite + React Router للواجهة؛ Ex
 
 `public form → intake API → TeacherSubmission PENDING → inspector review → transaction creates Teacher/decision/audit`.
 
+Public intake هو قناة جمع أولية scoped بمقاطعة المسار؛ بياناته غير متحقق منها ولا تنشئ Teacher أو Institution أو Assignment قبل قرار المفتش. تحفظ أسماء المؤسسات كتصريحات نصية فقط، ولا تكشف route العام PII أو duplicate candidates أو حالة الطلب؛ قرار المفتش ينشئ Teacher عند القبول لاحقًا. حماية abuse تشمل strict validation وحدود إدخال وrate limiting configurable. [ADR-015](DECISIONS.md#adr-015--public-teacher-intake-fields-and-handling).
+
+TASK-030 يفترض نسخة API واحدة؛ محدد المعدل في الذاكرة (10 طلبات/IP/15 دقيقة) يُصفّر عند إعادة التشغيل. قبل نشر عدة نسخ يلزم محدد معدل مشترك أو موثوق على الحافة؛ لا Redis في MVP. في production يُضبط `TRUSTED_CLIENT_IP_SOURCE=cloudflare` ويُستخدم `CF-Connecting-IP` فقط مع قصر الوصول على ingress الموثوق؛ `X-Forwarded-For` غير موثوق. التفاصيل في [API](API_CONTRACTS.md#public-teacher-intake-task-030).
+
 `inspector UI → authenticated API → domain service + policy check → Prisma → PostgreSQL`؛ الاستعلامات والتصفية والتجميع على الخادم. الوحدات: identity/district؛ intake؛ teacher/institution/assignment؛ schedule؛ visit/report/follow-up؛ pedagogy reference؛ inspector proposals؛ dashboard/read models؛ files/print؛ audit. كل وحدة تملك قواعدها؛ يجوز API مشترك دون وصل نماذج الواجهة مباشرة بقاعدة البيانات. الوثائق الرسمية read-only/reference ولا تتحول إلى اقتراحات إلا بنسخة منفصلة ذات provenance. نموذج LessonMemoTemplate داخل proposals، بلا FK إلى زيارة أو تقرير.
 
 ## أمن وتطور

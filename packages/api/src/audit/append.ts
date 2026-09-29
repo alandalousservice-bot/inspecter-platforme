@@ -5,6 +5,7 @@ export const AuditAction = {
   TEACHER_SUBMISSION_ACCEPTED: 'TEACHER_SUBMISSION_ACCEPTED',
   TEACHER_SUBMISSION_REJECTED: 'TEACHER_SUBMISSION_REJECTED',
   TEACHER_SUBMISSION_INTERNAL_REVIEW: 'TEACHER_SUBMISSION_INTERNAL_REVIEW',
+  TEACHER_PROFILE_UPDATED: 'TEACHER_PROFILE_UPDATED',
   INSPECTION_REPORT_FINALIZED: 'INSPECTION_REPORT_FINALIZED',
   FOLLOW_UP_STATE_CHANGED: 'FOLLOW_UP_STATE_CHANGED',
   INSPECTOR_PROPOSAL_CREATED: 'INSPECTOR_PROPOSAL_CREATED',
@@ -20,6 +21,13 @@ const eventContracts = {
   },
   [AuditAction.TEACHER_SUBMISSION_REJECTED]: { entityType: 'TeacherSubmission', metadata: z.object({}).strict() },
   [AuditAction.TEACHER_SUBMISSION_INTERNAL_REVIEW]: { entityType: 'TeacherSubmission', metadata: z.object({}).strict() },
+  [AuditAction.TEACHER_PROFILE_UPDATED]: {
+    entityType: 'Teacher',
+    metadata: z.object({ changedFields: z.array(z.enum([
+      'name', 'surname', 'birthDate', 'placeOfBirth', 'phone', 'email',
+      'professionalStatus', 'employedAt', 'confirmedAt', 'qualifications',
+    ])).min(1) }).strict(),
+  },
   [AuditAction.INSPECTION_REPORT_FINALIZED]: { entityType: 'InspectionReport', metadata: z.object({}).strict() },
   [AuditAction.FOLLOW_UP_STATE_CHANGED]: { entityType: 'FollowUp', metadata: z.object({}).strict() },
   [AuditAction.INSPECTOR_PROPOSAL_CREATED]: { entityType: 'InspectorProposal', metadata: z.object({}).strict() },

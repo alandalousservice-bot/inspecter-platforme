@@ -1,3 +1,5 @@
+import { isDecisionAllowed } from '../submissions/decision-policy';
+
 export type InspectorIdentity = { id: string; email: string };
 export type DistrictOption = { id: string; name: string };
 export type Institution = {
@@ -10,11 +12,76 @@ export type Institution = {
   updatedAt: string;
 };
 export type InstitutionPage = { limit: number; nextCursor: string | null; total: number };
+export type SubmissionStatus = 'PENDING' | 'INTERNAL_REVIEW' | 'ACCEPTED' | 'REJECTED';
+export type SubmissionDecisionAction = 'ACCEPT' | 'REJECT' | 'INTERNAL_REVIEW';
+export type SubmissionDecisionStatus = Extract<SubmissionStatus, 'PENDING' | 'INTERNAL_REVIEW'>;
+export type SubmissionDecisionResult = {
+  id: string;
+  status: Extract<SubmissionStatus, 'ACCEPTED' | 'REJECTED' | 'INTERNAL_REVIEW'>;
+};
+export type SubmissionListItem = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
+  submittedAt: string;
+  primaryInstitutionName: string;
+  status: SubmissionStatus;
+  hasPotentialDuplicates: boolean;
+};
+export type SubmissionPage = { limit: number; nextCursor: string | null; total: number };
+export type SubmissionProfile = {
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
+  placeOfBirth: string;
+  phone: string;
+  email: string;
+  professionalStatus: string;
+  employmentDate: string;
+  confirmationDate?: string;
+  qualifications?: string;
+  notes?: string;
+  primaryInstitutionName: string;
+  additionalInstitutionNames?: string[];
+};
+export type DuplicateReason = 'SAME_PHONE' | 'SAME_EMAIL' | 'SAME_NAME_AND_DOB';
+export type PotentialDuplicate = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
+  placeOfBirth: string;
+  status: SubmissionStatus;
+  submittedAt: string;
+  matchReasons: DuplicateReason[];
+};
+export type SubmissionDetail = {
+  id: string;
+  districtId: string;
+  status: SubmissionStatus;
+  submittedAt: string;
+  submittedProfile: SubmissionProfile;
+  potentialDuplicates: PotentialDuplicate[];
+  acceptedTeacherId: string | null;
+};
+
+export type TeacherProfile = {
+  id: string; districtId: string; name: string; surname: string;
+  birthDate: string | null; placeOfBirth: string | null; phone: string | null;
+  email: string | null; professionalStatus: string | null; employedAt: string | null;
+  confirmedAt: string | null; qualifications: string | null;
+  recordStatus: string; archivedAt: string | null; createdAt: string; updatedAt: string;
+  declaredInstitutions: { primaryInstitutionName: string; additionalInstitutionNames: string[] } | null;
+};
+export type TeacherProfilePatch = Partial<Pick<TeacherProfile,
+  'name' | 'surname' | 'birthDate' | 'placeOfBirth' | 'phone' | 'email'
+  | 'professionalStatus' | 'employedAt' | 'confirmedAt' | 'qualifications'>>;
 
 type ApiFailure = { error?: { message?: string; fields?: Record<string, string[]> } };
 
 export class ApiRequestError extends Error {
-  constructor(message: string, readonly fields?: Record<string, string[]>) {
+  constructor(message: string, readonly fields?: Record<string, string[]>, readonly status?: number) {
     super(message);
     this.name = 'ApiRequestError';
   }
@@ -46,7 +113,7 @@ async function readFailure(response: Response): Promise<never> {
   } catch {
     // Keep transport/parser details out of the UI.
   }
-  throw new ApiRequestError(body?.error?.message ?? 'تعذر إكمال الطلب.', body?.error?.fields);
+  throw new ApiRequestError(body?.error?.message ?? 'تعذر إكمال الطلب.', body?.error?.fields, response.status);
 }
 
 export async function login(email: string, password: string): Promise<InspectorIdentity> {
@@ -109,4 +176,70 @@ export async function createInstitution(input: { districtId: string; name: strin
   });
   if (!response.ok) return readFailure(response);
   return response.json() as Promise<{ data: Institution }>;
+}
+
+export async function listSubmissions(options: {
+  q?: string;
+  status?: SubmissionStatus;
+  districtId?: string;
+  cursor?: string;
+  limit?: number;
+} = {}) {
+  const query = new URLSearchParams();
+  if (options.q) query.set('q', options.q);
+  if (options.status) query.set('status', options.status);
+  if (options.districtId) query.set('districtId', options.districtId);
+  if (options.cursor) query.set('cursor', options.cursor);
+  query.set('limit', String(options.limit ?? 25));
+  const response = await fetch(`/api/v1/submissions?${query}`, { credentials: 'same-origin' });
+  if (!response.ok) return readFailure(response);
+  return response.json() as Promise<{ data: SubmissionListItem[]; page: SubmissionPage }>;
+}
+
+export async function getSubmission(id: string) {
+  const response = await fetch(`/api/v1/submissions/${encodeURIComponent(id)}`, { credentials: 'same-origin' });
+  if (!response.ok) return readFailure(response);
+  return response.json() as Promise<{ data: SubmissionDetail }>;
+}
+
+export async function getTeacherProfile(id: string): Promise<{ data: TeacherProfile }> {
+  const response = await fetch(`/api/v1/teachers/${encodeURIComponent(id)}`, { credentials: 'same-origin' });
+  if (!response.ok) return readFailure(response);
+  return response.json() as Promise<{ data: TeacherProfile }>;
+}
+
+export async function patchTeacherProfile(id: string, patch: TeacherProfilePatch): Promise<{ data: TeacherProfile }> {
+  const csrfToken = csrfCookie();
+  if (!csrfToken) throw new ApiRequestError('تعذر التحقق من الطلب. أعد تحميل الصفحة ثم حاول مجددًا.');
+  const response = await fetch(`/api/v1/teachers/${encodeURIComponent(id)}`, {
+    method: 'PATCH', credentials: 'same-origin',
+    headers: { 'content-type': 'application/json', 'x-csrf-token': csrfToken },
+    body: JSON.stringify(patch),
+  });
+  if (!response.ok) return readFailure(response);
+  return response.json() as Promise<{ data: TeacherProfile }>;
+}
+
+export async function decideSubmission(input: {
+  id: string;
+  action: SubmissionDecisionAction;
+  expectedStatus: SubmissionDecisionStatus;
+}): Promise<{ data: SubmissionDecisionResult }> {
+  if (!isDecisionAllowed(input.expectedStatus, input.action)) {
+    throw new ApiRequestError('لا يمكن تنفيذ هذا القرار للحالة الحالية.');
+  }
+  const csrfToken = csrfCookie();
+  if (!csrfToken) throw new ApiRequestError('تعذر التحقق من الطلب. أعد تحميل الصفحة ثم حاول مجددًا.');
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+    'x-csrf-token': csrfToken,
+  };
+  const response = await fetch(`/api/v1/submissions/${encodeURIComponent(input.id)}/decision`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers,
+    body: JSON.stringify({ action: input.action, expectedStatus: input.expectedStatus }),
+  });
+  if (!response.ok) return readFailure(response);
+  return response.json() as Promise<{ data: SubmissionDecisionResult }>;
 }

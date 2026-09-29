@@ -1,0 +1,7 @@
+.teacher-profile { display: grid; gap: var(--space-4); min-width: 0; }
+.teacher-profile__facts, .teacher-profile__form { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: var(--space-4); }
+.teacher-fact { min-width: 0; overflow-wrap: anywhere; }
+.teacher-fact dt { color: var(--color-text-muted); }
+.teacher-fact dd { margin: 0; }
+.teacher-profile__field { min-width: 0; display: grid; gap: var(--space-2); align-content: start; }
+.teacher-profile__actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }

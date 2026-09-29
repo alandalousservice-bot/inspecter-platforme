@@ -16,18 +16,21 @@ model District {
   memberships  InspectorDistrictMembership[]
   institutions Institution[]
   auditEvents  AuditLog[]
+  submissions  TeacherSubmission[]
+  teachers     Teacher[]
 }
 
 model Inspector {
-  id           String                        @id @default(uuid()) @db.Uuid
-  email        String                        @unique
-  passwordHash String
-  status       String
-  createdAt    DateTime                      @default(now())
-  updatedAt    DateTime                      @updatedAt
-  memberships  InspectorDistrictMembership[]
-  sessions     Session[]
-  auditEvents  AuditLog[]
+  id                 String                        @id @default(uuid()) @db.Uuid
+  email              String                        @unique
+  passwordHash       String
+  status             String
+  createdAt          DateTime                      @default(now())
+  updatedAt          DateTime                      @updatedAt
+  memberships        InspectorDistrictMembership[]
+  sessions           Session[]
+  auditEvents        AuditLog[]
+  decidedSubmissions TeacherSubmission[]           @relation("TeacherSubmissionDecider")
 }
 
 model InspectorDistrictMembership {
@@ -70,6 +73,45 @@ model Institution {
   district     District @relation(fields: [districtId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([districtId, name])
+}
+
+model TeacherSubmission {
+  id                   String     @id @default(uuid()) @db.Uuid
+  districtId           String     @db.Uuid
+  submittedProfile     Json
+  status               String     @default("PENDING")
+  submittedAt          DateTime   @default(now())
+  decidedAt            DateTime?
+  decidedByInspectorId String?    @db.Uuid
+  acceptedTeacherId    String?    @unique @db.Uuid
+  district             District   @relation(fields: [districtId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  decidedByInspector   Inspector? @relation("TeacherSubmissionDecider", fields: [decidedByInspectorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  acceptedTeacher      Teacher?    @relation("AcceptedSubmission", fields: [acceptedTeacherId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([districtId, status, submittedAt])
+}
+
+model Teacher {
+  id                 String             @id @default(uuid()) @db.Uuid
+  districtId         String             @db.Uuid
+  name               String
+  surname            String
+  birthDate          DateTime?          @db.Date
+  placeOfBirth       String?
+  phone              String?
+  email              String?
+  professionalStatus String?
+  employedAt         DateTime?          @db.Date
+  confirmedAt        DateTime?          @db.Date
+  qualifications     String?
+  recordStatus       String             @default("ACTIVE")
+  archivedAt         DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  district           District           @relation(fields: [districtId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  acceptedSubmission TeacherSubmission? @relation("AcceptedSubmission")
+
+  @@index([districtId, surname, name, recordStatus])
 }
 
 model AuditLog {

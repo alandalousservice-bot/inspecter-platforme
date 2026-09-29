@@ -16,6 +16,7 @@ export function AppShell({ children, headerAction }: AppShellProps) {
       <div className="app-shell__body">
         <aside className="app-sidebar">
           <nav aria-label="التنقل الرئيسي">
+            <NavLink to="/app/submissions">طلبات الأساتذة</NavLink>
             <NavLink to="/app/institutions">المؤسسات</NavLink>
           </nav>
         </aside>

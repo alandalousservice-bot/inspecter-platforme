@@ -81,6 +81,10 @@ function requireCsrf(request: Request, sessionToken?: string): void {
   }
 }
 
+export function requireAuthenticatedMutationCsrf(request: Request): void {
+  requireCsrf(request, readCookie(request, SESSION_COOKIE));
+}
+
 function issuePreAuthenticationCsrf(response: Response): void {
   const csrfToken = randomBytes(32).toString('base64url');
   appendCookie(response, CSRF_COOKIE, csrfToken, { path: '/', maxAgeSeconds: SESSION_TTL_MS / 1000 });
