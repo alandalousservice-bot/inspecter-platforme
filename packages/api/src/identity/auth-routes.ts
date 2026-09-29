@@ -1,5 +1,5 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import type { Express, Request, Response } from 'express';
+import type { Express, Request, Response, RequestHandler } from 'express';
 import type { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import { ApiError } from '../http/api-error.js';
@@ -17,6 +17,8 @@ const LOGIN_SCHEMA = z.object({
 }).strict();
 
 type AuthDatabase = Pick<PrismaClient, 'inspector' | 'session'>;
+
+type SessionDatabase = Pick<PrismaClient, 'session'>;
 
 function isProduction(): boolean {
   return process.env.NODE_ENV === 'production';
@@ -101,6 +103,26 @@ function issueSessionCookies(response: Response, token: string, expiresAt: Date)
 
 function unauthenticated(): ApiError {
   return new ApiError(401, 'UNAUTHENTICATED', 'تعذر تسجيل الدخول بهذه البيانات.');
+}
+
+export function requireAuthenticatedInspector(database: SessionDatabase): RequestHandler {
+  return async (request, response, next) => {
+    try {
+      const sessionToken = readCookie(request, SESSION_COOKIE);
+      if (!sessionToken || !/^[A-Za-z0-9_-]{43}$/.test(sessionToken)) throw unauthenticated();
+      const session = await database.session.findUnique({
+        where: { tokenHash: tokenHash(sessionToken) },
+        include: { inspector: true },
+      });
+      if (!session || session.revokedAt !== null || session.expiresAt.getTime() <= Date.now() || session.inspector.status !== 'ACTIVE') {
+        throw unauthenticated();
+      }
+      response.locals.inspectorId = session.inspector.id;
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
 }
 
 export function registerAuthRoutes(app: Express, database: AuthDatabase): void {

@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
+import { NavLink } from 'react-router';
 
-type AppShellProps = { children: ReactNode };
+type AppShellProps = { children: ReactNode; headerAction?: ReactNode };
 
-export function AppShell({ children }: AppShellProps) {
+export function AppShell({ children, headerAction }: AppShellProps) {
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-content">
@@ -10,13 +11,12 @@ export function AppShell({ children }: AppShellProps) {
       </a>
       <header className="app-header">
         <p className="app-header__title">منصة مفتش التربية البدنية والرياضية</p>
+        {headerAction}
       </header>
       <div className="app-shell__body">
         <aside className="app-sidebar">
           <nav aria-label="التنقل الرئيسي">
-            <a href="/" aria-current="page">
-              مساحة العمل
-            </a>
+            <NavLink to="/app/institutions">المؤسسات</NavLink>
           </nav>
         </aside>
         <main id="main-content" className="app-main" tabIndex={-1}>

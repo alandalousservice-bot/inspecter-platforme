@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
-import { Button, Card } from '../ui/index';
+import { Outlet, useNavigate } from 'react-router';
+import { Button, LoadingState } from '../ui/index';
+import { AppShell } from '../ui/AppShell';
 import { getCurrentInspector, logout } from './client';
 
 export function SessionPage() {
@@ -36,17 +37,11 @@ export function SessionPage() {
     }
   }
 
-  if (checking) return <main className="login-page" aria-busy="true">جارٍ التحقق من الجلسة…</main>;
+  if (checking) return <main className="login-page"><LoadingState label="جارٍ التحقق من الجلسة…" /></main>;
 
   return (
-    <main className="login-page" id="main-content">
-      <Card className="login-card" aria-labelledby="session-title">
-        <h1 id="session-title">تم التحقق من جلسة المفتش</h1>
-        {error ? <p role="alert">{error}</p> : null}
-        <Button type="button" disabled={submitting} onClick={() => void handleLogout()}>
-          {submitting ? 'جارٍ تسجيل الخروج…' : 'تسجيل الخروج'}
-        </Button>
-      </Card>
-    </main>
+    <AppShell headerAction={<div className="app-header__actions">{error ? <span role="alert">{error}</span> : null}<Button variant="secondary" type="button" disabled={submitting} onClick={() => void handleLogout()}>{submitting ? 'جارٍ تسجيل الخروج…' : 'تسجيل الخروج'}</Button></div>}>
+      <Outlet />
+    </AppShell>
   );
 }

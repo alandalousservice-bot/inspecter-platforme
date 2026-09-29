@@ -14,6 +14,8 @@ model District {
   createdAt    DateTime                      @default(now())
   updatedAt    DateTime                      @updatedAt
   memberships  InspectorDistrictMembership[]
+  institutions Institution[]
+  auditEvents  AuditLog[]
 }
 
 model Inspector {
@@ -25,6 +27,7 @@ model Inspector {
   updatedAt    DateTime                      @updatedAt
   memberships  InspectorDistrictMembership[]
   sessions     Session[]
+  auditEvents  AuditLog[]
 }
 
 model InspectorDistrictMembership {
@@ -54,4 +57,33 @@ model Session {
   inspector   Inspector @relation(fields: [inspectorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([inspectorId])
+}
+
+model Institution {
+  id           String   @id @default(uuid()) @db.Uuid
+  districtId   String   @db.Uuid
+  name         String
+  externalCode String?
+  archivedAt   DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  district     District @relation(fields: [districtId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([districtId, name])
+}
+
+model AuditLog {
+  id               String    @id @default(uuid()) @db.Uuid
+  actorInspectorId String?   @db.Uuid
+  districtId       String?   @db.Uuid
+  action           String
+  entityType       String
+  entityId         String    @db.Uuid
+  occurredAt       DateTime  @default(now())
+  requestId        String?   @db.Uuid
+  metadata         Json?
+  actorInspector   Inspector? @relation(fields: [actorInspectorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  district         District?  @relation(fields: [districtId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([districtId, occurredAt])
 }

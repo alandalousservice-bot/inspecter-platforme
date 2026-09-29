@@ -1,0 +1,102 @@
+.institutions-page {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.institutions-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.institutions-heading h1,
+.institutions-heading p {
+  margin-block: 0;
+}
+
+.institutions-heading h1 {
+  font-size: var(--font-size-page);
+}
+
+.institutions-heading p:not(.institutions-eyebrow) {
+  color: var(--color-text-muted);
+}
+
+.institutions-eyebrow {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+}
+
+.institutions-search {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) auto;
+  align-items: end;
+  gap: var(--space-3);
+}
+
+.institutions-result-count {
+  margin-block: var(--space-4);
+  color: var(--color-text-muted);
+}
+
+.institutions-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-block-start: var(--space-4);
+}
+
+.institution-form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.institution-district-summary {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.institution-district-summary span {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+}
+
+.institution-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-block-start: var(--space-2);
+}
+
+@media (max-width: 40rem) {
+  .institutions-heading {
+    display: grid;
+  }
+
+  .institutions-heading > button {
+    width: 100%;
+  }
+
+  .institutions-search {
+    grid-template-columns: 1fr;
+  }
+
+  .institutions-search > button {
+    width: 100%;
+  }
+
+  .institutions-pagination {
+    flex-wrap: wrap;
+  }
+
+  .institutions-pagination span {
+    order: -1;
+    width: 100%;
+    text-align: center;
+  }
+}

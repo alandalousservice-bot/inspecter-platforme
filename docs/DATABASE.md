@@ -28,8 +28,10 @@
 | Proposals | ProposalReferenceLink | proposalId، curriculumItemId، relation؛ المرجع لا يُعدل عبر المقترح |
 | Files | DocumentAsset | ownerKind/ownerId (allowlist وفحص service)، storageKey، MIME، size، checksum، accessClass، createdAt؛ metadata فقط، محتوى خاص خارج DB |
 | Files | DocumentExport | sourceKind/sourceId، sourceRevision، format، assetId nullable، generatedAt؛ اختياري عندما يُحفظ export فعليًا |
-| Audit | AuditLog | actorInspectorId nullable، districtId، action، entityType/id، occurredAt، requestId، minimal before/after metadata؛ append-only، لا نسخ أسرار/ملفات |
+| Audit | AuditLog | id UUID، actorInspectorId UUID nullable، districtId UUID nullable، action String، entityType String/entityId UUID، occurredAt DateTime default insertion، requestId UUID nullable، metadata JSON nullable بمخطط الحدث؛ بلا createdAt/updatedAt؛ append-only عبر الخدمة وفق ADR-025 |
 | Identity | Session | inspectorId، tokenHash، expiresAt، revokedAt، createdAt؛ server-side revocation |
+
+سياسة Institution: `archivedAt = NULL` تعني نشطة، وغير NULL تعني مؤرشفة. قوائم TASK-023 الافتراضية تستبعد المؤرشفة (بما في ذلك البحث والحساب)، مع إبقاء السجل والعلاقات. التفاصيل في [ADR-024](DECISIONS.md#adr-024--institution-archive-list-policy).
 
 العدد 24 يشمل foundations مؤجلة التنفيذ وفق الخطة، ولا يعني إنشاء كل الجداول في migration واحدة. `WeeklySchedule` و`WeeklySlot` منفصلان؛ `TeacherInstitutionAssignment` هو علاقة الأستاذ بالمؤسسات. `ProposalRevision` يحفظ نسخ المقترحات الأربع ولا يربط Memo بـVisit/Report. `CurriculumItem` يثبت فقط taxonomy عالية المستوى؛ لا تُحمّل بيانات رسمية بلا مصدر موثق.
 
@@ -41,6 +43,7 @@
 - `weeklyWorkloadMinutes >= 0`؛ في TeacherInstitutionAssignment يكون `validTo > validFrom` عندما يوجد؛ يُمنع أكثر من MAIN فعّال لنفس الأستاذ والفترة عبر تحقق معاملات + PostgreSQL exclusion constraint عند تحديد دلالة التداخل. لا يُفرض إجمالي نصاب رسمي غير مؤكد. إجمالي النصاب = مجموع دقائق الإسنادات الفعالة في تاريخ محدد.
 - `WeeklySlot` يتطلب `startMinute < endMinute` و0..1439، weekday مضبوط محليًا، assignment لنفس teacher وصالح عند فترة الجدول؛ منع تداخل حصص الأستاذ للفترة النشطة في service مع transaction وقيد DB مناسب بعد حسم دقة فترات الجداول. السنة الدراسية نص مقيّد تنسيقيًا فقط حتى اعتماد تقويم رسمي.
 - فهارس: Submission(districtId,status,submittedAt)، Teacher(districtId,surname,name,status)، Institution(districtId,name)، Assignment(teacherId,validFrom,validTo)/(institutionId,validFrom)، Schedule(teacherId,academicYear)، Slot(weekday,startMinute,endMinute)/(assignmentId)، Visit(teacherId,occurredAt)/(inspectorId,scheduledAt)، FollowUp(ownerInspectorId,status,dueAt)، Proposal(inspectorId,kind,status)، AuditLog(districtId,occurredAt). البحث النصي المتقدم يبدأ بـPostgres normalized columns/trigram بعد قياس؛ لا Elasticsearch مبكرًا.
+- AuditLog: FK اختيارية إلى Inspector/District بـ`onDelete: Restrict` و`onUpdate: Cascade`. `entityType/entityId` مرجع منطقي بلا FK إلى المورد. يُستمد district من المورد بعد authorization؛ الأحداث المقاطعية تتطلبه. metadata ذات allowlist لكل حدث بلا نسخ بيانات شخصية أو أسرار أو request bodies. لا update/delete في خدمة append؛ لا ضمان immutability على مستوى DB. التفاصيل في [ADR-025](DECISIONS.md#adr-025--auditlog-event-payload-and-append-contract).
 
 ## سياسة التاريخ والهجرات
 

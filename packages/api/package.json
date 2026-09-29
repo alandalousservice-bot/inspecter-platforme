@@ -7,7 +7,7 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc",
     "test": "npm run build && node --test test/*.test.mjs",
-    "test:db": "npm run build && node --test --test-concurrency=1 test/task020-db.integration.mjs test/task021-auth.integration.mjs test/task022-policy.integration.mjs",
+    "test:db": "npm run build && node --test --test-concurrency=1 test/task020-db.integration.mjs test/task021-auth.integration.mjs test/task022-policy.integration.mjs test/task023-institutions.integration.mjs test/task025-audit.integration.mjs",
     "start": "node dist/main.js"
   },
   "dependencies": {
