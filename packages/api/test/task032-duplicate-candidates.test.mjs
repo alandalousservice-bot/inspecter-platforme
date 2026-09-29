@@ -42,6 +42,21 @@ test('name, DOB, place, or institution alone never produces a candidate', () => 
   }
 });
 
+test('workplace never contributes duplicate identity signals', () => {
+  const target = { ...base, submittedProfile: { ...base.submittedProfile,
+    workplace: { institutionName: 'Same school', municipality: 'Same town', institutionAddress: 'Same address', directorPhone: '+21321234567' } } };
+  const unrelated = { ...other({ submittedProfile: {
+    firstName: 'Different', lastName: 'Person', dateOfBirth: '1990-01-01', phone: 'other', email: 'other@example.dz',
+    workplace: { institutionName: 'Same school', municipality: 'Same town', institutionAddress: 'Same address', directorPhone: '+21321234567' },
+  } }) };
+  assert.deepEqual(findPotentialDuplicateCandidates(target, [unrelated]), []);
+  const samePhone = other({ submittedProfile: {
+    firstName: 'Different', lastName: 'Person', dateOfBirth: '1990-01-01', phone: '+213555123456', email: 'other@example.dz',
+    workplace: { institutionName: 'Different school', municipality: 'Other town', institutionAddress: 'Other address', directorPhone: '+21321345678' },
+  } });
+  assert.deepEqual(findPotentialDuplicateCandidates(target, [samePhone])[0]?.matchReasons, ['SAME_PHONE']);
+});
+
 test('NFC, whitespace collapse, and Latin case-insensitive comparison are applied', () => {
   assert.deepEqual(reasons(other({ submittedProfile: { ...base.submittedProfile, phone: 'other', email: 'other', firstName: 'A\u0301lice', lastName: 'SMITH' } })), []);
   const composedBase = { ...base, submittedProfile: { ...base.submittedProfile, firstName: 'Élodie', lastName: '  Ben   Salem ' } };

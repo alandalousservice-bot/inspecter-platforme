@@ -7,6 +7,9 @@ export type Institution = {
   districtId: string;
   name: string;
   externalCode: string | null;
+  municipality: string | null;
+  address: string | null;
+  directorPhone: string | null;
   archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -42,8 +45,13 @@ export type SubmissionProfile = {
   confirmationDate?: string;
   qualifications?: string;
   notes?: string;
-  primaryInstitutionName: string;
-  additionalInstitutionNames?: string[];
+};
+export type DeclaredWorkplace = {
+  institutionName: string;
+  municipality: string | null;
+  institutionAddress: string | null;
+  directorPhone: string | null;
+  legacyAdditionalInstitutionNames: string[];
 };
 export type DuplicateReason = 'SAME_PHONE' | 'SAME_EMAIL' | 'SAME_NAME_AND_DOB';
 export type PotentialDuplicate = {
@@ -62,6 +70,7 @@ export type SubmissionDetail = {
   status: SubmissionStatus;
   submittedAt: string;
   submittedProfile: SubmissionProfile;
+  declaredWorkplace: DeclaredWorkplace | null;
   potentialDuplicates: PotentialDuplicate[];
   acceptedTeacherId: string | null;
 };
@@ -73,6 +82,8 @@ export type TeacherProfile = {
   confirmedAt: string | null; qualifications: string | null;
   recordStatus: string; archivedAt: string | null; createdAt: string; updatedAt: string;
   declaredInstitutions: { primaryInstitutionName: string; additionalInstitutionNames: string[] } | null;
+  declaredWorkplace: DeclaredWorkplace | null;
+  currentInstitution: Pick<Institution, 'id' | 'name' | 'municipality' | 'address' | 'directorPhone'> | null;
 };
 export type TeacherProfilePatch = Partial<Pick<TeacherProfile,
   'name' | 'surname' | 'birthDate' | 'placeOfBirth' | 'phone' | 'email'
@@ -155,10 +166,11 @@ export async function getCurrentDistricts(): Promise<DistrictOption[]> {
   return body.items;
 }
 
-export async function listInstitutions(options: { q?: string; cursor?: string; limit?: number } = {}) {
+export async function listInstitutions(options: { q?: string; cursor?: string; limit?: number; districtId?: string } = {}) {
   const query = new URLSearchParams();
   if (options.q) query.set('q', options.q);
   if (options.cursor) query.set('cursor', options.cursor);
+  if (options.districtId) query.set('districtId', options.districtId);
   query.set('limit', String(options.limit ?? 25));
   const response = await fetch(`/api/v1/institutions?${query}`, { credentials: 'same-origin' });
   if (!response.ok) return readFailure(response);
@@ -218,6 +230,38 @@ export async function patchTeacherProfile(id: string, patch: TeacherProfilePatch
   });
   if (!response.ok) return readFailure(response);
   return response.json() as Promise<{ data: TeacherProfile }>;
+}
+
+export type TeacherCurrentInstitutionInput =
+  | { expectedInstitutionId: string | null; institutionId: string }
+  | {
+    expectedInstitutionId: string | null;
+    createInstitution: {
+      name: string;
+      municipality?: string | null;
+      address?: string | null;
+      directorPhone?: string | null;
+    };
+  };
+
+export type TeacherCurrentInstitutionResult = {
+  teacherId: string;
+  currentInstitution: Pick<Institution, 'id' | 'name' | 'municipality' | 'address' | 'directorPhone'>;
+};
+
+export async function setTeacherCurrentInstitution(
+  id: string,
+  input: TeacherCurrentInstitutionInput,
+): Promise<{ data: TeacherCurrentInstitutionResult }> {
+  const csrfToken = csrfCookie();
+  if (!csrfToken) throw new ApiRequestError('تعذر التحقق من الطلب. أعد تحميل الصفحة ثم حاول مجددًا.');
+  const response = await fetch(`/api/v1/teachers/${encodeURIComponent(id)}/current-institution`, {
+    method: 'PUT', credentials: 'same-origin',
+    headers: { 'content-type': 'application/json', 'x-csrf-token': csrfToken },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) return readFailure(response);
+  return response.json() as Promise<{ data: TeacherCurrentInstitutionResult }>;
 }
 
 export async function decideSubmission(input: {

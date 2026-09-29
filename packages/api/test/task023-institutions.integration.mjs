@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { after, before, test } from 'node:test';
 import { createRequire } from 'node:module';
@@ -164,7 +164,7 @@ after(async () => {
 
 test('TASK-023 migration chain installs Institution fields, FK and district/name index', async () => {
   const columns = await db.$queryRaw`SELECT column_name FROM information_schema.columns WHERE table_schema=${schemaName} AND table_name='Institution'`;
-  assert.deepEqual(columns.map(({ column_name }) => column_name).sort(), ['archivedAt', 'createdAt', 'districtId', 'externalCode', 'id', 'name', 'updatedAt'].sort());
+  assert.deepEqual(columns.map(({ column_name }) => column_name).sort(), ['address', 'archivedAt', 'createdAt', 'directorPhone', 'districtId', 'externalCode', 'id', 'municipality', 'name', 'updatedAt'].sort());
   const districtNameIndex = await db.$queryRaw`SELECT indexname, indexdef FROM pg_catalog.pg_indexes WHERE schemaname=${schemaName} AND tablename='Institution' AND indexname='Institution_districtId_name_idx'`;
   assert.equal(districtNameIndex.length, 1);
   assert.ok(districtNameIndex[0].indexdef.includes('districtId'));
@@ -172,7 +172,7 @@ test('TASK-023 migration chain installs Institution fields, FK and district/name
   const fks = await db.$queryRaw`SELECT confdeltype, confupdtype FROM pg_catalog.pg_constraint WHERE conrelid=to_regclass(${`${schemaName}."Institution"`}) AND contype='f'`;
   assert.deepEqual(fks.map(({ confdeltype, confupdtype }) => ({ confdeltype, confupdtype })), [{ confdeltype: 'r', confupdtype: 'c' }]);
   const history = await db.$queryRawUnsafe(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL)::int AS applied FROM "${schemaName}"."_prisma_migrations"`);
-  assert.deepEqual(history[0], { total: 6, applied: 6 });
+  assert.deepEqual(history[0], { total: 7, applied: 7 });
 });
 
 test('authenticated District context returns only current memberships for the session owner', async () => {
@@ -220,6 +220,170 @@ test('create is validated, authenticated and limited to current District scope',
   assert.equal(invalidBody.error.code, 'VALIDATION_ERROR');
   assert.ok(invalid.headers.get('x-request-id'));
   assert.ok(!JSON.stringify(invalidBody).includes('  '));
+});
+
+test('TASK-042 create persists normalized workplace data and writes a minimal scoped audit', async () => {
+  const create = await request('/api/v1/institutions', {
+    method: 'POST', cookies: allowedCookies, csrfToken: csrf,
+    body: { districtId: districtA.id, name: 'ابتدائية النور', externalCode: 'N-02', municipality: ' بلدية   وهران ', address: ' شارع   الاستقلال ', directorPhone: '0555 123 456' },
+  });
+  assert.equal(create.status, 201);
+  const { data } = await create.json();
+  assert.deepEqual(data, {
+    id: data.id, districtId: districtA.id, name: 'ابتدائية النور', externalCode: 'N-02',
+    municipality: 'بلدية وهران', address: 'شارع الاستقلال', directorPhone: '+213555123456',
+    archivedAt: null, createdAt: data.createdAt, updatedAt: data.updatedAt,
+  });
+  assert.ok(create.headers.get('x-request-id'));
+  const audit = await db.auditLog.findFirstOrThrow({ where: { action: 'INSTITUTION_CREATED', entityId: data.id } });
+  assert.equal(audit.actorInspectorId, inspector.id);
+  assert.equal(audit.districtId, districtA.id);
+  assert.equal(audit.entityType, 'Institution');
+  assert.equal(audit.requestId, create.headers.get('x-request-id'));
+  assert.deepEqual(audit.metadata, {});
+  assert.equal(JSON.stringify(audit.metadata).includes('ابتدائية النور'), false);
+
+  const fixed = await request('/api/v1/institutions', {
+    method: 'POST', cookies: allowedCookies, csrfToken: csrf,
+    body: { districtId: districtA.id, name: 'ابتدائية السهل', directorPhone: '021234567' },
+  });
+  assert.equal(fixed.status, 201);
+  const fixedData = (await fixed.json()).data;
+  assert.equal(fixedData.directorPhone, '+21321234567');
+  assert.equal(fixedData.municipality, null);
+  assert.equal(fixedData.address, null);
+
+  const explicitlyCleared = await request('/api/v1/institutions', {
+    method: 'POST', cookies: allowedCookies, csrfToken: csrf,
+    body: { districtId: districtA.id, name: 'ابتدائية الوادي', municipality: null, address: null, directorPhone: null },
+  });
+  assert.equal(explicitlyCleared.status, 201);
+  const explicitlyClearedData = (await explicitlyCleared.json()).data;
+  assert.deepEqual([explicitlyClearedData.municipality, explicitlyClearedData.address, explicitlyClearedData.directorPhone], [null, null, null]);
+});
+
+test('TASK-042 workplace validation rejects overlong, malformed, empty, unknown and raw-overlimit input', async () => {
+  const valid = { districtId: districtA.id, name: 'مؤسسة تحقق' };
+  for (const body of [
+    { ...valid, municipality: 'و'.repeat(151) },
+    { ...valid, address: 'ع'.repeat(301) },
+    { ...valid, municipality: '' }, { ...valid, address: '   ' },
+    { ...valid, directorPhone: 'invalid' },
+    { ...valid, directorPhone: '021234567             ' },
+    { ...valid, unexpected: 'unknown' },
+  ]) {
+    const response = await request('/api/v1/institutions', { method: 'POST', cookies: allowedCookies, csrfToken: csrf, body });
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).error.code, 'VALIDATION_ERROR');
+  }
+  assert.equal(await db.institution.count({ where: { name: 'مؤسسة تحقق' } }), 0);
+  const noCsrf = await request('/api/v1/institutions', { method: 'POST', cookies: allowedCookies, body: valid });
+  assert.equal(noCsrf.status, 403);
+  const unauthenticated = await request('/api/v1/institutions', { method: 'POST', body: valid });
+  assert.equal(unauthenticated.status, 401);
+  assert.equal(await db.institution.count({ where: { name: 'مؤسسة تحقق' } }), 0);
+});
+
+test('TASK-042 detail and update expose authorized fields and conceal cross-district records', async () => {
+  const institution = await db.institution.create({ data: {
+    districtId: districtA.id, name: 'Source Institution', externalCode: 'KEEP',
+    municipality: 'بلدية قديمة', address: 'عنوان قديم', directorPhone: '+21321234567',
+  } });
+  const detail = await request(`/api/v1/institutions/${institution.id}`, { cookies: allowedCookies });
+  assert.equal(detail.status, 200);
+  assert.deepEqual(Object.keys((await detail.json()).data).sort(), [
+    'id', 'districtId', 'name', 'externalCode', 'municipality', 'address', 'directorPhone', 'archivedAt', 'createdAt', 'updatedAt',
+  ].sort());
+
+  const update = await request(`/api/v1/institutions/${institution.id}`, {
+    method: 'PATCH', cookies: allowedCookies, csrfToken: csrf,
+    body: { name: ' ابتدائية   جديدة ', municipality: ' بلدية   جديدة ', address: ' شارع   جديد ', directorPhone: '0555 123 456' },
+  });
+  assert.equal(update.status, 200);
+  const updated = (await update.json()).data;
+  assert.deepEqual({ name: updated.name, externalCode: updated.externalCode, municipality: updated.municipality, address: updated.address, directorPhone: updated.directorPhone }, {
+    name: 'ابتدائية جديدة', externalCode: 'KEEP', municipality: 'بلدية جديدة', address: 'شارع جديد', directorPhone: '+213555123456',
+  });
+  const updateAudit = await db.auditLog.findFirstOrThrow({ where: { action: 'INSTITUTION_UPDATED', entityId: institution.id } });
+  assert.equal(updateAudit.actorInspectorId, inspector.id);
+  assert.equal(updateAudit.districtId, districtA.id);
+  assert.equal(updateAudit.entityType, 'Institution');
+  assert.equal(updateAudit.requestId, update.headers.get('x-request-id'));
+  assert.deepEqual(updateAudit.metadata, { changedFields: ['address', 'directorPhone', 'municipality', 'name'] });
+  assert.equal(JSON.stringify(updateAudit.metadata).includes('بلدية جديدة'), false);
+  assert.equal(JSON.stringify(updateAudit.metadata).includes('+213555123456'), false);
+
+  const clear = await request(`/api/v1/institutions/${institution.id}`, {
+    method: 'PATCH', cookies: allowedCookies, csrfToken: csrf,
+    body: { municipality: null, address: null, directorPhone: null },
+  });
+  assert.equal(clear.status, 200);
+  const clearResponse = (await clear.json()).data;
+  const clearStored = await db.institution.findUniqueOrThrow({ where: { id: institution.id } });
+  assert.deepEqual([clearResponse.municipality, clearResponse.address, clearResponse.directorPhone], [null, null, null]);
+  assert.deepEqual([clearStored.municipality, clearStored.address, clearStored.directorPhone], [null, null, null]);
+  const unchangedBefore = await db.institution.findUniqueOrThrow({ where: { id: institution.id } });
+  const auditCountBeforeNoop = await db.auditLog.count({ where: { entityId: institution.id } });
+  const noOp = await request(`/api/v1/institutions/${institution.id}`, {
+    method: 'PATCH', cookies: allowedCookies, csrfToken: csrf,
+    body: { name: 'ابتدائية جديدة', municipality: null, address: null, directorPhone: null },
+  });
+  assert.equal(noOp.status, 200);
+  assert.equal((await db.institution.findUniqueOrThrow({ where: { id: institution.id } })).updatedAt.getTime(), unchangedBefore.updatedAt.getTime());
+  assert.equal(await db.auditLog.count({ where: { entityId: institution.id } }), auditCountBeforeNoop);
+
+  for (const body of [{ name: '' }, { municipality: '' }, { address: ' ' }, { directorPhone: '' }, { districtId: districtB.id }, { externalCode: 'OTHER' }, { archivedAt: null }, {}]) {
+    const response = await request(`/api/v1/institutions/${institution.id}`, { method: 'PATCH', cookies: allowedCookies, csrfToken: csrf, body });
+    assert.equal(response.status, 400, JSON.stringify(body));
+  }
+  const noCsrf = await request(`/api/v1/institutions/${institution.id}`, { method: 'PATCH', cookies: allowedCookies, body: { name: 'بدون حماية' } });
+  assert.equal(noCsrf.status, 403);
+  assert.equal((await db.institution.findUniqueOrThrow({ where: { id: institution.id } })).name, 'ابتدائية جديدة');
+  const malformedId = await request('/api/v1/institutions/not-a-uuid', { cookies: allowedCookies });
+  assert.equal(malformedId.status, 400);
+  const outside = await db.institution.create({ data: { districtId: otherDistrict.id, name: 'Private Outside Institution' } });
+  const outsideRead = await request(`/api/v1/institutions/${outside.id}`, { cookies: allowedCookies });
+  const outsideUpdate = await request(`/api/v1/institutions/${outside.id}`, { method: 'PATCH', cookies: allowedCookies, csrfToken: csrf, body: { name: 'Try Update' } });
+  const missing = await request(`/api/v1/institutions/${randomUUID()}`, { cookies: allowedCookies });
+  assert.equal(outsideRead.status, 404);
+  assert.equal(outsideUpdate.status, 404);
+  assert.equal((await outsideRead.json()).error.message, (await outsideUpdate.json()).error.message);
+  assert.equal(await db.institution.findUniqueOrThrow({ where: { id: outside.id } }).then(({ name }) => name), 'Private Outside Institution');
+  assert.equal(missing.status, 404);
+
+  const expiredResource = await db.institution.create({ data: { districtId: expiredDistrict.id, name: 'Expired Scope Institution' } });
+  const expiredRead = await request(`/api/v1/institutions/${expiredResource.id}`, { cookies: allowedCookies });
+  const expiredUpdate = await request(`/api/v1/institutions/${expiredResource.id}`, { method: 'PATCH', cookies: allowedCookies, csrfToken: csrf, body: { name: 'Attempt Expired Update' } });
+  const expiredCreate = await request('/api/v1/institutions', { method: 'POST', cookies: allowedCookies, csrfToken: csrf, body: { districtId: expiredDistrict.id, name: 'Attempt Expired Create' } });
+  assert.equal(expiredRead.status, 404);
+  assert.equal(expiredUpdate.status, 404);
+  assert.equal(expiredCreate.status, 404);
+  assert.equal((await db.institution.findUniqueOrThrow({ where: { id: expiredResource.id } })).name, 'Expired Scope Institution');
+});
+
+test('TASK-042 archived institutions remain readable but cannot be updated', async () => {
+  const archived = await db.institution.create({ data: { districtId: districtA.id, name: 'Archived Detail', archivedAt: new Date() } });
+  assert.equal((await request(`/api/v1/institutions/${archived.id}`, { cookies: allowedCookies })).status, 200);
+  const update = await request(`/api/v1/institutions/${archived.id}`, { method: 'PATCH', cookies: allowedCookies, csrfToken: csrf, body: { name: 'Changed' } });
+  assert.equal(update.status, 409);
+  assert.equal((await db.institution.findUniqueOrThrow({ where: { id: archived.id } })).name, 'Archived Detail');
+});
+
+test('TASK-042 required audit append failure rolls create and update back', async () => {
+  await db.$executeRawUnsafe(`CREATE FUNCTION "${schemaName}".reject_task042_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action IN ('INSTITUTION_CREATED','INSTITUTION_UPDATED') THEN RAISE EXCEPTION 'synthetic audit failure'; END IF; RETURN NEW; END $$`);
+  await db.$executeRawUnsafe(`CREATE TRIGGER reject_task042_audit BEFORE INSERT ON "${schemaName}"."AuditLog" FOR EACH ROW EXECUTE FUNCTION "${schemaName}".reject_task042_audit()`);
+  try {
+    const create = await request('/api/v1/institutions', { method: 'POST', cookies: allowedCookies, csrfToken: csrf, body: { districtId: districtA.id, name: 'Rollback Create' } });
+    assert.equal(create.status, 500);
+    assert.equal(await db.institution.count({ where: { name: 'Rollback Create' } }), 0);
+    const target = await db.institution.create({ data: { districtId: districtA.id, name: 'Rollback Update' } });
+    const update = await request(`/api/v1/institutions/${target.id}`, { method: 'PATCH', cookies: allowedCookies, csrfToken: csrf, body: { name: 'Should Roll Back' } });
+    assert.equal(update.status, 500);
+    assert.equal((await db.institution.findUniqueOrThrow({ where: { id: target.id } })).name, 'Rollback Update');
+  } finally {
+    await db.$executeRawUnsafe(`DROP TRIGGER reject_task042_audit ON "${schemaName}"."AuditLog"`);
+    await db.$executeRawUnsafe(`DROP FUNCTION "${schemaName}".reject_task042_audit()`);
+  }
 });
 
 test('list searches and paginates only active Institutions across authorized Districts', async () => {

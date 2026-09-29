@@ -5,7 +5,8 @@ import { appendAuditEvent, AuditAction } from '../audit/append.js';
 import { ApiError } from '../http/api-error.js';
 import { validateBody } from '../http/validate-body.js';
 import { requireAuthenticatedMutationCsrf } from '../identity/auth-routes.js';
-import { cleanText, dateField, emailField, phoneField, PROFESSIONAL_STATUSES } from '../intake/submission-schema.js';
+import { cleanText, dateField, directorPhoneField, emailField, phoneField, PROFESSIONAL_STATUSES } from '../intake/submission-schema.js';
+import { projectDeclaredWorkplace } from '../intake/declared-workplace.js';
 import { requireInspectorDistrictMembership } from '../policy/district-access.js';
 
 const fields = [
@@ -27,6 +28,17 @@ const patchSchema = z.object({
   qualifications: cleanText(1000).nullable().optional(),
 }).strict().refine((value) => Object.keys(value).length > 0, { message: 'يلزم حقل واحد على الأقل.' });
 type Patch = z.infer<typeof patchSchema>;
+const institutionCreateSchema = z.object({
+  name: cleanText(200, true),
+  municipality: cleanText(150, true).nullable().optional(),
+  address: cleanText(300, true).nullable().optional(),
+  directorPhone: directorPhoneField.nullable().optional(),
+}).strict();
+const currentInstitutionMutationSchema = z.union([
+  z.object({ expectedInstitutionId: z.string().uuid().nullable(), institutionId: z.string().uuid() }).strict(),
+  z.object({ expectedInstitutionId: z.string().uuid().nullable(), createInstitution: institutionCreateSchema }).strict(),
+]);
+type CurrentInstitutionMutation = z.infer<typeof currentInstitutionMutationSchema>;
 
 const notFound = () => new ApiError(404, 'NOT_FOUND', 'المورد غير موجود ضمن نطاق الوصول.');
 const invalidDate = (field: string) => new ApiError(400, 'VALIDATION_ERROR', 'تحقق من البيانات المدخلة.', { [field]: ['تاريخ غير صالح.'] });
@@ -46,26 +58,29 @@ function validateResultingDates(teacher: Teacher, patch: Patch): void {
 async function readProfile(database: Pick<PrismaClient, 'teacher'>, id: string) {
   const teacher = await database.teacher.findUnique({
     where: { id },
-    include: { acceptedSubmission: { select: { districtId: true, status: true, submittedProfile: true } } },
+    include: {
+      acceptedSubmission: { select: { districtId: true, status: true, submittedProfile: true } },
+      institution: { select: { id: true, name: true, municipality: true, address: true, directorPhone: true } },
+    },
   });
   if (!teacher) throw notFound();
-  const { acceptedSubmission, ...current } = teacher;
+  const { acceptedSubmission, institutionId: _institutionId, institution, ...current } = teacher;
+  void _institutionId;
   const source = acceptedSubmission?.status === 'ACCEPTED' && acceptedSubmission.districtId === current.districtId
     ? acceptedSubmission.submittedProfile : null;
-  const declaredInstitutions = source && typeof source === 'object' && !Array.isArray(source)
-    && typeof source.primaryInstitutionName === 'string'
-    ? {
-      primaryInstitutionName: source.primaryInstitutionName,
-      additionalInstitutionNames: Array.isArray(source.additionalInstitutionNames)
-        ? source.additionalInstitutionNames.filter((name): name is string => typeof name === 'string') : [],
-    }
-    : null;
+  const declaredWorkplace = projectDeclaredWorkplace(source);
+  const declaredInstitutions = declaredWorkplace ? {
+    primaryInstitutionName: declaredWorkplace.institutionName,
+    additionalInstitutionNames: declaredWorkplace.legacyAdditionalInstitutionNames,
+  } : null;
   return {
     ...current,
     birthDate: toCalendar(current.birthDate),
     employedAt: toCalendar(current.employedAt),
     confirmedAt: toCalendar(current.confirmedAt),
     declaredInstitutions,
+    declaredWorkplace,
+    currentInstitution: institution,
   };
 }
 
@@ -118,5 +133,82 @@ export function registerTeacherProfileRoutes(app: Express, database: PrismaClien
     });
     const profile = await readProfile(database, id.data);
     response.json({ data: profile });
+  });
+
+  app.put('/api/v1/teachers/:id/current-institution', validateBody(currentInstitutionMutationSchema), async (request, response) => {
+    requireAuthenticatedMutationCsrf(request);
+    const id = z.string().uuid().safeParse(request.params.id);
+    if (!id.success) throw new ApiError(400, 'VALIDATION_ERROR', 'تحقق من البيانات المدخلة.', { id: ['قيمة غير صالحة.'] });
+    const input = request.body as CurrentInstitutionMutation;
+    const inspectorId = response.locals.inspectorId as string;
+    const requestId = response.locals.requestId as string;
+
+    const result = await database.$transaction(async (transaction) => {
+      await transaction.$queryRaw`SELECT id FROM "Teacher" WHERE id = ${id.data}::uuid FOR UPDATE`;
+      const teacher = await transaction.teacher.findUnique({ where: { id: id.data } });
+      if (!teacher) throw notFound();
+      await requireInspectorDistrictMembership(transaction, inspectorId, teacher.districtId);
+      if (teacher.institutionId !== input.expectedInstitutionId) {
+        throw new ApiError(409, 'CONFLICT', 'تغير ملف الأستاذ. أعد تحميله ثم حاول مجددًا.');
+      }
+
+      let targetInstitutionId: string;
+      let createdInstitution: Awaited<ReturnType<typeof transaction.institution.create>> | undefined;
+      if ('createInstitution' in input) {
+        createdInstitution = await transaction.institution.create({
+          data: { ...input.createInstitution, districtId: teacher.districtId },
+        });
+        targetInstitutionId = createdInstitution.id;
+      } else {
+        await transaction.$queryRaw`SELECT id FROM "Institution" WHERE id = ${input.institutionId}::uuid FOR SHARE`;
+        const institution = await transaction.institution.findUnique({ where: { id: input.institutionId } });
+        if (!institution || institution.districtId !== teacher.districtId) throw notFound();
+        await requireInspectorDistrictMembership(transaction, inspectorId, institution.districtId);
+        if (institution.archivedAt !== null) {
+          throw new ApiError(409, 'CONFLICT', 'لا يمكن ربط مؤسسة مؤرشفة.');
+        }
+        targetInstitutionId = institution.id;
+      }
+
+      if (teacher.institutionId === targetInstitutionId) {
+        const currentInstitution = createdInstitution ?? await transaction.institution.findUniqueOrThrow({ where: { id: targetInstitutionId } });
+        return {
+          teacherId: teacher.id,
+          currentInstitution: {
+            id: currentInstitution.id, name: currentInstitution.name,
+            municipality: currentInstitution.municipality, address: currentInstitution.address,
+            directorPhone: currentInstitution.directorPhone,
+          },
+        };
+      }
+
+      await transaction.teacher.update({ where: { id: teacher.id }, data: { institutionId: targetInstitutionId } });
+      if (createdInstitution) {
+        await appendAuditEvent(transaction, {
+          source: 'HTTP', actorInspectorId: inspectorId, districtId: teacher.districtId,
+          action: AuditAction.INSTITUTION_CREATED, entityType: 'Institution', entityId: createdInstitution.id,
+          requestId, metadata: {},
+        });
+      }
+      await appendAuditEvent(transaction, {
+        source: 'HTTP', actorInspectorId: inspectorId, districtId: teacher.districtId,
+        action: teacher.institutionId === null ? AuditAction.TEACHER_INSTITUTION_LINKED : AuditAction.TEACHER_INSTITUTION_CHANGED,
+        entityType: 'Teacher', entityId: teacher.id, requestId,
+        metadata: teacher.institutionId === null
+          ? { institutionId: targetInstitutionId }
+          : { previousInstitutionId: teacher.institutionId, institutionId: targetInstitutionId },
+      });
+      const currentInstitution = createdInstitution ?? await transaction.institution.findUniqueOrThrow({ where: { id: targetInstitutionId } });
+      return {
+        teacherId: teacher.id,
+        currentInstitution: {
+          id: currentInstitution.id, name: currentInstitution.name,
+          municipality: currentInstitution.municipality, address: currentInstitution.address,
+          directorPhone: currentInstitution.directorPhone,
+        },
+      };
+    });
+
+    response.json({ data: result });
   });
 }

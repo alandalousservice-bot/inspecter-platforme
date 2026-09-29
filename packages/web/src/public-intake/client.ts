@@ -10,8 +10,12 @@ export type TeacherSubmissionPayload = {
   confirmationDate?: string;
   qualifications?: string;
   notes?: string;
-  primaryInstitutionName: string;
-  additionalInstitutionNames?: string[];
+  workplace: {
+    institutionName: string;
+    municipality: string;
+    institutionAddress: string;
+    directorPhone: string;
+  };
 };
 
 export class PublicSubmissionError extends Error {

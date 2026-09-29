@@ -54,18 +54,23 @@ TASK-034 migration محدودة بجدول Teacher وعلاقته بـDistrict �
 
 ADR-015 ACCEPTED: قرار Product Owner لحقول public intake والتوجيه والتحقق والتكرار والتصحيح وحدود إدخال MVP موثق في [DECISIONS](DECISIONS.md#adr-015--public-teacher-intake-fields-and-handling) و[API_CONTRACTS](API_CONTRACTS.md#public-teacher-intake-task-030). TASK-030 اكتملت بعد clean isolated migration وكل التحققات، وTASK-031 اكتملت كواجهة عامة؛ لا يعني ذلك إغلاق G3. يُراجع مسار مطابقة/اعتماد أسماء المؤسسات المعلنة قبل TASK-034/TASK-040 دون تغيير نطاقهما الآن.
 
-## Phase 4 — assignments, schedule, search gate G4
+## Phase 4 — current workplace, schedule, search gate G4
+
+[ADR-029](DECISIONS.md#adr-029--one-current-teacher-workplace-after-g3) يحل محل افتراض الإسنادات المتعددة بعد G3، و[ADR-030](DECISIONS.md#adr-030--weekly-schedule-mvp-contract) يحسم جدول MVP قبل TASK-047. لا يُعاد تنفيذ TASK-030..035 أو تعديل migrations السابقة. IDs `TASK-044/045` تبقى للدليل/البحث؛ تسلسل التنفيذ الفعلي هو `040 → 041 → 042 → 043 → 046 → 047 → 048 → 044 → 045` لأن بحث اليوم/الوقت يعتمد على الجدول.
 
 | ID | Objective; Scope | Dependencies; Expected areas | Acceptance Criteria; Tests | Out of Scope; Gate |
 |---|---|---|---|---|
-| TASK-040 | Assignment migration + interval/workload service | G3； prisma/assignment | multiple institutions, history, total at date; unit/integration | official workload threshold؛ G4 |
-| TASK-041 | Assignment API + editor | 040,012； server/client assignments | MAIN/SECONDARY, history, validation; E2E | cross-district transfer؛ G4 |
-| TASK-042 | WeeklySchedule/Slot migration + overlap rules | 040； prisma/schedule | structured time, valid assignment, overlap rejected; DB/unit | attachment-only schedule؛ G4 |
-| TASK-043 | Schedule API + weekly editor/read view | 042,012؛ server/client schedule | time/day filters, RTL timetable, revision; integration/UI | attendance؛ G4 |
-| TASK-044 | Teacher search API + indexed filters | 043,035؛ server/teacher | q/institution/status/visit/time filters, pagination; integration/perf sample | search engine؛ G4 |
-| TASK-045 | Teacher table/filter UI | 044,012؛ client/teacher | usable 180+ rows, URL filters, responsive; E2E/visual | client-only filtering؛ G4 |
+| TASK-040 COMPLETED | Forward migration: Institution municipality/address/directorPhone nullable + Teacher.institutionId nullable | G3, ADR-029؛ prisma/institution/teacher | clean+upgrade على قاعدة اختبار، صفوف G2/G3 بلا backfill، FK مركب يمنع cross-district، Teacher بلا رابط أو برابط واحد، لا تغيير migration سابق؛ persistence/regression gates PASS | Assignment/جدول/تدفق اعتماد/API؛ G4 |
+| TASK-041 COMPLETED | Public workplace intake evolution المتصل: API + RTL form + قرّاء الطلب التاريخي | 040, TASK-030/031/032, ADR-015/029؛ intake API/client وsubmission list/detail وprofile alias | POST جديد strict بأربعة حقول workplace مطلوبة وبلا مفاتيح G3 القديمة؛ form واحد وreceipt، عرض تصريح جديد/قديم، snapshot قديم ثابت، 202/limits/rate/privacy؛ connected G3 regression بعد تحديث fixture للشكل الجديد؛ جميع بوابات TASK-041 PASS | مطابقة Institution/قبول رابط؛ G4 |
+| TASK-042 COMPLETED | Institution details API extension | 040, TASK-023/025, ADR-029؛ institutions/audit | list/create additive للحقول الجديدة، GET/PATCH scoped، CSRF لمسار POST القائم، validation/null clear/archived 409، audit إنشاء/تعديل بلا قيم PII؛ DB/API integration؛ جميع بوابات TASK-042 PASS | Teacher link/UI/auto-merge؛ G4 |
+| TASK-043 COMPLETED | Current Teacher institution link API + read model | 040,041,042, TASK-035, ADR-029؛ teachers/institutions/audit | PUT اختيار/إنشاء ذري بشرط `expectedInstitutionId`، 404/409 وFK district، أحداث تدقيق، GET Teacher يميز currentInstitution عن declaredWorkplace؛ API/DB integration وكل بوابات المهمة PASS | UI/transfer history/weekly slots؛ G4 |
+| TASK-046 COMPLETED | Teacher profile workplace review/link UI | 041,042,043,012؛ client/teacher/institution | معلن مقابل معتمد، حالة «لم تُعتمد مؤسسة حالية»، اختيار مؤسسة قائمة أو إنشاء صريح بتأكيد، استبدال الرابط بلا لغة نقل؛ RTL/states/E2E؛ بوابات المهمة PASS | auto-match/merge/جدول أسبوعي؛ G4 |
+| TASK-047 READY / NOT STARTED | WeeklySchedule/WeeklyScheduleSlot persistence migration | 040,046,ADR-030؛ prisma/schedule | جدول واحد لكل Teacher/year، revision بلا history، يوم 1..7 ودقائق 0..1440، checks وفهرس وGiST exclusion للتداخل مع سماح التجاور؛ forward-only clean+upgrade migration وDB/integration، بلا institutionId/assignmentId على slot | API/UI/AuditLog أو دليل Teacher أو عطلات/نقل؛ G4 |
+| TASK-048 NOT STARTED | Schedule API + weekly editor/read view | 047,012,ADR-030؛ server/client schedule | auth/district scope وCSRF، جدول السنة الحالي وslots متعددة/يوم، revision concurrency، تحقق/tداخل وأخطاء آمنة، منع mutation قبل مؤسسة حالية، AuditLog ذري آمن، RTL وintegration/browser coverage | حضور/عطلات/استثناءات أو نقل مؤسسة أو تاريخ نسخ؛ G4 |
+| TASK-044 NOT STARTED | Teacher search API + indexed filters | 048,035,043؛ server/teacher | q/currentInstitution/recordStatus واليوم/الآن حسب Africa/Algiers خادميًا مع pagination؛ integration/perf sample؛ visited/from/to بعد تنفيذ Visit domain، والبلدية مستقبلًا من currentInstitution لا Teacher | search engine أو فلاتر زيارة قبل TASK-050؛ G4 |
+| TASK-045 NOT STARTED | Teacher table/filter UI | 044,012؛ client/teacher | usable 180+ rows, URL filters, responsive، Tuesday-morning E2E باستخدام API فقط | client-only filtering؛ G4 |
 
-G4: multi-institution and Tuesday-morning search E2E pass; migration/index review.
+G4: ربط مؤسسة حالية واحدة فقط بعد موافقة المفتش، بقاء التصريح منفصلًا عن المعتمد، وجدول/بحث الثلاثاء صباحًا E2E؛ مراجعة migrations والفهارس. اكتملت TASK-040..043 وTASK-046؛ الجدول (047/048) ثم البحث والدليل (044/045) لاحقة. يوصى بـcheckpoint لتغييرات مكان العمل المكتملة قبل TASK-047، دون تنفيذه في مراجعة ADR-030.
 
 ## Phase 5 — visits and reporting gate G5
 

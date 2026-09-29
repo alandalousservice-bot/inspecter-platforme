@@ -89,7 +89,7 @@ function profile(changes = {}) {
     firstName: 'أمينة', lastName: 'بن صالح', dateOfBirth: '1985-03-04', placeOfBirth: 'وهران',
     phone: '+213555123456', email: 'Amina@example.dz', professionalStatus: 'PERMANENT',
     employmentDate: '2005-09-01', confirmationDate: '2007-09-01', qualifications: 'شهادة تجريبية',
-    notes: 'ملاحظة المرسل', primaryInstitutionName: 'ابتدائية النور', additionalInstitutionNames: ['مدرسة إضافية'],
+    notes: 'ملاحظة المرسل', workplace: { institutionName: 'ابتدائية النور', municipality: 'وهران', institutionAddress: 'شارع النخيل', directorPhone: '+21321234567' },
     ...changes,
   };
 }
@@ -175,7 +175,7 @@ after(async () => {
 test('clean chain creates Teacher columns, indexes, and restricted FKs', async () => {
   const columns = await db.$queryRaw`SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_schema=${schemaName} AND table_name='Teacher'`;
   assert.deepEqual(columns.map((row) => row.column_name).sort(), [
-    'id', 'districtId', 'name', 'surname', 'birthDate', 'placeOfBirth', 'phone', 'email', 'professionalStatus',
+    'id', 'districtId', 'institutionId', 'name', 'surname', 'birthDate', 'placeOfBirth', 'phone', 'email', 'professionalStatus',
     'employedAt', 'confirmedAt', 'qualifications', 'recordStatus', 'archivedAt', 'createdAt', 'updatedAt',
   ].sort());
   for (const field of ['id', 'districtId', 'name', 'surname', 'recordStatus', 'createdAt', 'updatedAt']) {
@@ -223,8 +223,10 @@ test('ACCEPT maps the exact current profile and creates one linked Teacher and o
   assert.equal(teacher.qualifications, 'شهادة تجريبية');
   assert.equal(teacher.recordStatus, 'ACTIVE');
   assert.equal(teacher.archivedAt, null);
+  assert.equal(teacher.institutionId, null);
   assert.ok(teacher.createdAt && teacher.updatedAt && persisted.decidedAt);
   assert.equal(persisted.decidedByInspectorId, inspector.id);
+  assert.deepEqual(persisted.submittedProfile.workplace, { institutionName: 'ابتدائية النور', municipality: 'وهران', institutionAddress: 'شارع النخيل', directorPhone: '+21321234567' });
   assert.equal(await db.institution.count(), institutionCount);
   assert.equal(await db.teacher.count({ where: { id: teacher.id } }), 1);
   const audit = await db.auditLog.findMany({ where: { entityId: target.id } });
@@ -267,11 +269,15 @@ test('database enforces accepted Teacher FK, unique source link and restricted d
 });
 
 test('REJECT and INTERNAL_REVIEW transitions audit without Teacher; review can then accept or reject', async () => {
+  const teacherCountBefore = await db.teacher.count();
+  const institutionCountBefore = await db.institution.count();
   const rejected = await submission();
   assert.equal((await decision(rejected.id, 'REJECT')).status, 200);
   const rejectedRow = await db.teacherSubmission.findUniqueOrThrow({ where: { id: rejected.id } });
   assert.equal(rejectedRow.status, 'REJECTED');
   assert.equal(rejectedRow.acceptedTeacherId, null);
+  assert.equal(await db.teacher.count(), teacherCountBefore);
+  assert.equal(await db.institution.count(), institutionCountBefore);
   assert.ok(rejectedRow.decidedAt);
   assert.equal(rejectedRow.decidedByInspectorId, inspector.id);
   assert.equal((await decision(rejected.id, 'ACCEPT')).status, 409);
@@ -282,9 +288,13 @@ test('REJECT and INTERNAL_REVIEW transitions audit without Teacher; review can t
   assert.ok(reviewRow.decidedAt);
   assert.equal(reviewRow.decidedByInspectorId, inspector.id);
   assert.equal(reviewRow.acceptedTeacherId, null);
+  assert.equal(await db.teacher.count(), teacherCountBefore);
+  assert.equal(await db.institution.count(), institutionCountBefore);
   assert.equal((await decision(review.id, 'INTERNAL_REVIEW', 'INTERNAL_REVIEW')).status, 409);
   assert.equal((await decision(review.id, 'ACCEPT', 'INTERNAL_REVIEW')).status, 200);
   assert.equal((await db.teacherSubmission.findUniqueOrThrow({ where: { id: review.id } })).status, 'ACCEPTED');
+  assert.equal(await db.teacher.count(), teacherCountBefore + 1);
+  assert.equal(await db.institution.count(), institutionCountBefore);
   const reviewReject = await submission();
   assert.equal((await decision(reviewReject.id, 'INTERNAL_REVIEW')).status, 200);
   assert.equal((await decision(reviewReject.id, 'REJECT', 'INTERNAL_REVIEW')).status, 200);

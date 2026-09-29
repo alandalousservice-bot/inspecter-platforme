@@ -7,7 +7,7 @@ const districtId = 'd42c3ef0-baf5-4b60-8dd2-e8f39b4c9d41';
 const validValues = {
   firstName: 'أحمد', lastName: 'بن صالح', dateOfBirth: '1985-03-04', placeOfBirth: 'وهران',
   phone: '+213 555 123 456', email: 'teacher@example.dz', professionalStatus: 'PERMANENT',
-  employmentDate: '2010-09-01', primaryInstitutionName: 'ابتدائية النور',
+  employmentDate: '2010-09-01', institutionName: 'ابتدائية النور', municipality: 'بلدية الجزائر', institutionAddress: 'شارع الاستقلال', directorPhone: '021234567',
 };
 
 function jsonResponse(status: number, body: unknown, headers?: Record<string, string>) {
@@ -46,7 +46,8 @@ describe('TASK-031 public teacher intake', () => {
     expect(screen.getByRole('heading', { name: 'نموذج تقديم بيانات الأستاذ' })).toBeTruthy();
     expect(screen.getByRole('group', { name: 'المعلومات الشخصية' })).toBeTruthy();
     expect(screen.getByRole('group', { name: 'المعلومات المهنية' })).toBeTruthy();
-    expect(screen.getByRole('group', { name: 'المؤسسة أو المؤسسات الابتدائية' })).toBeTruthy();
+    expect(screen.getByRole('group', { name: 'جهة العمل الحالية' })).toBeTruthy();
+    for (const label of [/اسم المؤسسة/, /بلدية العمل/, /عنوان المؤسسة/, /رقم هاتف مدير المؤسسة/]) expect(screen.getByRole('textbox', { name: label })).toBeTruthy();
     expect(screen.getByRole('textbox', { name: /الاسم/ })).toBeTruthy();
     const status = screen.getByRole('combobox', { name: /الصفة المهنية/ });
     expect(within(status).getByRole('option', { name: 'مرسم' }).getAttribute('value')).toBe('PERMANENT');
@@ -70,13 +71,19 @@ describe('TASK-031 public teacher intake', () => {
     }));
     const options = vi.mocked(fetch).mock.calls[0][1] as RequestInit;
     const payload = JSON.parse(String(options.body)) as Record<string, unknown>;
-    expect(payload).toEqual(validValues);
+    expect(payload).toEqual({
+      firstName: validValues.firstName, lastName: validValues.lastName, dateOfBirth: validValues.dateOfBirth,
+      placeOfBirth: validValues.placeOfBirth, phone: validValues.phone, email: validValues.email,
+      professionalStatus: validValues.professionalStatus, employmentDate: validValues.employmentDate,
+      workplace: { institutionName: validValues.institutionName, municipality: validValues.municipality, institutionAddress: validValues.institutionAddress, directorPhone: validValues.directorPhone },
+    });
     expect(payload).not.toHaveProperty('districtId');
     expect(payload).not.toHaveProperty('receiptId');
     expect(payload).not.toHaveProperty('confirmationDate');
     expect(payload).not.toHaveProperty('qualifications');
     expect(payload).not.toHaveProperty('notes');
-    expect(payload).not.toHaveProperty('additionalInstitutionNames');
+    expect(payload).not.toHaveProperty('primaryInstitutionName');
+    expect(payload.workplace).toEqual({ institutionName: validValues.institutionName, municipality: validValues.municipality, institutionAddress: validValues.institutionAddress, directorPhone: validValues.directorPhone });
   });
 
   it('maps the selected Arabic professional status to its stable API value', async () => {
@@ -122,21 +129,23 @@ describe('TASK-031 public teacher intake', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('supports zero to five additional institutions, removal, and rejects duplicate names', async () => {
+  it('requires one complete workplace and exposes no additional institution controls', async () => {
+    const { container } = renderPage();
+    fillRequired();
+    fireEvent.change(document.getElementById('municipality')!, { target: { value: ' ' } });
+    await submit();
+    expect(screen.getByText('هذا الحقل مطلوب.')).toBeTruthy();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(container.textContent).not.toMatch(/إضافة مؤسسة أخرى|حذف المؤسسة الإضافية/);
+  });
+
+  it('counts the director phone input limit before trimming or normalization', async () => {
     renderPage();
     fillRequired();
-    const add = screen.getByRole('button', { name: 'إضافة مؤسسة أخرى' });
-    fireEvent.click(add);
-    expect(document.activeElement).toBe(document.getElementById('additionalInstitution-0'));
-    fireEvent.change(document.getElementById('additionalInstitution-0')!, { target: { value: '  ابتدائية   النور ' } });
+    fireEvent.change(document.getElementById('directorPhone')!, { target: { value: '021234567             ' } });
     await submit();
-    expect(screen.getByText('لا يمكن تكرار اسم المؤسسة.')).toBeTruthy();
+    expect(screen.getByText(/رقمًا جزائريًا ثابتًا أو محمولًا صالحًا/)).toBeTruthy();
     expect(fetch).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'حذف المؤسسة الإضافية 1' }));
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'إضافة مؤسسة أخرى' }));
-    for (let index = 0; index < 5; index += 1) fireEvent.click(screen.getByRole('button', { name: 'إضافة مؤسسة أخرى' }));
-    expect(document.getElementById('additionalInstitution-4')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'إضافة مؤسسة أخرى' })).toBeNull();
   });
 
   it('includes optional values only when present and preserves their documented shape', async () => {
@@ -145,15 +154,13 @@ describe('TASK-031 public teacher intake', () => {
     fireEvent.change(document.getElementById('confirmationDate')!, { target: { value: '2012-09-01' } });
     fireEvent.change(document.getElementById('qualifications')!, { target: { value: 'شهادة جامعية' } });
     fireEvent.change(document.getElementById('notes')!, { target: { value: 'ملاحظة' } });
-    fireEvent.click(screen.getByRole('button', { name: 'إضافة مؤسسة أخرى' }));
-    fireEvent.change(document.getElementById('additionalInstitution-0')!, { target: { value: 'ابتدائية الأمل' } });
     await submit();
     await screen.findByRole('heading', { name: 'تم استلام بياناتك' });
     const payload = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body)) as Record<string, unknown>;
     expect(payload.confirmationDate).toBe('2012-09-01');
     expect(payload.qualifications).toBe('شهادة جامعية');
     expect(payload.notes).toBe('ملاحظة');
-    expect(payload.additionalInstitutionNames).toEqual(['ابتدائية الأمل']);
+    expect(payload.workplace).toEqual({ institutionName: validValues.institutionName, municipality: validValues.municipality, institutionAddress: validValues.institutionAddress, directorPhone: validValues.directorPhone });
   });
 
   it('prevents submission for an invalid route district without displaying its value', async () => {

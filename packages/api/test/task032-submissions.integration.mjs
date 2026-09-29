@@ -170,7 +170,7 @@ before(async () => {
 
   target = await createSubmission(districtA, profile(), 'PENDING', new Date('2026-01-01T00:00:00Z'));
   duplicate = await createSubmission(districtA, profile({ notes: 'candidate secret notes' }), 'PENDING', new Date('2026-01-02T00:00:00Z'));
-  pendingOther = await createSubmission(districtA, profile({ firstName: 'سلمى', phone: '+213555000000', email: 'different@example.dz' }), 'PENDING', new Date('2026-01-03T00:00:00Z'));
+  pendingOther = await createSubmission(districtA, profile({ firstName: 'سلمى', phone: '+213555000000', email: 'different@example.dz', primaryInstitutionName: undefined, additionalInstitutionNames: undefined, workplace: { institutionName: 'ابتدائية جديدة', municipality: 'بلدية جديدة', institutionAddress: 'عنوان جديد', directorPhone: '+21321234567' } }), 'PENDING', new Date('2026-01-03T00:00:00Z'));
   internalReview = await createSubmission(districtA, profile({ firstName: 'مختلف', phone: '+213555123456', email: 'other@example.dz' }), 'INTERNAL_REVIEW', new Date('2026-01-04T00:00:00Z'));
   rejected = await createSubmission(districtA, profile(), 'REJECTED', new Date('2026-01-05T00:00:00Z'));
   crossDistrict = await createSubmission(districtB, profile(), 'PENDING');
@@ -201,16 +201,20 @@ test('list requires an authenticated ACTIVE Inspector and defaults to PENDING', 
 test('list exposes only triage fields, duplicate boolean, and q/status/district server filters', async () => {
   const response = await request(`/api/v1/submissions?q=${encodeURIComponent('ابتدائية النور')}&districtId=${districtA.id}`, { cookies: allowedCookies });
   const body = await response.json();
-  assert.equal(body.page.total, 3);
+  assert.equal(body.page.total, 2);
   const item = body.data.find(({ id }) => id === target.id);
   assert.equal(item.hasPotentialDuplicates, true);
-  assert.equal(body.data.find(({ id }) => id === pendingOther.id)?.hasPotentialDuplicates, false);
   assert.deepEqual(Object.keys(item).sort(), ['id', 'firstName', 'lastName', 'dateOfBirth', 'submittedAt', 'primaryInstitutionName', 'status', 'hasPotentialDuplicates'].sort());
   assert.equal(JSON.stringify(body).includes('+213555123456'), false);
   assert.equal(JSON.stringify(body).includes('Amina@example.dz'), false);
   assert.equal(JSON.stringify(body).includes('potentialDuplicates'), false);
   const nameSearch = await request(`/api/v1/submissions?q=${encodeURIComponent('أمينة')}`, { cookies: allowedCookies });
   assert.equal((await nameSearch.json()).page.total, 2);
+  const workplaceSearch = await request(`/api/v1/submissions?q=${encodeURIComponent('ابتدائية جديدة')}`, { cookies: allowedCookies });
+  const workplaceBody = await workplaceSearch.json();
+  assert.deepEqual(workplaceBody.data.map(({ id }) => id), [pendingOther.id]);
+  assert.equal(workplaceBody.data[0].primaryInstitutionName, 'ابتدائية جديدة');
+  assert.equal(workplaceBody.data[0].hasPotentialDuplicates, false);
 
   const scoped = await request(`/api/v1/submissions?districtId=${districtB.id}`, { cookies: allowedCookies });
   assert.equal(scoped.status, 404);
@@ -240,6 +244,7 @@ test('detail returns authorized submitted profile and candidates with minimized 
   const body = await response.json();
   assert.equal(body.data.id, target.id);
   assert.equal(body.data.submittedProfile.email, 'Amina@example.dz');
+  assert.deepEqual(body.data.declaredWorkplace, { institutionName: 'ابتدائية النور', municipality: null, institutionAddress: null, directorPhone: null, legacyAdditionalInstitutionNames: ['مدرسة إضافية'] });
   const matched = body.data.potentialDuplicates.find(({ id }) => id === duplicate.id);
   assert.deepEqual(matched.matchReasons, ['SAME_PHONE', 'SAME_EMAIL', 'SAME_NAME_AND_DOB']);
   assert.deepEqual(Object.keys(matched).sort(), ['id', 'firstName', 'lastName', 'dateOfBirth', 'placeOfBirth', 'status', 'submittedAt', 'matchReasons'].sort());
@@ -283,7 +288,7 @@ test('public submission receipt remains private and has no candidate disclosure'
     body: {
       firstName: 'اسم تجريبي', lastName: 'لقب تجريبي', dateOfBirth: '1980-01-02', placeOfBirth: 'الجزائر',
       phone: '0555123456', email: 'public@example.dz', professionalStatus: 'PERMANENT', employmentDate: '2000-01-02',
-      primaryInstitutionName: 'مدرسة تجريبية',
+      workplace: { institutionName: 'مدرسة تجريبية', municipality: 'بلدية الجزائر', institutionAddress: 'شارع تجريبي', directorPhone: '021234567' },
     },
   });
   assert.equal(response.status, 202);

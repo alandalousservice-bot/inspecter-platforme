@@ -202,8 +202,8 @@ after(async () => {
                COUNT(*) FILTER (WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL)::int AS applied
         FROM "${schemaName}"."_prisma_migrations"
       `);
-      assert.deepEqual(history[0], { total: 6, applied: 6 });
-      log('TASK-020 second deploy/status: PASS; migration history: 6/6 applied');
+      assert.deepEqual(history[0], { total: 7, applied: 7 });
+      log('TASK-020 second deploy/status: PASS; migration history: 7/7 applied');
       void secondDeploy;
     }
   } catch (error) {
@@ -289,6 +289,7 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
     { source_table: 'Institution', target_table: 'District', confdeltype: 'r', confupdtype: 'c' },
     { source_table: 'Session', target_table: 'Inspector', confdeltype: 'r', confupdtype: 'c' },
     { source_table: 'Teacher', target_table: 'District', confdeltype: 'r', confupdtype: 'c' },
+    { source_table: 'Teacher', target_table: 'Institution', confdeltype: 'r', confupdtype: 'c' },
     { source_table: 'TeacherSubmission', target_table: 'District', confdeltype: 'r', confupdtype: 'c' },
     { source_table: 'TeacherSubmission', target_table: 'Inspector', confdeltype: 'r', confupdtype: 'c' },
     { source_table: 'TeacherSubmission', target_table: 'Teacher', confdeltype: 'r', confupdtype: 'c' },
@@ -314,7 +315,7 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
   assert.match(emailUniqueIndex.indexdef, /\bemail\b/i);
   const uniqueIndexes = indexes.filter((index) => index.indexdef.includes('UNIQUE') && !index.indexname.endsWith('_pkey'));
   assert.deepEqual(uniqueIndexes.map(({ indexname }) => indexname), [
-    'Inspector_email_key', 'Session_tokenHash_key', 'TeacherSubmission_acceptedTeacherId_key',
+    'Inspector_email_key', 'Institution_id_districtId_key', 'Session_tokenHash_key', 'TeacherSubmission_acceptedTeacherId_key',
   ]);
 
   const migrationHistory = await prismaClient.$queryRawUnsafe(`
@@ -322,7 +323,7 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
            COUNT(*) FILTER (WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL)::int AS applied
     FROM "${schemaName}"."_prisma_migrations"
   `);
-  assert.deepEqual(migrationHistory[0], { total: 6, applied: 6 });
+  assert.deepEqual(migrationHistory[0], { total: 7, applied: 7 });
 
   await t.test('creates the four models with UUIDs, nullability, and resolvable relations', async () => {
     const runId = randomBytes(6).toString('hex');

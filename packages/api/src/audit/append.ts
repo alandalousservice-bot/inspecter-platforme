@@ -12,6 +12,10 @@ export const AuditAction = {
   INSPECTOR_PROPOSAL_UPDATED: 'INSPECTOR_PROPOSAL_UPDATED',
   INSPECTOR_PROPOSAL_CLONED: 'INSPECTOR_PROPOSAL_CLONED',
   INSPECTOR_PROPOSAL_ARCHIVED: 'INSPECTOR_PROPOSAL_ARCHIVED',
+  INSTITUTION_CREATED: 'INSTITUTION_CREATED',
+  INSTITUTION_UPDATED: 'INSTITUTION_UPDATED',
+  TEACHER_INSTITUTION_LINKED: 'TEACHER_INSTITUTION_LINKED',
+  TEACHER_INSTITUTION_CHANGED: 'TEACHER_INSTITUTION_CHANGED',
 } as const;
 
 const eventContracts = {
@@ -34,6 +38,19 @@ const eventContracts = {
   [AuditAction.INSPECTOR_PROPOSAL_UPDATED]: { entityType: 'InspectorProposal', metadata: z.object({}).strict() },
   [AuditAction.INSPECTOR_PROPOSAL_CLONED]: { entityType: 'InspectorProposal', metadata: z.object({}).strict() },
   [AuditAction.INSPECTOR_PROPOSAL_ARCHIVED]: { entityType: 'InspectorProposal', metadata: z.object({}).strict() },
+  [AuditAction.INSTITUTION_CREATED]: { entityType: 'Institution', metadata: z.object({}).strict() },
+  [AuditAction.INSTITUTION_UPDATED]: {
+    entityType: 'Institution',
+    metadata: z.object({ changedFields: z.array(z.enum(['name', 'municipality', 'address', 'directorPhone'])).min(1) }).strict(),
+  },
+  [AuditAction.TEACHER_INSTITUTION_LINKED]: {
+    entityType: 'Teacher',
+    metadata: z.object({ institutionId: z.string().uuid() }).strict(),
+  },
+  [AuditAction.TEACHER_INSTITUTION_CHANGED]: {
+    entityType: 'Teacher',
+    metadata: z.object({ previousInstitutionId: z.string().uuid(), institutionId: z.string().uuid() }).strict(),
+  },
 } as const;
 
 const inputSchema = z.object({

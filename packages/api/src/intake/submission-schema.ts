@@ -67,6 +67,8 @@ export const phoneField = z.string().transform((raw, context) => {
   return normalized ?? value;
 });
 
+export const directorPhoneField = z.string().refine((raw) => Array.from(raw).length <= 20, 'قيمة غير صالحة.').pipe(phoneField);
+
 export const emailField = z.string().transform((raw, context) => {
   const value = raw.trim();
   if (Array.from(value).length > 254) {
@@ -81,7 +83,12 @@ export const emailField = z.string().transform((raw, context) => {
   return normalized;
 });
 
-const institutionName = cleanText(200, true);
+const workplaceSchema = z.object({
+  institutionName: cleanText(200, true),
+  municipality: cleanText(150, true),
+  institutionAddress: cleanText(300, true),
+  directorPhone: directorPhoneField,
+}).strict();
 
 export const teacherSubmissionSchema = z.object({
   firstName: cleanText(100, true),
@@ -103,8 +110,7 @@ export const teacherSubmissionSchema = z.object({
     }
     return value;
   }).optional(),
-  primaryInstitutionName: institutionName,
-  additionalInstitutionNames: z.array(institutionName).max(5).optional(),
+  workplace: workplaceSchema,
 }).strict().superRefine((value, context) => {
   const today = new Date().toISOString().slice(0, 10);
   if (value.dateOfBirth > today) {
@@ -117,19 +123,6 @@ export const teacherSubmissionSchema = z.object({
     && (value.confirmationDate > today || value.confirmationDate < value.employmentDate)) {
     context.addIssue({ code: 'custom', path: ['confirmationDate'], message: 'تاريخ غير صالح.' });
   }
-
-  const normalizeName = (name: string) => name.normalize('NFC').replace(/\s+/gu, ' ').trim().toLowerCase();
-  const primary = normalizeName(value.primaryInstitutionName);
-  const seen = new Set([primary]);
-  value.additionalInstitutionNames?.forEach((name, index) => {
-    const normalized = normalizeName(name);
-    if (seen.has(normalized)) {
-      context.addIssue({
-        code: 'custom', path: ['additionalInstitutionNames', index], message: 'اسم مؤسسة مكرر.',
-      });
-    }
-    seen.add(normalized);
-  });
 });
 
 export type TeacherSubmissionInput = z.output<typeof teacherSubmissionSchema>;

@@ -67,6 +67,16 @@ async function request(id, method = 'GET', body, options = {}) {
   return fetch(`${baseUrl}/api/v1/teachers/${id}`, { method, headers, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 }
 
+async function currentInstitutionRequest(id, body, options = {}) {
+  const selectedCookies = options.cookies === undefined ? cookies : options.cookies;
+  const headers = { 'content-type': 'application/json' };
+  if (selectedCookies) headers.cookie = cookieHeader(selectedCookies);
+  if (selectedCookies && !options.noCsrf) headers['x-csrf-token'] = options.invalidCsrf ? 'invalid' : csrf(selectedCookies);
+  return fetch(`${baseUrl}/api/v1/teachers/${id}/current-institution`, {
+    method: 'PUT', headers, ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+}
+
 async function fixture(districtId = district.id) {
   const snapshot = {
     firstName: 'أمينة', lastName: 'بن صالح', dateOfBirth: '1985-03-04', placeOfBirth: 'وهران',
@@ -148,11 +158,14 @@ test('GET returns scoped current profile and minimal accepted declarations witho
   const { data } = await response.json();
   assert.deepEqual(Object.keys(data).sort(), [
     'id', 'districtId', 'name', 'surname', 'birthDate', 'placeOfBirth', 'phone', 'email', 'professionalStatus',
-    'employedAt', 'confirmedAt', 'qualifications', 'recordStatus', 'archivedAt', 'createdAt', 'updatedAt', 'declaredInstitutions',
+    'employedAt', 'confirmedAt', 'qualifications', 'recordStatus', 'archivedAt', 'createdAt', 'updatedAt', 'declaredInstitutions', 'declaredWorkplace', 'currentInstitution',
   ].sort());
   assert.equal(data.birthDate, '1985-03-04');
   assert.equal(data.recordStatus, 'ACTIVE');
   assert.deepEqual(data.declaredInstitutions, { primaryInstitutionName: 'ابتدائية النور', additionalInstitutionNames: ['ابتدائية الفجر'] });
+  assert.deepEqual(data.declaredWorkplace, { institutionName: 'ابتدائية النور', municipality: null, institutionAddress: null, directorPhone: null, legacyAdditionalInstitutionNames: ['ابتدائية الفجر'] });
+  assert.equal(data.currentInstitution, null);
+  assert.equal(Object.hasOwn(data, 'institutionId'), false);
   assert.equal(JSON.stringify(data).includes('private intake note'), false);
   assert.equal(await db.auditLog.count({ where: { entityId: teacher.id } }), 0);
   const detail = await fetch(`${baseUrl}/api/v1/submissions/${submission.id}`, { headers: { cookie: cookieHeader(cookies) } });
@@ -215,7 +228,7 @@ test('PATCH validates strict keys, empty values, dates and resulting chronology'
   const { teacher } = await fixture();
   for (const body of [{}, { name: null }, { surname: null }, { name: '' }, { name: '  ' },
     { placeOfBirth: '' }, { qualifications: '' }, { phone: '' }, { email: '' },
-    { districtId: district.id }, { recordStatus: 'INACTIVE' }, { archivedAt: null },
+    { districtId: district.id }, { institutionId: randomUUID() }, { recordStatus: 'INACTIVE' }, { archivedAt: null },
     { acceptedTeacherId: randomUUID() }, { declaredInstitutions: {} }, { notes: 'secret' },
     { name: 'x'.repeat(101) }, { name: 'bad\u0001name' }, { professionalStatus: 'OTHER' },
     { birthDate: '2026-02-30' }, { birthDate: '9999-01-01' },
@@ -269,7 +282,7 @@ test('G3 public intake to inspector review, accept, linked GET/PATCH and immutab
   const submittedProfile = {
     firstName: 'سلمى', lastName: 'بوخاري', dateOfBirth: '1986-03-04', placeOfBirth: 'وهران',
     phone: '0555123456', email: 'Salma@EXAMPLE.DZ', professionalStatus: 'PERMANENT',
-    employmentDate: '2006-09-01', primaryInstitutionName: 'ابتدائية النور',
+    employmentDate: '2006-09-01', workplace: { institutionName: 'ابتدائية النور', municipality: 'وهران', institutionAddress: 'شارع النخيل', directorPhone: '+21321234567' },
   };
   const publicResponse = await fetch(`${baseUrl}/api/v1/public/districts/${district.id}/submissions`, {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(submittedProfile),
@@ -294,9 +307,14 @@ test('G3 public intake to inspector review, accept, linked GET/PATCH and immutab
   const accepted = await db.teacherSubmission.findUniqueOrThrow({ where: { id: pending.id } });
   assert.ok(accepted.acceptedTeacherId);
   assert.equal(await db.teacher.count({ where: { id: accepted.acceptedTeacherId } }), 1);
+  const acceptedTeacher = await db.teacher.findUniqueOrThrow({ where: { id: accepted.acceptedTeacherId } });
+  assert.equal(acceptedTeacher.institutionId, null);
+  assert.deepEqual(accepted.submittedProfile.workplace, submittedProfile.workplace);
   const detail = await fetch(`${baseUrl}/api/v1/submissions/${pending.id}`, { headers: { cookie: cookieHeader(cookies) } });
   assert.equal((await detail.json()).data.acceptedTeacherId, accepted.acceptedTeacherId);
   assert.equal((await request(accepted.acceptedTeacherId)).status, 200);
+  const teacherContext = (await (await request(accepted.acceptedTeacherId)).json()).data.declaredWorkplace;
+  assert.deepEqual(teacherContext, { institutionName: 'ابتدائية النور', municipality: 'وهران', institutionAddress: 'شارع النخيل', directorPhone: '+21321234567', legacyAdditionalInstitutionNames: [] });
   assert.equal((await request(accepted.acceptedTeacherId, 'PATCH', { surname: 'قاسمي' })).status, 200);
   assert.equal((await db.teacher.findUniqueOrThrow({ where: { id: accepted.acceptedTeacherId } })).surname, 'قاسمي');
   assert.deepEqual((await db.teacherSubmission.findUniqueOrThrow({ where: { id: pending.id } })).submittedProfile, pending.submittedProfile);
@@ -315,4 +333,177 @@ test('G3 public intake to inspector review, accept, linked GET/PATCH and immutab
   assert.equal(await db.teacher.count({ where: { id: (await db.teacherSubmission.findUniqueOrThrow({ where: { id: racing.id } })).acceptedTeacherId } }), 1);
   assert.equal((await request(accepted.acceptedTeacherId, 'GET', undefined, { cookies: null })).status, 401);
   assert.equal((await fetch(`${baseUrl}/api/v1/public/teachers/${accepted.acceptedTeacherId}`)).status, 404);
+});
+
+test('TASK-043 read model separates declared workplace from the authoritative current Institution', async () => {
+  const { teacher, submission, snapshot } = await fixture();
+  const institution = await db.institution.create({ data: {
+    districtId: district.id, name: 'Authoritative School', municipality: 'بلدية موثقة',
+    address: 'عنوان موثق', directorPhone: '+21321234567',
+  } });
+  await db.teacher.update({ where: { id: teacher.id }, data: { institutionId: institution.id } });
+
+  const response = await request(teacher.id);
+  assert.equal(response.status, 200);
+  const { data } = await response.json();
+  assert.deepEqual(data.currentInstitution, {
+    id: institution.id, name: 'Authoritative School', municipality: 'بلدية موثقة',
+    address: 'عنوان موثق', directorPhone: '+21321234567',
+  });
+  assert.deepEqual(data.declaredWorkplace, {
+    institutionName: 'ابتدائية النور', municipality: null, institutionAddress: null,
+    directorPhone: null, legacyAdditionalInstitutionNames: ['ابتدائية الفجر'],
+  });
+  assert.notEqual(data.currentInstitution.name, data.declaredWorkplace.institutionName);
+  assert.equal(Object.hasOwn(data, 'institutionId'), false);
+  assert.deepEqual((await db.teacherSubmission.findUniqueOrThrow({ where: { id: submission.id } })).submittedProfile, snapshot);
+});
+
+test('TASK-043 links and changes only the Teacher relation with scoped ID-only audits', async () => {
+  const { teacher, submission, snapshot } = await fixture();
+  const first = await db.institution.create({ data: {
+    districtId: district.id, name: 'First Trusted School', municipality: 'First town',
+    address: 'First address', directorPhone: '+21321234567',
+  } });
+  const firstBefore = await db.institution.findUniqueOrThrow({ where: { id: first.id } });
+  const link = await currentInstitutionRequest(teacher.id, { expectedInstitutionId: null, institutionId: first.id });
+  assert.equal(link.status, 200);
+  assert.deepEqual((await link.json()).data, {
+    teacherId: teacher.id,
+    currentInstitution: { id: first.id, name: first.name, municipality: first.municipality, address: first.address, directorPhone: first.directorPhone },
+  });
+  assert.equal((await db.teacher.findUniqueOrThrow({ where: { id: teacher.id } })).institutionId, first.id);
+  assert.deepEqual(await db.institution.findUniqueOrThrow({ where: { id: first.id } }), firstBefore);
+  assert.deepEqual((await db.teacherSubmission.findUniqueOrThrow({ where: { id: submission.id } })).submittedProfile, snapshot);
+  const linkedAudit = await db.auditLog.findFirstOrThrow({ where: { entityId: teacher.id, action: 'TEACHER_INSTITUTION_LINKED' } });
+  assert.equal(linkedAudit.entityType, 'Teacher');
+  assert.equal(linkedAudit.actorInspectorId, inspector.id);
+  assert.equal(linkedAudit.districtId, district.id);
+  assert.equal(linkedAudit.requestId, link.headers.get('x-request-id'));
+  assert.deepEqual(linkedAudit.metadata, { institutionId: first.id });
+  assert.equal(JSON.stringify(linkedAudit.metadata).includes('First Trusted School'), false);
+  assert.equal(JSON.stringify(linkedAudit.metadata).includes('First address'), false);
+
+  const genericPatch = await request(teacher.id, 'PATCH', { institutionId: null });
+  assert.equal(genericPatch.status, 400);
+  assert.equal((await db.teacher.findUniqueOrThrow({ where: { id: teacher.id } })).institutionId, first.id);
+
+  const second = await db.institution.create({ data: { districtId: district.id, name: 'Second Trusted School' } });
+  const secondBefore = await db.institution.findUniqueOrThrow({ where: { id: second.id } });
+  const change = await currentInstitutionRequest(teacher.id, { expectedInstitutionId: first.id, institutionId: second.id });
+  assert.equal(change.status, 200);
+  assert.equal((await db.teacher.findUniqueOrThrow({ where: { id: teacher.id } })).institutionId, second.id);
+  assert.deepEqual(await db.institution.findUniqueOrThrow({ where: { id: first.id } }), firstBefore);
+  assert.deepEqual(await db.institution.findUniqueOrThrow({ where: { id: second.id } }), secondBefore);
+  const changedAudit = await db.auditLog.findFirstOrThrow({ where: { entityId: teacher.id, action: 'TEACHER_INSTITUTION_CHANGED' } });
+  assert.deepEqual(changedAudit.metadata, { previousInstitutionId: first.id, institutionId: second.id });
+  assert.equal(await db.$queryRaw`SELECT to_regclass('"TeacherInstitutionAssignment"')::text AS name`.then((rows) => rows[0]?.name ?? null), null);
+
+  const countBeforeNoop = await db.auditLog.count({ where: { entityId: teacher.id } });
+  const teacherBeforeNoop = await db.teacher.findUniqueOrThrow({ where: { id: teacher.id } });
+  const noOp = await currentInstitutionRequest(teacher.id, { expectedInstitutionId: second.id, institutionId: second.id });
+  assert.equal(noOp.status, 200);
+  assert.equal((await db.teacher.findUniqueOrThrow({ where: { id: teacher.id } })).updatedAt.getTime(), teacherBeforeNoop.updatedAt.getTime());
+  assert.equal(await db.auditLog.count({ where: { entityId: teacher.id } }), countBeforeNoop);
+});
+
+test('TASK-043 enforces authentication, CSRF, scope, strict target shape and archive eligibility', async () => {
+  const { teacher } = await fixture();
+  const local = await db.institution.create({ data: { districtId: district.id, name: 'Local eligible' } });
+  const outside = await db.institution.create({ data: { districtId: otherDistrict.id, name: 'Secret outside' } });
+  const archived = await db.institution.create({ data: { districtId: district.id, name: 'Archived target', archivedAt: new Date() } });
+
+  assert.equal((await currentInstitutionRequest(teacher.id, { expectedInstitutionId: null, institutionId: local.id }, { cookies: null })).status, 401);
+  assert.equal((await currentInstitutionRequest(teacher.id, { expectedInstitutionId: null, institutionId: local.id }, { cookies: inactiveCookies })).status, 401);
+  assert.equal((await currentInstitutionRequest(teacher.id, { expectedInstitutionId: null, institutionId: local.id }, { noCsrf: true })).status, 403);
+  assert.equal((await currentInstitutionRequest(teacher.id, { expectedInstitutionId: null, institutionId: local.id }, { invalidCsrf: true })).status, 403);
+  assert.equal((await currentInstitutionRequest('not-a-uuid', { expectedInstitutionId: null, institutionId: local.id })).status, 400);
+  assert.equal((await currentInstitutionRequest(randomUUID(), { expectedInstitutionId: null, institutionId: local.id })).status, 404);
+
+  for (const body of [
+    { institutionId: local.id },
+    { expectedInstitutionId: null },
+    { expectedInstitutionId: null, institutionId: null },
+    { expectedInstitutionId: null, institutionId: local.id, createInstitution: { name: 'extra' } },
+    { expectedInstitutionId: null, createInstitution: { name: 'new', districtId: district.id } },
+    { expectedInstitutionId: null, createInstitution: { name: 'new', directorPhone: 'invalid' } },
+  ]) assert.equal((await currentInstitutionRequest(teacher.id, body)).status, 400, JSON.stringify(body));
+
+  const outsideResponse = await currentInstitutionRequest(teacher.id, { expectedInstitutionId: null, institutionId: outside.id });
+  assert.equal(outsideResponse.status, 404);
+  assert.equal((await outsideResponse.json()).error.message, 'المورد غير موجود ضمن نطاق الوصول.');
+  assert.equal((await currentInstitutionRequest(teacher.id, { expectedInstitutionId: null, institutionId: archived.id })).status, 409);
+  assert.equal((await db.teacher.findUniqueOrThrow({ where: { id: teacher.id } })).institutionId, null);
+  assert.equal(await db.auditLog.count({ where: { entityId: teacher.id } }), 0);
+
+  const expired = await fixture(expiredDistrict.id);
+  const expiredInstitution = await db.institution.create({ data: { districtId: expiredDistrict.id, name: 'Expired scope' } });
+  assert.equal((await currentInstitutionRequest(expired.teacher.id, { expectedInstitutionId: null, institutionId: expiredInstitution.id })).status, 404);
+});
+
+test('TASK-043 expected current state serializes concurrent links and rejects stale replacement', async () => {
+  const { teacher } = await fixture();
+  const first = await db.institution.create({ data: { districtId: district.id, name: 'Concurrent A' } });
+  const second = await db.institution.create({ data: { districtId: district.id, name: 'Concurrent B' } });
+  const outcomes = await Promise.all([
+    currentInstitutionRequest(teacher.id, { expectedInstitutionId: null, institutionId: first.id }),
+    currentInstitutionRequest(teacher.id, { expectedInstitutionId: null, institutionId: second.id }),
+  ]);
+  assert.deepEqual(outcomes.map(({ status }) => status).sort(), [200, 409]);
+  const winnerId = (await db.teacher.findUniqueOrThrow({ where: { id: teacher.id } })).institutionId;
+  assert.ok([first.id, second.id].includes(winnerId));
+  const staleTargetId = winnerId === first.id ? second.id : first.id;
+  const stale = await currentInstitutionRequest(teacher.id, { expectedInstitutionId: staleTargetId, institutionId: staleTargetId });
+  assert.equal(stale.status, 409);
+  assert.equal((await db.teacher.findUniqueOrThrow({ where: { id: teacher.id } })).institutionId, winnerId);
+  assert.equal(await db.auditLog.count({ where: { entityId: teacher.id, action: 'TEACHER_INSTITUTION_LINKED' } }), 1);
+  assert.equal(await db.auditLog.count({ where: { entityId: teacher.id, action: 'TEACHER_INSTITUTION_CHANGED' } }), 0);
+});
+
+test('TASK-043 create-and-link normalizes reviewed values and rolls back all writes if audit fails', async () => {
+  const { teacher, submission, snapshot } = await fixture();
+  const initialInstitutionCount = await db.institution.count();
+  const body = {
+    expectedInstitutionId: null,
+    createInstitution: { name: '  Reviewed   School ', municipality: ' بلدية   جديدة ', address: ' شارع   جديد ', directorPhone: '021234567' },
+  };
+  const response = await currentInstitutionRequest(teacher.id, body);
+  assert.equal(response.status, 200);
+  const result = (await response.json()).data;
+  const created = await db.institution.findUniqueOrThrow({ where: { id: result.currentInstitution.id } });
+  assert.equal(created.districtId, teacher.districtId);
+  assert.deepEqual([created.name, created.municipality, created.address, created.directorPhone], ['Reviewed School', 'بلدية جديدة', 'شارع جديد', '+21321234567']);
+  assert.equal((await db.teacher.findUniqueOrThrow({ where: { id: teacher.id } })).institutionId, created.id);
+  assert.equal(await db.institution.count(), initialInstitutionCount + 1);
+  assert.deepEqual((await db.teacherSubmission.findUniqueOrThrow({ where: { id: submission.id } })).submittedProfile, snapshot);
+  const creationAudit = await db.auditLog.findFirstOrThrow({ where: { action: 'INSTITUTION_CREATED', entityId: created.id } });
+  const linkAudit = await db.auditLog.findFirstOrThrow({ where: { action: 'TEACHER_INSTITUTION_LINKED', entityId: teacher.id } });
+  assert.deepEqual(creationAudit.metadata, {});
+  assert.deepEqual(linkAudit.metadata, { institutionId: created.id });
+  assert.equal(creationAudit.actorInspectorId, inspector.id);
+  assert.equal(creationAudit.districtId, teacher.districtId);
+  assert.equal(linkAudit.actorInspectorId, inspector.id);
+  assert.equal(linkAudit.districtId, teacher.districtId);
+  for (const sensitive of ['Reviewed School', 'بلدية جديدة', 'شارع جديد', '+21321234567']) {
+    assert.equal(JSON.stringify([creationAudit.metadata, linkAudit.metadata]).includes(sensitive), false);
+  }
+
+  const rollbackTeacher = (await fixture()).teacher;
+  const beforeRollbackCount = await db.institution.count();
+  await db.$executeRawUnsafe(`CREATE FUNCTION "${schemaName}".reject_task043_link_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='TEACHER_INSTITUTION_LINKED' THEN RAISE EXCEPTION 'synthetic audit failure'; END IF; RETURN NEW; END $$`);
+  await db.$executeRawUnsafe(`CREATE TRIGGER reject_task043_link_audit BEFORE INSERT ON "${schemaName}"."AuditLog" FOR EACH ROW EXECUTE FUNCTION "${schemaName}".reject_task043_link_audit()`);
+  try {
+    const failed = await currentInstitutionRequest(rollbackTeacher.id, {
+      expectedInstitutionId: null,
+      createInstitution: { name: 'Will Roll Back', municipality: 'Rollback Town' },
+    });
+    assert.equal(failed.status, 500);
+    assert.equal(JSON.stringify(await failed.json()).includes('synthetic audit failure'), false);
+    assert.equal(await db.institution.count(), beforeRollbackCount);
+    assert.equal((await db.teacher.findUniqueOrThrow({ where: { id: rollbackTeacher.id } })).institutionId, null);
+    assert.equal(await db.auditLog.count({ where: { entityId: rollbackTeacher.id } }), 0);
+  } finally {
+    await db.$executeRawUnsafe(`DROP TRIGGER reject_task043_link_audit ON "${schemaName}"."AuditLog"`);
+    await db.$executeRawUnsafe(`DROP FUNCTION "${schemaName}".reject_task043_link_audit()`);
+  }
 });

@@ -11,21 +11,19 @@ const validSubmission = {
   email: 'teacher@EXAMPLE.DZ',
   professionalStatus: 'PERMANENT',
   employmentDate: '2000-01-02',
-  primaryInstitutionName: 'ابتدائية النور',
+  workplace: { institutionName: 'ابتدائية النور', municipality: 'بلدية الجزائر', institutionAddress: 'شارع الاستقلال', directorPhone: '021234567' },
 };
 
-test('valid Arabic submission is normalized without losing its snapshot fields', () => {
+test('valid Arabic submission normalizes the single structured workplace', () => {
   const parsed = teacherSubmissionSchema.parse({
     ...validSubmission,
     firstName: '  أحمد   علي  ',
-    primaryInstitutionName: ' مدرسة   النور ',
-    additionalInstitutionNames: ['   مدرسة الهدى  '],
+    workplace: { ...validSubmission.workplace, institutionName: ' مدرسة   النور ', municipality: ' بلدية   الجزائر ', institutionAddress: ' شارع   الاستقلال ' },
   });
   assert.equal(parsed.firstName, 'أحمد علي');
   assert.equal(parsed.phone, '+213555123456');
   assert.equal(parsed.email, 'teacher@example.dz');
-  assert.equal(parsed.primaryInstitutionName, 'مدرسة النور');
-  assert.deepEqual(parsed.additionalInstitutionNames, ['مدرسة الهدى']);
+  assert.deepEqual(parsed.workplace, { institutionName: 'مدرسة النور', municipality: 'بلدية الجزائر', institutionAddress: 'شارع الاستقلال', directorPhone: '+21321234567' });
 });
 
 test('only the four documented professional statuses are accepted', () => {
@@ -43,8 +41,7 @@ test('Unicode code point boundaries and control character policy are enforced', 
     placeOfBirth: 'ج'.repeat(150),
     qualifications: 'د'.repeat(1000),
     notes: `ملاحظة\n${'م'.repeat(1993)}`,
-    primaryInstitutionName: 'و'.repeat(200),
-    additionalInstitutionNames: Array.from({ length: 5 }, (_, index) => `${index}${'ز'.repeat(199)}`),
+    workplace: { institutionName: 'و'.repeat(200), municipality: 'ز'.repeat(150), institutionAddress: 'ع'.repeat(300), directorPhone: '0555123456' },
   };
   assert.equal(teacherSubmissionSchema.safeParse(exact).success, true);
   assert.equal(teacherSubmissionSchema.safeParse({ ...exact, firstName: `${exact.firstName}ا` }).success, false);
@@ -76,11 +73,17 @@ test('Algerian fixed and mobile local/international phone forms normalize canoni
   }
 });
 
-test('institution names reject duplicates after normalized comparison and only accept bounded arrays', () => {
-  assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, additionalInstitutionNames: [] }).success, true);
-  assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, additionalInstitutionNames: Array(5).fill('مدرسة') }).success, false);
-  assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, primaryInstitutionName: 'المدرسة', additionalInstitutionNames: [' المدرسة '] }).success, false);
-  assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, additionalInstitutionNames: Array(6).fill('مدرسة') }).success, false);
+test('workplace is mandatory, strict, bounded and rejects legacy declaration keys', () => {
+  assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, workplace: undefined }).success, false);
+  assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, workplace: { ...validSubmission.workplace, extra: 'x' } }).success, false);
+  for (const [field, max] of [['institutionName', 200], ['municipality', 150], ['institutionAddress', 300]]) {
+    assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, workplace: { ...validSubmission.workplace, [field]: 'و'.repeat(max + 1) } }).success, false);
+  }
+  assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, primaryInstitutionName: 'legacy' }).success, false);
+  assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, additionalInstitutionNames: ['legacy'] }).success, false);
+  assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, workplace: { ...validSubmission.workplace, institutionName: ' ' } }).success, false);
+  assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, workplace: { ...validSubmission.workplace, directorPhone: '0'.repeat(21) } }).success, false);
+  assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, workplace: { ...validSubmission.workplace, directorPhone: '021234567             ' } }).success, false);
 });
 
 test('strict schema rejects unknown keys, null optional values, and empty optional text', () => {

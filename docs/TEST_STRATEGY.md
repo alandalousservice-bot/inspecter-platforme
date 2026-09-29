@@ -4,9 +4,9 @@
 
 | مستوى | تحقق حرج |
 |---|---|
-| Unit | تطبيع البحث/مرشحات التكرار دون merge؛ مجموع النصاب حسب التاريخ؛ صلاحية فترات الإسناد؛ تداخل slots؛ transitions للطلب/الزيارة/التقرير؛ schema المقترحات حسب kind |
+| Unit | تطبيع البحث/مرشحات التكرار دون merge؛ فصل جهة العمل المعلنة عن المعتمدة؛ تداخل slots في الجدول الأسبوعي المستقل؛ transitions للطلب/الزيارة/التقرير؛ schema المقترحات حسب kind |
 | Integration | 202 public receipt بلا تسريب؛ rate limit/CSRF/auth؛ قبول واحد فقط عند طلبين متزامنين مع Teacher وAuditLog؛ رفض/مراجعة بلا Teacher؛ فحص ownership/district لكل query/mutation؛ pagination/filtering؛ قيود FK/transactions؛ migration clean+upgrade |
-| E2E | تسجيل المفتش؛ إرسال عام ثم مراجعة واعتماد؛ أستاذ بمؤسستين ونصاب صحيح؛ البحث الثلاثاء صباحًا؛ زيارة→تقرير→متابعة؛ proposal إنشاء/تعديل/نسخ/أرشفة/طباعة؛ MemoTemplate مستقل عن زيارة |
+| E2E | تسجيل المفتش؛ إرسال عام ثم مراجعة واعتماد؛ أستاذ بلا مؤسسة معتمدة ثم اعتماد مؤسسة حالية واحدة؛ البحث الثلاثاء صباحًا بعد تنفيذ الجدول المستقل؛ زيارة→تقرير→متابعة؛ proposal إنشاء/تعديل/نسخ/أرشفة/طباعة؛ MemoTemplate مستقل عن زيارة |
 | UI/print | RTL وkeyboard/focus/error/loading/empty، desktop/tablet/mobile، 200% zoom؛ A4 متعدد الصفحات وعربية وأرقام/PDF browser preview |
 | Ops | logs بلا PII، session revoke، restore test قبل النشر، health check، migration gate منفصل |
 
@@ -21,6 +21,24 @@ TASK-034 integration tests: فرض مصفوفة ADR-026 على الخادم؛ ج
 TASK-035 API/DB tests: GET/PATCH يشترطان Inspector `ACTIVE` وعضوية حالية؛ اختبر جلسة غائبة/معطلة، عضوية منتهية/مستقبلية، و404 عام للمعرّف الغائب أو خارج النطاق وUUID مشوه. GET يعيد الحقول المحددة وتواريخ `YYYY-MM-DD` وسياق المؤسسات المعلنة من الطلب المقبول فقط، دون snapshot كامل أو notes/receipt/decision metadata أو AuditLog قراءة. تفصيل submission لا يكشف `acceptedTeacherId` خارج النطاق، ويظهر رابطًا فقط بعد قبول مرتبط. PATCH يختبر كل حقل على حدة، الجزئي والإبقاء على المحذوف، مسح nullable بـ`null`، رفض null لـ`name/surname`، رفض `""`، الجسم الفارغ/المفاتيح غير المعروفة/حقول النطاق والحالة والأرشفة والمصدر، والحدود Unicode ومحارف التحكم والتواريخ الحقيقية/المستقبلية والكرونولوجيا بعد الدمج والهاتف الجزائري والبريد والوضعيات الأربع. لا merge أو منع تحديث بسبب PII مكرر. اختبر تغير `updatedAt` عند التعديل فقط، وno-op دون AuditLog، وحدث `TEACHER_PROFILE_UPDATED` واحدًا بأسماء الحقول المتغيرة فقط دون قيم PII، وأن فشل append يرجع PATCH. يبقى submittedProfile وقرار الطلب وInstitution/Assignment وعدد Teachers دون تغيير؛ لا migration لـTASK-035. اختبر آخر كتابة ناجحة للحقل نفسه دون version precondition والحقول غير المذكورة دون فقد.
 
 TASK-035 UI/G3: عرض/تحرير/إلغاء/حفظ مع loading/error/success وvalidation محلية/خادمية، منع double-submit، عدم التحديث المتفائل، focus/keyboard وRTL/responsive. حالات `ACTIVE/INACTIVE` بتسميات عربية read-only، والتصريحات الأصلية موسومة غير معتمدة ولا حقول تعديل لها، ولا حساب أستاذ أو قائمة/إسناد/زيارة. اختبر مسارًا متكاملًا public POST → قائمة/تفصيل المفتش وتنبيه التشابه → تأكيد ACCEPT → `acceptedTeacherId` من تفصيل مصرح → GET وواجهة Teacher → PATCH مسموح → snapshot الأصلي ثابت؛ ومساري REJECT وINTERNAL_REVIEW والسباق/الخصوصية. تظل اختبارات TASK-020..034 خضراء قبل غلق G3.
+
+## Post-G3 workplace regression — ADR-029
+
+تبقى اختبارات TASK-030..035 وسيناريو G3 المحفوظ دليلًا تاريخيًا لصيغة `primaryInstitutionName`/`additionalInstitutionNames`، ولا تُعاد كتابة snapshots أو migrations القديمة. من TASK-041 يُضاف مسار E2E متصل للنموذج الجديد: أربعة حقول جهة عمل مطلوبة لمؤسسة واحدة، رفض مفاتيح المؤسسات القديمة في POST الجديد، `202` بإيصال فقط، وبقاء السجل المرسل دون إنشاء Institution أو رابط. يُقرأ snapshot قديم بجميع تصريحاته الأصلية وبحقول البلدية/العنوان/هاتف المدير `null`، ويظل ACCEPT ينشئ Teacher واحدًا بلا مؤسسة معتمدة، مع بقاء قرارات G3 وملف Teacher عاملين.
+
+TASK-040: clean+upgrade migration من checkpoint G3 على قاعدة معزولة؛ صفوف Institution القديمة تبقى سليمة والحقول الجديدة NULL، وTeacher القديم `institutionId=NULL`. اختبر FK المركب داخل District، ورفض ربط District مختلفة على مستوى DB، ورابط واحد كحد أقصى لكل Teacher، وعدم تغيير الجداول أو snapshots التاريخية.
+
+TASK-041: تحقّق Zod وحدود النص والهاتف لكل حقل workplace، ورفض الأسماء الإضافية/المفاتيح القديمة في POST الجديد، وواجهة عربية RTL ولوحة مفاتيح/تركيز/أخطاء/إيصال. اختبر القراءة المتوافقة للقديم في تفاصيل الطلب وملف Teacher، وغياب الإنشاء/المطابقة الآلية للمؤسسة.
+
+TASK-042: GET/PATCH مؤسسة ضمن النطاق، تحقق المدخلات والمحو الصريح بـ`null` مع بقاء الحقل المحذوف، و`409` للمؤرشفة. اختبر CSRF لـPOST القديم والجديد، وإنشاء/تعديل AuditLog ذريًّا بلا قيم هاتف/عنوان في metadata؛ لا merge على تشابه الاسم.
+
+TASK-043/046: اختيار مؤسسة موجودة في District Teacher نفسها أو إنشاء صريح ثم ربط ذري، وفشل العملية كلها إذا فشل التدقيق أو FK. اختبر `expectedInstitutionId` وتعارض التزامن، `404` عامًا لخارج النطاق، `409` للمؤرشفة، وعدم نسخ تصريحات الأستاذ تلقائيًا إلى سجل مشترك. يُعرض «لم تُعتمد مؤسسة حالية» عند NULL؛ يفصل الملف بين التصريح التاريخي والرابط المعتمد؛ التغيير يستبدل الرابط فقط بلا تاريخ نقل أو جدول أسبوعي. أحداث التدقيق IDs وأسماء الحقول فقط بلا PII؛ تدفقات UI loading/error/success/RTL/accessibility.
+
+TASK-047: clean+upgrade migration مع Teacher قديم بلا مؤسسة؛ جدول واحد لكل `(teacherId,academicYear)` بصيغة سنتين متتابعتين، revision افتراضي موجب، timestamps وFK/onDelete، وعدم وجود status/validFrom/validTo أو institutionId/assignmentId أو تاريخ نسخ. اختبر يوم 1..7، دقائق `0 <= start < end <= 1440`، slots متعددة/يوم، تجاور مسموح، تداخل مرفوض من DB حتى في سباق إدخال؛ اختلاف يوم/جدول لا يُرفض. اختبر حدود النصوص الاختيارية وتطبيعها في TASK-048 عند توفر API. لا API/UI/AuditLog في 047.
+
+TASK-048: integration لauth/CSRF/district scope و404 خارج النطاق، عرض الجدول وTeacher غير المربوط، ومنع الإنشاء/التعديل دون مؤسسة حالية؛ سنة canonical/slot validation/حدود النص، تداخل برسالة آمنة، revision stale/conflict 409 بلا تغيير جزئي أو audit، وزيادة revision مرة لكل mutation ناجحة. اختبر `WEEKLY_SCHEDULE_CREATED/UPDATED` داخل transaction مع metadata IDs/counts/changedFields فقط، وعدم تسرب notes/level/group أو PII، وrollback عند فشل append. UI عربي RTL يستعرض ويحرر الجدول الحالي، loading/empty/error/conflict/keyboard/focus، ومتصفح متصل؛ بلا استثناءات أو تاريخ نسخ.
+
+TASK-044/045: server-side q/filters/pagination ودليل صالح لأكثر من 180 Teacher، «يعمل اليوم» slot واحد على الأقل ليوم `Africa/Algiers` الحالي، و«يعمل الآن» مع `startMinute <= localMinute < endMinute`؛ تحقق حدود بداية/نهاية slot وعدم فحص العطلات؛ الثلاثاء صباحًا E2E باستخدام بيانات API، لا client-only filtering. إن أضيفت البلدية لاحقًا تؤخذ من `currentInstitution.municipality` لا عمود Teacher. لا يُعدّ غياب الجدول مانعًا لهجرة TASK-040.
 
 عند كل task: tests الخاصة به، typecheck، lint، build عند تغير wiring، regression مرتبط بالموديول. Gate المرحلي يتطلب الأدلة لا مجرد نجاح الأمر. لا يجري اختبارات إنتاج أو migrations عليه في هذه المرحلة.
 

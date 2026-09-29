@@ -98,12 +98,22 @@ export function SubmissionDetailPage() {
                 <Fact label="الصفة المهنية">{professionalStatusLabels[profile.professionalStatus] ?? profile.professionalStatus}</Fact>
                 <Fact label="تاريخ التوظيف">{formatDate(profile.employmentDate)}</Fact>
                 {profile.confirmationDate ? <Fact label="تاريخ الترسيم/التثبيت">{formatDate(profile.confirmationDate)}</Fact> : null}
-                <Fact label="المؤسسة الأساسية">{profile.primaryInstitutionName}</Fact>
-                {profile.additionalInstitutionNames?.length ? <Fact label="مؤسسات إضافية">{profile.additionalInstitutionNames.join('، ')}</Fact> : null}
                 {profile.qualifications ? <Fact label="المؤهلات">{profile.qualifications}</Fact> : null}
                 {profile.notes ? <Fact label="ملاحظات المرسل">{profile.notes}</Fact> : null}
                 <Fact label="الحالة">{statusLabels[submission.status]}</Fact>
                 <Fact label="تاريخ الإرسال">{formatDate(submission.submittedAt)}</Fact>
+              </dl>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader title="جهة العمل المصرح بها — غير معتمدة" />
+            <CardContent>
+              <dl className="submission-facts submission-facts--profile">
+                <Fact label="اسم المؤسسة">{submission.declaredWorkplace?.institutionName}</Fact>
+                <Fact label="البلدية">{submission.declaredWorkplace?.municipality ?? 'غير متاحة'}</Fact>
+                <Fact label="عنوان المؤسسة">{submission.declaredWorkplace?.institutionAddress ?? 'غير متاحة'}</Fact>
+                <Fact label="هاتف المدير"><span dir="ltr">{submission.declaredWorkplace?.directorPhone ?? 'غير متاحة'}</span></Fact>
+                {submission.declaredWorkplace?.legacyAdditionalInstitutionNames.length ? <Fact label="مؤسسات إضافية — تصريح تاريخي">{submission.declaredWorkplace.legacyAdditionalInstitutionNames.join('، ')}</Fact> : null}
               </dl>
             </CardContent>
           </Card>

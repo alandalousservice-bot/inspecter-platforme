@@ -7,7 +7,7 @@
 | ADR-001 | ACCEPTED | React/Vite + Express modular monolith TypeScript API؛ أبسط فصل للويب وأجهزة مستقبلية مقابل SSR/monolith متشابك |
 | ADR-002 | ACCEPTED | PostgreSQL + Prisma؛ علاقات وتاريخ ومعاملات وفهارس واضحة، قابل للنشر على مزودين |
 | ADR-003 | ACCEPTED | Teacher كيان مهني بلا login؛ Inspector فقط صاحب جلسة؛ submission لا ينشئ Teacher إلا بقرار transaction |
-| ADR-004 | ACCEPTED | إسنادات Teacher↔Institution مستقلة زمنيا، جدول أسبوعي structured؛ لا schoolId وحيد ولا PDF مصدر بيانات |
+| ADR-004 | ACCEPTED | قرار G0 التاريخي بإسنادات متعددة مؤرخة؛ يستبدل ADR-029 نموذج العلاقة للمراحل اللاحقة لـG3. يبقى الجدول الأسبوعي منفصلًا |
 | ADR-005 | ACCEPTED | جلسات خادمية قابلة للإبطال في cookie مع CSRF/authorization على الخادم؛ تبسيط إبطال الجلسات مقارنة JWT مستقل |
 | ADR-006 | ACCEPTED | Official/reference منفصل عن InspectorProposal؛ revisions محفوظة وMemoTemplate ليس Visit/Report |
 | ADR-007 | ACCEPTED | طباعة HTML A4 وحفظ PDF من المتصفح في MVP؛ server PDF عند ثبوت حاجة لمخرجات ثابتة/آلية |
@@ -18,7 +18,7 @@
 | ADR-012 | OPEN | نموذج تقرير الزيارة الرسمي: عند وصوله تُحدد الحقول والقالب والتوقيعات؛ الآن skeleton فقط |
 | ADR-013 | OPEN | المرجع البيداغوجي الرسمي وحقوق استعماله وإصداره: تحقق مصدر/سلطة كل وثيقة قبل وسمها OFFICIAL |
 | ADR-014 | OPEN | سياسة الخصوصية والاحتفاظ والأرشفة والحذف، ومن يرى المقترحات ومتى تُنشر للأساتذة: يقررها Product Owner/الجهة المعنية |
-| ADR-015 | ACCEPTED | نموذج Public Teacher Intake وحقوله وحدود إدخاله وتوجيه المقاطعة والتحقق والتكرار والتصحيح كما هو موثق أدناه؛ لا Teacher/Institution/Assignment من public POST |
+| ADR-015 | ACCEPTED | عقد G3 التاريخي لـPublic Teacher Intake؛ يستبدل ADR-029 شكل مكان العمل للإرسالات الجديدة بعد TASK-041، مع بقاء snapshots القديمة كما أُرسلت |
 | ADR-016 | OPEN | branding/palette النهائية والخط المرخص؛ tokens والأدوار مقررة، القيم لا تُختار اعتباطيًا |
 | ADR-017 | OPEN | سياسة نقل أستاذ بين المقاطعات وتاريخ ملكية السجلات متعددة المفتشين؛ يُحسم قبل تنفيذ النقل |
 | ADR-018 | REJECTED | نسخ teacher-as-user وteacher.schoolId الوحيد من ArenaSPEX؛ يخالف Master ويكسر التاريخ والصلاحيات |
@@ -32,6 +32,8 @@
 | ADR-026 | ACCEPTED | قرارات TeacherSubmission: مصفوفة انتقالات نهائية في MVP، بلا سبب رفض أو ملاحظة مراجعة، وواجهة القرار لا تُفعّل قبل TASK-034 |
 | ADR-027 | ACCEPTED | عقد Teacher عند قبول الطلب: سجل مهني حالي، `recordStatus=ACTIVE` أوليًا، qualifications تُنقل وnotes تبقى في snapshot؛ قرارات submission بلا `Idempotency-Key` في MVP؛ التفاصيل أدناه |
 | ADR-028 | ACCEPTED | عقد تحرير ملف Teacher في TASK-035: تصحيح الحقول المهنية الحالية دون مساس بإقرار المصدر أو النطاق/دورة الحياة؛ تدقيق القيم المتغيرة بأسماء الحقول فقط؛ التفاصيل أدناه |
+| ADR-029 | ACCEPTED | بعد G3: مؤسسة حالية واحدة معتمدة كحد أقصى لكل Teacher وعلاقة FK مباشرة nullable، وتصريح مكان عمل واحد بأربعة حقول مطلوبة، واعتماد/ربط صريح من المفتش؛ التفاصيل أدناه |
+| ADR-030 | ACCEPTED | جدول أسبوعي حالي واحد لكل Teacher وسنة دراسية؛ slots متعددة بلا تداخل، revision للتزامن لا للتاريخ؛ التفاصيل أدناه |
 
 الأمور OPEN لا توقف المهام التي تقتصر على foundations ولا تخمّن ما وراءها. [IMPLEMENTATION_PLAN](IMPLEMENTATION_PLAN.md) يحدد gates التي تحتاجها.
 
@@ -69,7 +71,7 @@
 
 AuditLog سجل أفعال العمل والأمن المُلزم بتدقيقها، وليس application logging أو analytics أو telemetry أو مخزن request tracing. `requestId` رابط تشخيصي فقط. `action` ثابت نصي موثق ومتحقق منه في التطبيق، بلا DB enum أو قيمة حرة من المستدعي. تُعرّف الأحداث المعروفة لقبول/رفض/مراجعة TeacherSubmission، إنهاء InspectionReport، انتقال FollowUp، وعمليات Proposal المطلوبة في TASK-063؛ تعريف الحدث لا ينفذ workflow أو يوجب ربط endpoint قائم ضمن TASK-025. لا يشمل TASK-025 إنشاء Institution أو login/logout أو session revoke أو أي workflow مستقبلي.
 
-الثوابت المدعومة: `TEACHER_SUBMISSION_ACCEPTED/REJECTED/INTERNAL_REVIEW` (نوع المورد `TeacherSubmission`)، `INSPECTION_REPORT_FINALIZED` (`InspectionReport`)، `FOLLOW_UP_STATE_CHANGED` (`FollowUp`)، و`INSPECTOR_PROPOSAL_CREATED/UPDATED/CLONED/ARCHIVED` (`InspectorProposal`). يضيف [ADR-028](#adr-028--inspector-managed-teacher-profile-editing-task-035) في TASK-035 حدث `TEACHER_PROFILE_UPDATED` (نوع المورد `Teacher`) بتفاصيل مقيدة. في TASK-025 لم يُربط أي endpoint قائم؛ عمليات submission في TASK-034، وتعديل Teacher في TASK-035، وreport في TASK-052، وFollowUp عند تنفيذ عقده، وproposal في TASK-063 وما يتبعه هي مستهلكون بحسب مهماتهم. لا يعني توثيق الثابت تنفيذًا مسبقًا.
+الثوابت المدعومة: `TEACHER_SUBMISSION_ACCEPTED/REJECTED/INTERNAL_REVIEW` (نوع المورد `TeacherSubmission`)، `INSPECTION_REPORT_FINALIZED` (`InspectionReport`)، `FOLLOW_UP_STATE_CHANGED` (`FollowUp`)، و`INSPECTOR_PROPOSAL_CREATED/UPDATED/CLONED/ARCHIVED` (`InspectorProposal`). يضيف [ADR-028](#adr-028--inspector-managed-teacher-profile-editing-task-035) في TASK-035 حدث `TEACHER_PROFILE_UPDATED` (`Teacher`) بتفاصيل مقيدة. وتضيف [ADR-029](#adr-029--one-current-teacher-workplace-after-g3) عند تنفيذ TASK-042 حدثي `INSTITUTION_CREATED/UPDATED` (`Institution`)؛ الإنشاء metadata `{}` والتعديل `{changedFields:[name|municipality|address|directorPhone]}` فقط. ويضيف [ADR-030](#adr-030--weekly-schedule-mvp-contract) عند TASK-048 حدثي `WEEKLY_SCHEDULE_CREATED/UPDATED` (`WeeklySchedule`) بالmetadata المحددة هناك. عمليات submission في TASK-034، وتعديل Teacher في TASK-035، ومؤسسة في TASK-042، والجدول في TASK-048، وreport في TASK-052، وFollowUp عند تنفيذ عقده، وproposal في TASK-063 وما يتبعه هي مستهلكون بحسب مهماتهم. لا يعني توثيق أي ثابت تنفيذ workflow قبل مهمته.
 
 `actorInspectorId` يشير إلى المفتش المنفذ؛ NULL محجوز لفعل آلي موثوق مستقبلًا، وليس هوية عامة مجهولة. لا `actorType` أو تنفيذ public/system workflow الآن. `districtId` سياق مقاطعة المورد وقت الحدث، ويأخذه المستدعي من المورد بعد authorization؛ لا يُختار من عضويات المفتش عند تعددها. يلزم للأحداث ذات المورد المقاطعي ويجوز NULL لحدث مستقبلي بلا مقاطعة. `entityType/entityId` مرجع منطقي متعدد الأنواع بلا FK إلى المورد، كي يبقى تاريخ الحدث عند أرشفته. actor/district علاقات FK بـ`Restrict` عند الحذف و`Cascade` عند تحديث المفتاح.
 
@@ -132,6 +134,32 @@ AuditLog سجل أفعال العمل والأمن المُلزم بتدقيقه
 **حدود الأمان العامة:** كل POST طلب مستقل؛ المسار العام مستثنى صراحة من `Idempotency-Key`. حماية MVP هي حد معدل 10 طلبات لكل IP خلال 15 دقيقة، strict validation وحد JSON عام 32KB؛ لا CAPTCHA أو challenge/WAF في TASK-030. محدد المعدل في ذاكرة عملية API واحدة فقط، وتصفير العدّاد عند إعادة التشغيل مقبول في MVP؛ قبل تعدد النسخ يلزم محدد مشترك أو موثوق على الحافة. تفاصيل الإدخال والرد ومصدر الهاتف في [API_CONTRACTS](API_CONTRACTS.md#public-teacher-intake-task-030).
 
 **حدود التنفيذ:** ADR-014 يبقى OPEN دون قرار retention. ADR-011 منفصل لسياسة duplicate candidates. تراجع حدود declared institutions قبل TASK-034/TASK-040؛ لا يتغير scope هاتين المهمتين بهذا القرار.
+
+### ADR-029 — One current Teacher workplace after G3
+
+هذا قرار Product Owner لاحق للـG3 ويَسود على افتراض تعدد المؤسسات وتاريخ انتقالاتها في ADR-004/ADR-015 وما بُني عليهما من خطط مستقبلية. لا يُعيد تفسير snapshots الموجودة ولا يغير نتيجة G3 أو TASK-034/035 المنفذتين. للمفتش علاقة تشغيلية بمؤسسة **حالية واحدة على الأكثر** لكل Teacher؛ قد يكون Teacher بلا مؤسسة معتمدة مؤقتًا بعد `ACCEPT` وحتى موافقة المفتش. لا أدوار `MAIN/SECONDARY`، ولا إسنادات إضافية أو سجل نقل أو تاريخ انتقال أو نصاب أسبوعي داخل علاقة Teacher بالمؤسسة. AuditLog يسجل تغيير الرابط بوصفه حدثًا، لا workflow نقل.
+
+العقد المستقبلي الأبسط هو `Teacher.institutionId` nullable يشير إلى Institution في `Teacher.districtId` نفسها، دون جدول `TeacherInstitutionAssignment`. يضمن FK مركب على `(institutionId,districtId) → Institution(id,districtId)` تطابق المقاطعة في DB؛ يُضاف مفتاح مرجعي مركب مناسب على Institution، وفهرس للرابط عند الحاجة للبحث. يرفض الخادم الربط عبر المقاطعات ويخفي وجود السجلات خارج نطاق المفتش. عند تصحيح المؤسسة الحالية يُستبدل ID الحالي ذريًا بعد تأكيد المفتش؛ لا تُنشأ فترة تاريخية أو سبب نقل أو تاريخ سريان. لا يُعدّل `districtId` عبر هذا المسار؛ ADR-017 باقٍ OPEN.
+
+للمؤسسة حقول حالية `municipality` كنص بلدية حر منظم، و`address` كعنوان بريدي/مكاني مقروء، و`directorPhone` كرقم اتصال مدير المؤسسة. كلها nullable في DB وInstitution API حفاظًا على الصفوف القائمة وعلى إمكانية ترك معلومة غير موثقة فارغة؛ `name` يبقى مطلوبًا. تُطبّق حدود وتطبيع [API_CONTRACTS](API_CONTRACTS.md#post-g3-workplace-contract-adr-029)؛ رقم المدير يقبل الثابت والمحمول الجزائريين وفق قاعدة هاتف الأستاذ نفسها، بلا OTP أو uniqueness أو إثبات ملكية، ويمكن للمفتش مسحه صراحةً بـ`null` في PATCH. لا جدول بلديات وطني ولا geocoding أو خرائط.
+
+بعد TASK-041 يصبح جسم public POST الجديد حاويًا `workplace:{institutionName,municipality,institutionAddress,directorPhone}` بأربعة نصوص مطلوبة لمؤسسة واحدة؛ مفاتيح `primaryInstitutionName` و`additionalInstitutionNames` مرفوضة في **الإرسال الجديد**. المسار والإيصال والحماية والحقول الشخصية الأخرى تبقى وفق ADR-015. تبقى ملفات G3 القديمة بصيغتها الأصلية في `TeacherSubmission.submittedProfile` ولا تُعاد كتابتها؛ قارئ موحد يعرض الاسم القديم ويجعل المعلومات الثلاث الأخرى المفقودة `null`/«غير متاحة»، وتظهر أسماء المؤسسات الإضافية القديمة بوصفها تصريحًا تاريخيًا فقط، لا مؤسسات حالية ولا روابط معتمدة. لا إنشاء أو مطابقة Institution أو Teacher أو رابط أثناء public POST.
+
+`ACCEPT` يستمر بإنشاء Teacher وحده مع `institutionId=NULL` وحفظ التصريح الأصلي؛ لا اعتماد مؤسسة ضمن قرار الطلب. بعد القبول يطّلع المفتش على التصريح، ويختار Institution نشطة قائمة في المقاطعة أو يؤكد إنشاء Institution جديدة من قيم راجعها، ثم يربطها صراحةً. القيم المعلنة لا تكتب فوق مؤسسة مشتركة مختارة؛ تعديل بيانات مؤسسة قائمة إجراء مستقل صريح. الإنشاء والربط وAuditLog المطلوب لها في معاملة واحدة؛ فشل أي جزء يرجع الكل. الاقتراحات بالبحث استشارية، ولا دمج أو مطابقة أو إنشاء آلي، ولا uniqueness على اسم Institution. التحديث المشروط للرابط يمنع الكتابة اعتمادًا على حالة قديمة؛ الرمز `409` عند تعارض الرابط/الأرشفة، و`404` عام عند مورد غائب أو خارج النطاق.
+
+أحداث التنفيذ المستقبلية: `TEACHER_INSTITUTION_LINKED` و`TEACHER_INSTITUTION_CHANGED` بمورد Teacher وmetadata معرّفات المؤسسات فقط؛ `INSTITUTION_CREATED` بمورد Institution عند الإنشاء المؤكد ضمن workflow، و`INSTITUTION_UPDATED` مع أسماء الحقول المتغيرة فقط عند تعديل بياناتها صراحةً. تُضاف للأسماء المسموح بها عند مهمة الـAPI، لا الآن؛ actor/district/requestId من سياق الخادم، والـappend مع mutation في المعاملة نفسها، بلا اسم/عنوان/هاتف أو جسم طلب في metadata. لا حدث لـpublic submission ولا سجل انتقال منفصل.
+
+الجدول الأسبوعي مجال لاحق مستقل عن علاقة المؤسسة. يحدد أيام وساعات العمل ويستعمل المؤسسة الحالية المعتمدة كسياق المكان؛ لا `assignmentId` في WeeklyScheduleSlot، ولا rows للجدول في TASK-040. يحسم ADR-030 شكل الجدول والتداخل. هذه تغييرات **forward-only**؛ لا يُعدّل أي migration سابق، ولا يُحسم ADR-014 أو ADR-017 هنا.
+
+### ADR-030 — Weekly Schedule MVP contract
+
+**الحالة: ACCEPTED — قرار Product Owner قبل TASK-047.** يوجد `WeeklySchedule` حالي واحد على الأكثر لكل `(teacherId, academicYear)`، بلا جدول نسخ أو حالات draft/published أو `validFrom/validTo`. السنة الدراسية إلزامية بصيغة `YYYY-YYYY`؛ السنة الثانية = الأولى + 1. `revision` عدد صحيح موجب يبدأ 1 ويزيد عند تغيير slots، لا يحمل بيانات تاريخية؛ تستخدمه TASK-048 كشرط optimistic concurrency. تعديل المؤسسة الحالية لا يحتفظ بمكان عمل تاريخي في الجدول أو نسخه.
+
+يحوي الجدول عدة `WeeklyScheduleSlot`، بما فيها أكثر من حصة في اليوم نفسه. كل slot: `dayOfWeek` عدد صحيح من 1 الاثنين إلى 7 الأحد؛ `startMinute/endMinute` عددان صحيحان لدقائق الساعة المحلية مع `0 <= startMinute < endMinute <= 1440`؛ `levelLabel`, `groupLabel`, `notes` نصوص nullable/optional. تنظف النصوص بـUnicode NFC وtrim واختزال فراغات العرض المتكررة، وتُرفض محارف التحكم والنصوص الفارغة بعد التنظيف؛ الحدود بعد التنظيف بعدد Unicode code points: `levelLabel` و`groupLabel` حتى 100 لكل منهما، و`notes` حتى 500. لا curriculum FK، ولا timestamp أو timezone لكل slot. لا يتداخل slotان في الجدول واليوم نفسيهما: `A.startMinute < B.endMinute && B.startMinute < A.endMinute`؛ يسمح بالتجاور. يفرض PostgreSQL القيد بـGiST exclusion على `(scheduleId,dayOfWeek,int4range(startMinute,endMinute,'[)'))` مستفيدًا من `btree_gist` الموجود في سلسلة migrations؛ تتحقق TASK-048 أيضًا لخطاء ودية. لا منع عبر يومين مختلفين أو جدولين مختلفين.
+
+لا `institutionId` أو `assignmentId` على slot؛ سياق المكان في العروض التشغيلية من `Teacher.institutionId → currentInstitution` المعتمدة الواحدة. يجوز وجود Teacher بلا مؤسسة وعرضه، لكن TASK-048 تمنع إنشاء الجدول أو تعديله ما دام `institutionId=NULL`. لا مؤسسة متعددة حالية أو تاريخ نقل/نسخ للجدول. العطلات والاستثناءات والإغلاقات والتعويضات والتواريخ المنفردة خارج MVP؛ الجدول نمط أسبوعي متكرر. المنطقة الزمنية التشغيلية `Africa/Algiers` لتحديد اليوم والدقيقة الحاليين، لا عمود timezone في slot. في TASK-044: «يعمل اليوم» يعني slot واحدًا على الأقل في يوم الأسبوع الحالي بهذه المنطقة؛ «يعمل الآن» يضيف `startMinute <= now < endMinute`، دون فحص عطلة.
+
+TASK-047 = persistence فقط: النموذجان والعلاقات والقيود والفهارس وهجرة forward-only واختبارات DB/integration، بلا API/UI/AuditLog. TASK-048 = API ونموذج قراءة وإنشاء/تحرير، تحقق ونطاق وصلاحية المؤسسة وتزامن revision وأخطاء تداخل مفهومة وواجهة عربية RTL واختبار متصل. تدقق mutations داخل transaction بحدثي `WEEKLY_SCHEDULE_CREATED` عند الإنشاء و`WEEKLY_SCHEDULE_UPDATED` عند تغيير slots أو حذف slot؛ `entityType=WeeklySchedule`, `entityId=scheduleId`, `districtId=Teacher.districtId`، actor وrequestId من الطلب. metadata للإنشاء `{}`، وللتحديث `{changedFields:["slots"],affectedSlotIds:[UUID...],slotCount:<integer>}` فقط. لا قيم notes أو level/group أو بيانات Teacher الشخصية أو عنوان/هاتف Institution في audit أو السجلات. لا حذف كامل للجدول في MVP. TASK-044/045 لاحقتان لـ048؛ فلاتر اليوم/الوقت والترقيم على الخادم؛ بلدية دليل Teacher إن أضيف فلترها مستقبلًا تُستمد من `currentInstitution.municipality` ولا تُنسخ إلى Teacher.
 
 ## TASK-001 — سجل مراجعة G0
 

@@ -13,7 +13,7 @@ vi.mock('../auth/client', () => ({ createInstitution, getCurrentDistricts, listI
 
 const districtOne = { id: 'district-1', name: 'مقاطعة الشمال' };
 const districtTwo = { id: 'district-2', name: 'مقاطعة الجنوب' };
-const rowOne = { id: 'institution-1', districtId: districtOne.id, name: 'مدرسة النور', externalCode: null, archivedAt: null, createdAt: '', updatedAt: '' };
+const rowOne = { id: 'institution-1', districtId: districtOne.id, name: 'مدرسة النور', externalCode: null, municipality: null, address: null, directorPhone: null, archivedAt: null, createdAt: '', updatedAt: '' };
 const page = (data: Institution[] = [], nextCursor: string | null = null, total = data.length) => ({ data, page: { limit: 25, nextCursor, total } });
 
 beforeAll(() => {

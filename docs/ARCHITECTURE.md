@@ -22,7 +22,7 @@ Public intake هو قناة جمع أولية scoped بمقاطعة المسار
 
 TASK-030 يفترض نسخة API واحدة؛ محدد المعدل في الذاكرة (10 طلبات/IP/15 دقيقة) يُصفّر عند إعادة التشغيل. قبل نشر عدة نسخ يلزم محدد معدل مشترك أو موثوق على الحافة؛ لا Redis في MVP. في production يُضبط `TRUSTED_CLIENT_IP_SOURCE=cloudflare` ويُستخدم `CF-Connecting-IP` فقط مع قصر الوصول على ingress الموثوق؛ `X-Forwarded-For` غير موثوق. التفاصيل في [API](API_CONTRACTS.md#public-teacher-intake-task-030).
 
-`inspector UI → authenticated API → domain service + policy check → Prisma → PostgreSQL`؛ الاستعلامات والتصفية والتجميع على الخادم. الوحدات: identity/district؛ intake؛ teacher/institution/assignment؛ schedule؛ visit/report/follow-up؛ pedagogy reference؛ inspector proposals؛ dashboard/read models؛ files/print؛ audit. كل وحدة تملك قواعدها؛ يجوز API مشترك دون وصل نماذج الواجهة مباشرة بقاعدة البيانات. الوثائق الرسمية read-only/reference ولا تتحول إلى اقتراحات إلا بنسخة منفصلة ذات provenance. نموذج LessonMemoTemplate داخل proposals، بلا FK إلى زيارة أو تقرير.
+`inspector UI → authenticated API → domain service + policy check → Prisma → PostgreSQL`؛ الاستعلامات والتصفية والتجميع على الخادم. الوحدات: identity/district؛ intake؛ teacher/institution؛ schedule؛ visit/report/follow-up؛ pedagogy reference؛ inspector proposals؛ dashboard/read models؛ files/print؛ audit. كل وحدة تملك قواعدها؛ يجوز API مشترك دون وصل نماذج الواجهة مباشرة بقاعدة البيانات. مجال schedule مستقل عن رابط المؤسسة الحالية وفق [ADR-030](DECISIONS.md#adr-030--weekly-schedule-mvp-contract)، ويستخدم `Africa/Algiers` للتفسير التشغيلي لليوم/الساعة دون timezone لكل slot. الوثائق الرسمية read-only/reference ولا تتحول إلى اقتراحات إلا بنسخة منفصلة ذات provenance. نموذج LessonMemoTemplate داخل proposals، بلا FK إلى زيارة أو تقرير.
 
 ## أمن وتطور
 

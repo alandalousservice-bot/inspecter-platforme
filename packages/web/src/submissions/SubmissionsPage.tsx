@@ -123,7 +123,7 @@ export function SubmissionsPage() {
                       </div>
                       <dl className="submission-list-card__facts">
                         <div><dt>تاريخ الميلاد</dt><dd>{formatDate(row.dateOfBirth)}</dd></div>
-                        <div><dt>المؤسسة الأساسية</dt><dd>{row.primaryInstitutionName}</dd></div>
+                        <div><dt>جهة العمل المصرح بها</dt><dd>{row.primaryInstitutionName}</dd></div>
                         <div><dt>تاريخ الإرسال</dt><dd>{formatDateTime(row.submittedAt)}</dd></div>
                         <div><dt>الحالة</dt><dd>{statusLabels.get(row.status) ?? 'غير محددة'}</dd></div>
                       </dl>

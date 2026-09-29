@@ -1,6 +1,6 @@
 # API Contracts v0.1
 
-HTTP JSON `/api/v1`. هذه عقود الموارد والسلوك؛ schemas التفصيلية تتبع حقول [DATABASE](DATABASE.md)، ولا يجوز للمنفذ اختراع حقول بيداغوجية رسمية. كل request/response متحقق بـZod؛ unknown input rejected أو stripped وفق schema منشور، لا mass assignment. `Id` UUID، تواريخ ISO 8601 UTC، `weekday` محلي 0..6 محدد في العقد التنفيذي. الحقول الناقصة في API تُعالج بإصدار contract موثق، لا بافتراض صامت.
+HTTP JSON `/api/v1`. هذه عقود الموارد والسلوك؛ schemas التفصيلية تتبع حقول [DATABASE](DATABASE.md)، ولا يجوز للمنفذ اختراع حقول بيداغوجية رسمية. كل request/response متحقق بـZod؛ unknown input rejected أو stripped وفق schema منشور، لا mass assignment. `Id` UUID، تواريخ ISO 8601 UTC؛ `dayOfWeek` للجدول الأسبوعي 1 الاثنين .. 7 الأحد وفق `Africa/Algiers`. الحقول الناقصة في API تُعالج بإصدار contract موثق، لا بافتراض صامت.
 
 ## غلاف واستعمال مشترك
 
@@ -16,19 +16,18 @@ HTTP JSON `/api/v1`. هذه عقود الموارد والسلوك؛ schemas ا�
 
 | Endpoint | العمليات | نطاق الإدخال/الإخراج والحماية |
 |---|---|---|
-| `/public/districts/:districtId/submissions` | POST | حقول Teacher المطلوبة/الاختيارية وأسماء مؤسسات معلنة كنصوص وفق ADR-015؛ district من المسار؛ ينشئ TeacherSubmission مستقلًا بحالة داخلية PENDING؛ `202` وreceipt ID فقط بلا PII أو status أو duplicate disclosure؛ لا lookup |
+| `/public/districts/:districtId/submissions` | POST | عقد G3 التاريخي ADR-015؛ من TASK-041 يحل `workplace` لمؤسسة واحدة محل حقول الأسماء القديمة وفق ADR-029. district من المسار؛ TeacherSubmission مستقل `PENDING`، `202` وإيصال فقط، بلا public lookup |
 | `/submissions` | GET | Inspector مصادق؛ `status` افتراضيًا `PENDING`، و`districtId`, `q`, cursor وفق العقد؛ قائمة scoped ومؤشر `hasPotentialDuplicates` منطقي دون تفاصيل المرشحين |
 | `/submissions/:id` | GET | بيانات الطلب للمفتش المصرح و`potentialDuplicates` بأسباب التشابه فقط؛ 404 عام خارج النطاق |
 | `/submissions/:id/decision` | POST | عقد TASK-033/034 أدناه؛ ACTIVE Inspector، CSRF، district scope؛ 409 عند تعارض الحالة |
 | `/institutions` | GET/POST | district-scoped، q/pagination؛ create للمفتش المصرح |
-| `/institutions/:id` | GET/PATCH | نسخة جزئية مصرح بها؛ archive endpoint منفصل |
-| `/teachers` | GET | q, district, institution, professionalStatus, recordStatus, visited/from/to, weekday/time filters؛ indexed/server-side |
+| `/institutions/:id` | GET/PATCH — TASK-042 مكتملة | تفاصيل مؤسسة مصرح بها وتعديل صريح لبياناتها؛ لا archive endpoint ضمن المرحلة |
+| `/teachers` | GET — TASK-044 لاحقًا | q, district, currentInstitution, professionalStatus, recordStatus, day/time بعد TASK-048؛ indexed/server-side؛ visited/from/to بعد Visit domain |
 | `/teachers/:id` | GET/PATCH | ملف مهني حالي وفق عقد TASK-035 أدناه؛ لا حساب مستخدم أو تحرير إسنادات/زيارات |
-| `/teachers/:id/assignments` | GET/POST | kind, workloadMinutes, validity؛ تحقق من district وhistorical overlap |
-| `/assignments/:id` | PATCH/POST archive | change بإغلاق interval/نسخة جديدة عند اللزوم، لا rewrite للتاريخ |
-| `/teachers/:id/schedules` | GET/POST | academicYear/revision؛ GET structured slots |
-| `/schedules/:id/slots` | POST | assignmentId, weekday, start/endMinute, level/group label؛ يتحقق من الصلاحية والتداخل |
-| `/slots/:id` | PATCH/DELETE | تعديل draft schedule فقط؛ النسخ المعتمدة لا تُمسح بصمت |
+| `/teachers/:id/current-institution` | PUT — TASK-043 مكتملة | اختيار مؤسسة حالية واحدة أو إنشاؤها صراحةً وربطها ذريًا؛ `expectedInstitutionId` يمنع قرارًا مبنيًا على رابط تغيّر |
+| `/teachers/:id/schedules` | GET/POST — TASK-048 لاحقًا | سنة دراسية canonical وجدول حالي واحد لها؛ GET structured slots/revision |
+| `/schedules/:id/slots` | POST — TASK-048 لاحقًا | dayOfWeek/startMinute/endMinute وlabels/notes اختيارية؛ بلا institutionId/assignmentId |
+| `/slots/:id` | PATCH/DELETE — TASK-048 لاحقًا | تحرير slot في الجدول الحالي مع expected revision؛ لا تاريخ نسخ أو draft/published |
 | `/visits` | GET/POST | teacherId, institutionId, scheduledAt، status، filter by date |
 | `/visits/:id` | GET/PATCH | وصف هيكلي؛ لا حقول تقييم رسمية |
 | `/visits/:id/report` | GET/PUT | draft فقط؛ finalization endpoint مستقل يحفظ snapshot |
@@ -52,6 +51,32 @@ HTTP JSON `/api/v1`. هذه عقود الموارد والسلوك؛ schemas ا�
 - `GET /institutions` lists Institutions only in the authenticated Inspector's current District memberships. Optional `districtId` narrows the list and must be in scope; an out-of-scope District is returned as generic 404. `q` is a trimmed, bounded case-insensitive name search; `limit` defaults to 25 and is capped at 100; cursor pagination has a stable `name,id` order. Only `archivedAt = NULL` rows are considered, including search results, pagination, and `page.total`; no archived selector is defined in this task. Response is `{data, page:{limit,nextCursor,total}}`.
 - `POST /institutions` accepts only `{districtId,name,externalCode?}`. District membership is required; an out-of-scope District returns generic 404. No update, delete, archive, or unarchive operation is introduced by TASK-023.
 - Archive semantics are defined by [ADR-024](DECISIONS.md#adr-024--institution-archive-list-policy).
+
+### Weekly schedule forward contract (ADR-030 / TASK-048)
+
+هذه المسارات مستقبلية حتى TASK-048؛ لا API في TASK-047. Inspector `ACTIVE` بعضوية حالية في District Teacher، مع إخفاء مورد خارج النطاق بـ`404` وCSRF للـmutations. `GET /teachers/:id/schedules` يعرض الجدول الحالي لكل سنة دراسية مطلوبة مع `revision` وslots مرتبة حسب `(dayOfWeek,startMinute,id)`؛ لا تعرض حالة draft/published أو تواريخ صلاحية أو مؤسسة مخزنة على slot. `POST /teachers/:id/schedules` ينشئ جدولًا واحدًا لكل `(teacherId,academicYear)`، والسنة إلزامية `YYYY-YYYY` متتابعة؛ تكرار السنة `409`. لا حذف كامل للجدول في MVP.
+
+`POST /schedules/:id/slots` و`PATCH/DELETE /slots/:id` تتطلب `expectedRevision` من الجدول الحالي؛ التغيير الناجح يزيد `revision` مرة واحدة ويعيد revision الجديدة، والتعارض `409` بلا تغيير جزئي أو AuditLog. لا Mutation إذا `Teacher.institutionId=NULL` حتى اعتماد مؤسسة حالية؛ يسمح بعرض Teacher غير المربوط. يتحقق Zod strict من `dayOfWeek` 1 الاثنين .. 7 الأحد، و`startMinute/endMinute` كأعداد صحيحة مع `0 <= startMinute < endMinute <= 1440`. `levelLabel/groupLabel/notes` اختيارية nullable، وبعد NFC/trim واختزال فراغات العرض ورفض محارف التحكم يبلغ الحد Unicode code points 100/100/500؛ النص الفارغ مرفوض. لا curriculum IDs أو institutionId/assignmentId أو timezone/تاريخ slot. أكثر من slot في اليوم مسموح؛ يمنع التداخل لنفس الجدول واليوم (`A.startMinute < B.endMinute && B.startMinute < A.endMinute`) ويسمح بالتجاور؛ خطأ الخدمة ودّي وآمن، وقيد DB يحمي السباقات. كل mutation وحدثها التدقيقي في معاملة واحدة: `WEEKLY_SCHEDULE_CREATED` للإنشاء بmetadata `{}`، و`WEEKLY_SCHEDULE_UPDATED` لتغيير/حذف slots بmetadata `{changedFields:["slots"],affectedSlotIds:[...],slotCount:<integer>}`، بلا نصوص slot أو PII. جميع التواريخ التشغيلية «اليوم/الآن» تستخدم `Africa/Algiers`، لكن slot يحتفظ بدقائق يوم محلية فقط؛ لا استثناءات عطلة في MVP. [ADR-030](DECISIONS.md#adr-030--weekly-schedule-mvp-contract).
+
+### Post-G3 workplace contract (ADR-029)
+
+هذه **عقود ما بعد G3** لـTASK-040..043. `Institution` تضيف `municipality` و`address` و`directorPhone` nullable؛ قيم DB القديمة NULL. من TASK-042 تحمل عناصر GET list وGET detail وPOST/PATCH response الحقول `{id,districtId,name,externalCode,municipality,address,directorPhone,archivedAt,createdAt,updatedAt}`؛ قيم workplace الغائبة تظهر `null`. تمتد استجابة `GET /institutions` بهذه الحقول، ويظل `q` بحث اسم خادميًا ومقيدًا بالمقاطعات النشطة، دون مطابقة هوية أو merge. `GET /institutions/:id` يعيد مؤسسة مصرحًا بها أو `404` عامًا؛ اسم مؤسسة مماثل لا يمنع إنشاء أخرى.
+
+يستمر `POST /institutions` القائم بجسم `{districtId,name,externalCode?}`، ويقبل **إضافةً** `municipality?`, `address?`, `directorPhone?` (كل منها نص صالح أو `null`؛ الغياب/null يحفظ NULL). يتطلب `name` من 1..200، و`externalCode` من 1..100، ولا يسمح بمفاتيح أخرى. يطبق TASK-042 حماية CSRF على هذا المسار القائم. `PATCH /institutions/:id` يقبل جسمًا جزئيًا strict غير فارغ من `name`, `municipality`, `address`, `directorPhone` فقط: الاسم لا يقبل `null`، والباقي يقبل `null` للمحو؛ المفتاح الغائب لا يتغير، والنص الفارغ مرفوض. لا تغيير لـ`districtId`, `archivedAt` أو `externalCode` عبر PATCH هذا. القراءة/الإنشاء/التعديل لمفتش `ACTIVE` بعضوية حالية؛ mutations بـCSRF؛ مؤسسة غائبة أو خارج النطاق تعيد `404` عامًا، والمُؤرشفة تبقى قابلة للقراءة بالتفصيل ولا تُعدل (`409` ضمن النطاق). التعديل المكافئ بعد التطبيع لا يحدّث updatedAt ولا يسجل audit؛ التغيير الفعلي يسجل `INSTITUTION_UPDATED` بmetadata أسماء الحقول المتغيرة فقط، والإنشاء يسجل `INSTITUTION_CREATED` بmetadata فارغة، ضمن معاملة العملية؛ لا تدقيق بأثر رجعي على عمليات G2.
+
+حدود نصوص المؤسسة والتصريح: `name`/`workplace.institutionName` 1..200، `municipality` 1..150، `address`/`workplace.institutionAddress` 1..300 Unicode code points بعد trim واختزال فراغات العرض المتكررة؛ تُرفض محارف التحكم والنصوص الفارغة، وتُحفظ الحروف العربية كما أُدخلت بلا geocoding أو رمز بلدية أو قائمة مرجعية. `directorPhone`/`workplace.directorPhone` حتى 20 حرفًا في الإدخال، يقبل الهاتف الثابت الجغرافي والمحمول الجزائري وفق قاعدة `phone` في ADR-015 ويُحفظ بشكل `+213`؛ لا OTP أو ownership check أو uniqueness. الحقول الثلاثة الجديدة مطلوبة في **التصريح العام الجديد**، لكنها nullable في Institution وعمليات المفتش للتوافق مع الصفوف القديمة أو معلومة لم تعتمد بعد.
+
+`PUT /api/v1/teachers/:id/current-institution` ينفذ بعد `ACCEPT` فقط، ولا يدخل ضمن PATCH ملف TASK-035. جسمه strict بأحد شكلين حصريين:
+
+```json
+{"expectedInstitutionId":null,"institutionId":"<existing Institution UUID>"}
+```
+
+أو `{"expectedInstitutionId":null,"createInstitution":{"name":"...","municipality":"...","address":"...","directorPhone":"..."}}`؛ عند وجود رابط حالي تُستخدم قيمة UUID للمؤسسة الحالية بدل `null`. `expectedInstitutionId` مطلوب UUID أو `null`، وحقول الإنشاء الثلاثة الجديدة اختيارية ويمكن أن تكون `null`، و`name` مطلوب. لا يُقبل `districtId` أو `workplace` أو كلا فرعي الاختيار في body. رد النجاح `200` هو `{data:{teacherId:"<UUID>",currentInstitution:{id,name,municipality,address,directorPhone}}}`؛ عند إعادة اختيار المؤسسة الحالية نفسها والحالة المتوقعة صحيحة يعاد الرد بلا تحديث أو حدث جديد. لا مسار unlink عام في هذه المرحلة.
+
+يتحقق الخادم داخل transaction من Teacher في نطاق المفتش الحالي، ومن `expectedInstitutionId` تحت قفل السجل، ثم من مؤسسة مختارة نشطة في District Teacher نفسها؛ الغائب/خارج النطاق `404` عام، والمدخل غير الصالح `400`، وغياب Session `401`، وفشل CSRF `403`، وتغير الرابط أو المؤسسة المؤرشفة `409`. في فرع الإنشاء يُشتق District من Teacher لا من body، وتُنشأ Institution وتُربط بـTeacher وتُلحق أحداث AuditLog في **معاملة واحدة**؛ لا رد نجاح جزئي. اختيار مؤسسة قائمة لا يغيّر اسمها أو عنوانها أو هاتف مديرها من تصريح الأستاذ. تغيير الرابط يستبدل المؤسسة الحالية فقط، بلا تاريخ نقل. يضمن FK المركب في [DATABASE](DATABASE.md#post-g3-current-workplace-contract-adr-029) تساوي District حتى لو أخطأ service. أحداث `TEACHER_INSTITUTION_LINKED/CHANGED`, `INSTITUTION_CREATED/UPDATED` وmetadata المسموحة في ADR-029؛ لا قيم PII في التدقيق أو السجلات/الأخطاء.
+
+من TASK-043 يضيف `GET /teachers/:id` حقلي قراءة إلى غلاف TASK-035: `currentInstitution:null|{id,name,municipality,address,directorPhone}` للرابط المعتمد، و`declaredWorkplace:null|{institutionName,municipality,institutionAddress,directorPhone,legacyAdditionalInstitutionNames:string[]}` من snapshot المقبول فقط. عند قراءة snapshot G3 قد تكون حقول البلدية/العنوان/هاتف المدير `null` وتبقى الأسماء الإضافية في `legacyAdditionalInstitutionNames` التاريخية؛ لا تُنشأ قيم افتراضية. حقل `declaredInstitutions` القديم يبقى alias قراءة للتوافق مع عميل G3: في الإرسال الجديد يستمد الاسم من `workplace.institutionName` وقائمة إضافية فارغة، وفي القديم يحتفظ بالأسماء الأصلية؛ لا يدل الاسم `primary` في alias على تعدد علاقات معتمدة. الواجهة الجديدة تستخدم `declaredWorkplace` وتفصلها عن `currentInstitution`. يبقى `PATCH /teachers/:id` محصورًا بحقول ADR-028 ولا يقبل `institutionId`.
 
 ### Inspector submission reads and potential duplicates (TASK-032)
 
@@ -98,7 +123,7 @@ PATCH يقبل JSON object صارمًا يحوي **حقلًا واحدًا عل�
 
 لا يطلب PATCH `expectedVersion` أو `updatedAt` precondition في MVP؛ يُحدث الحقول المرسلة وحدها، وتغلب آخر كتابة ناجحة للحقل نفسه عند التزامن. لا يلغي حقلٌ محذوف تعديلات مفتش آخر. إذا لم يتغير أي حقل بعد التطبيع، يعاد GET الحالي دون UPDATE أو AuditLog أو تغيير `updatedAt`. وعند تغير حقل واحد على الأقل، يتم UPDATE وإضافة `TEACHER_PROFILE_UPDATED` في Prisma transaction واحدة؛ metadata `{changedFields:[<أسماء الحقول المتغيرة فقط>]}` بقيم فريدة مرتبة من allowlist، بلا قيم قديمة/جديدة أو PII. actor/district/entity/requestId من السياق المصرح؛ فشل audit يرجع التعديل. لا تغيير في submission أو Institution/Assignment أو إنشاء Teacher ثانٍ.
 
-### Public Teacher intake (TASK-030)
+### Public Teacher intake — historical G3 contract (TASK-030)
 
 `POST /public/districts/:districtId/submissions` يستقبل JSON بحقول مطلوبة: `firstName`, `lastName`, `dateOfBirth`, `placeOfBirth`, `phone`, `email`, `professionalStatus`, `employmentDate`, `primaryInstitutionName`؛ واختيارية: `confirmationDate`, `qualifications`, `notes`, `additionalInstitutionNames`. `confirmationDate` يقابل مصطلح Teacher `confirmedAt`. `qualifications` نص اختياري فقط؛ `additionalInstitutionNames` مصفوفة نصوص اختيارية فقط. `districtId` من المسار وحده ولا يقبل في body أو من IP؛ لا `institutionId` ولا selector. لا `Idempotency-Key` مطلوب لهذا المسار؛ كل POST مستقل.
 
@@ -128,5 +153,17 @@ UUID المقاطعة المشوه يعيد `400` عامًا؛ مقاطعة غي
 كل POST صالح ينشئ TeacherSubmission مستقلًا، غير متحقق منه وبحالة داخلية `PENDING`، ولا ينشئ Teacher أو Institution أو Assignment أو AuditLog. لا تعديل عام، correction token، receipt lookup أو status lookup. الاشتباه بالتكرار لا يمنع الإرسال ولا يظهر للمرسل؛ المرشحون للمفتش فقط لاحقًا وفق TASK-032/ADR-011. النجاح `202` وجسمه **بالضبط** `{ "data": { "receiptId": "<TeacherSubmission UUID>" } }`، مع `Cache-Control: no-store`، دون profile أو `PENDING` أو duplicate information. receiptId ليس توثيقًا أو تفويضًا أو رمز تصحيح، ولا يتيح استعلام حالة عامًا.
 
 لا PII في logs/errors ولا personal lookup. تدقيق قرارات المفتش لاحقًا وفق TASK-034/ADR-025. حدود التخزين في [DATABASE](DATABASE.md) والسياسة في [ADR-015](DECISIONS.md#adr-015--public-teacher-intake-fields-and-handling).
+
+### Public workplace intake — forward contract (TASK-041)
+
+من تشغيل TASK-041 يستعمل `POST /public/districts/:districtId/submissions` الحقول الشخصية المطلوبة/الاختيارية والتحقق والتوجيه والحد 32KB وrate limit ورد `202` والإيصال والخصوصية عينها في عقد G3 أعلاه، لكن بدل `primaryInstitutionName` و`additionalInstitutionNames` يقبل **فقط** الكائن المطلوب `workplace` التالي:
+
+```json
+{"workplace":{"institutionName":"ابتدائية مثال","municipality":"بلدية مثال","institutionAddress":"عنوان مثال","directorPhone":"+213555123456"}}
+```
+
+جميع مفاتيح `workplace` الأربعة مطلوبة، نصوص غير فارغة ولا تقبل `null`؛ الحدود والتطبيع في [عقد مكان العمل](#post-g3-workplace-contract-adr-029). يرفض Zod strict أي مفتاح إضافي داخل الكائن أو خارجه، خصوصًا حقلي G3 القديمين في **POST جديد**؛ لا مؤسسات إضافية ولا `institutionId` أو `districtId` في body. هذا مثال لشكل الكائن لا رقم هاتف صالحًا للاختبار؛ يطبق الخادم قاعدة الهاتف الجزائري الموثقة. كل POST يبقى snapshot مستقلًا غير متحقق `PENDING`، ولا ينشئ Teacher أو Institution أو رابط مؤسسة أو AuditLog، ولا يطابق مؤسسة قائمة أو يكشف التكرار. لا public edit أو status lookup.
+
+الطلبات المخزنة قبل TASK-041 تبقى بصيغة G3 ولا تُعاد كتابتها. قارئ الطلب للمفتش يتعرف على الشكلين دون تخمين قيم مفقودة؛ `GET /submissions` يبقي `primaryInstitutionName` كاسم حقل **عرض متوافق** مستمد من الاسم القديم أو `workplace.institutionName` الجديد، وتعرض واجهة التفصيل بيانات workplace الجديدة أو الاسم والأسماء الإضافية التاريخية القديمة مع وسم واضح. `GET /teachers/:id` المستقبلي يعرض `declaredWorkplace` الموحّد و`currentInstitution` المعتمدة منفصلين كما أعلاه. لا يتيح ذلك إرسال شكل G3 القديم من جديد بعد تفعيل العقد الجديد، ولا يُعاد تفسير الأسماء الإضافية القديمة كروابط حالية.
 
 الطباعة: `/print` route داخل الواجهة يجلب snapshot موثقًا من endpoints أعلاه؛ `@media print` A4، حفظ PDF من المتصفح. لا يُعلن عن API لملف PDF مولد على الخادم قبل إثبات الحاجة. رفع الملفات وTrainingEvent CRUD عقود مؤجلة؛ foundations في [DATABASE](DATABASE.md) لا تعني endpoints عاملة. تفاصيل الحالة في [UI_MAP](UI_MAP.md).

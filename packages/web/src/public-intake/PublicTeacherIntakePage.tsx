@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useParams } from 'react-router';
 import { Button, Card, Input } from '../ui';
 import { PublicSubmissionError, submitTeacherIntake, type TeacherSubmissionPayload } from './client';
@@ -16,14 +16,16 @@ type FormValues = {
   confirmationDate: string;
   qualifications: string;
   notes: string;
-  primaryInstitutionName: string;
-  additionalInstitutionNames: string[];
+  institutionName: string;
+  municipality: string;
+  institutionAddress: string;
+  directorPhone: string;
 };
 
 const initialValues: FormValues = {
   firstName: '', lastName: '', dateOfBirth: '', placeOfBirth: '', phone: '', email: '',
   professionalStatus: '', employmentDate: '', confirmationDate: '', qualifications: '', notes: '',
-  primaryInstitutionName: '', additionalInstitutionNames: [],
+  institutionName: '', municipality: '', institutionAddress: '', directorPhone: '',
 };
 
 const statusOptions = [
@@ -37,14 +39,13 @@ const fieldLabels: Record<string, string> = {
   firstName: 'الاسم', lastName: 'اللقب', dateOfBirth: 'تاريخ الميلاد', placeOfBirth: 'مكان الميلاد',
   phone: 'رقم الهاتف', email: 'البريد الإلكتروني', professionalStatus: 'الصفة المهنية',
   employmentDate: 'تاريخ التوظيف', confirmationDate: 'تاريخ الترسيم أو التثبيت',
-  qualifications: 'الشهادات والمؤهلات', notes: 'ملاحظات', primaryInstitutionName: 'اسم المؤسسة الأساسية',
-  additionalInstitutionNames: 'المؤسسات الإضافية',
+  qualifications: 'الشهادات والمؤهلات', notes: 'ملاحظات', institutionName: 'اسم المؤسسة',
+  municipality: 'بلدية العمل', institutionAddress: 'عنوان المؤسسة', directorPhone: 'رقم هاتف مدير المؤسسة',
 };
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const codePoints = (value: string) => Array.from(value).length;
 const cleanName = (value: string) => value.trim().replace(/\s+/gu, ' ');
-const normalizedInstitution = (value: string) => cleanName(value).normalize('NFC').toLowerCase();
 const hasControlCharacters = (value: string) => /[\p{Cc}]/u.test(value);
 
 function validDate(value: string): boolean {
@@ -57,7 +58,8 @@ function validDate(value: string): boolean {
 function validate(values: FormValues): Record<string, string> {
   const errors: Record<string, string> = {};
   const requiredText: Array<[keyof FormValues, number]> = [
-    ['firstName', 100], ['lastName', 100], ['placeOfBirth', 150], ['primaryInstitutionName', 200],
+    ['firstName', 100], ['lastName', 100], ['placeOfBirth', 150],
+    ['institutionName', 200], ['municipality', 150], ['institutionAddress', 300],
   ];
   for (const [field, maximum] of requiredText) {
     const value = cleanName(values[field] as string);
@@ -84,6 +86,12 @@ function validate(values: FormValues): Record<string, string> {
   if (codePoints(values.phone.trim()) > 20 || !(/^[234]\d{7}$/u.test(national) || /^[567]\d{8}$/u.test(national))) {
     errors.phone = 'أدخل رقمًا جزائريًا ثابتًا أو محمولًا صالحًا، محليًا أو بصيغة ‎+213.';
   }
+  const directorPhone = values.directorPhone.trim().replace(/ /gu, '');
+  const directorNational = directorPhone.startsWith('+213') ? directorPhone.slice(4) : directorPhone.startsWith('0') ? directorPhone.slice(1) : '';
+  if (codePoints(values.directorPhone) > 20
+    || !(/^[234]\d{7}$/u.test(directorNational) || /^[567]\d{8}$/u.test(directorNational))) {
+    errors.directorPhone = 'أدخل رقمًا جزائريًا ثابتًا أو محمولًا صالحًا، محليًا أو بصيغة ‎+213.';
+  }
   if (codePoints(values.email.trim()) > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(values.email.trim())) {
     errors.email = 'أدخل بريدًا إلكترونيًا صحيحًا.';
   }
@@ -93,29 +101,6 @@ function validate(values: FormValues): Record<string, string> {
   if (codePoints(values.notes.trim()) > 2000) errors.notes = 'تحقق من الملاحظات.';
   if (/[\p{Cc}]/u.test(values.notes.replace(/[\n\r\t]/gu, ''))) errors.notes = 'تحقق من الملاحظات.';
 
-  if (values.additionalInstitutionNames.length > 5) errors.additionalInstitutionNames = 'يمكن إدخال خمس مؤسسات إضافية كحد أقصى.';
-  const institutions = [values.primaryInstitutionName, ...values.additionalInstitutionNames];
-  const seen = new Set<string>();
-  for (const name of institutions) {
-    const normalized = normalizedInstitution(name);
-    if (!normalized) {
-      errors.additionalInstitutionNames = 'أكمل اسم كل مؤسسة أضفتها أو احذف الحقل الفارغ.';
-      break;
-    }
-    if (codePoints(normalized) > 200) {
-      errors.additionalInstitutionNames = 'يجب ألا يتجاوز اسم المؤسسة 200 حرف.';
-      break;
-    }
-    if (hasControlCharacters(name)) {
-      errors.additionalInstitutionNames = 'تحقق من اسم المؤسسة.';
-      break;
-    }
-    if (seen.has(normalized)) {
-      errors.additionalInstitutionNames = 'لا يمكن تكرار اسم المؤسسة.';
-      break;
-    }
-    seen.add(normalized);
-  }
   return errors;
 }
 
@@ -129,13 +114,15 @@ function makePayload(values: FormValues): TeacherSubmissionPayload {
     email: values.email.trim(),
     professionalStatus: values.professionalStatus as TeacherSubmissionPayload['professionalStatus'],
     employmentDate: values.employmentDate,
-    primaryInstitutionName: cleanName(values.primaryInstitutionName),
+    workplace: {
+      institutionName: cleanName(values.institutionName),
+      municipality: cleanName(values.municipality),
+      institutionAddress: cleanName(values.institutionAddress),
+      directorPhone: values.directorPhone.trim(),
+    },
     ...(values.confirmationDate ? { confirmationDate: values.confirmationDate } : {}),
     ...(values.qualifications.trim() ? { qualifications: values.qualifications.trim() } : {}),
     ...(values.notes.trim() ? { notes: values.notes.trim() } : {}),
-    ...(values.additionalInstitutionNames.length
-      ? { additionalInstitutionNames: values.additionalInstitutionNames.map(cleanName) }
-      : {}),
   };
 }
 
@@ -143,7 +130,8 @@ function serverFieldErrors(fields?: Record<string, string[]>): Record<string, st
   if (!fields) return {};
   const result: Record<string, string> = {};
   for (const key of Object.keys(fields)) {
-    const field = key.split('.')[0];
+    const fieldParts = key.split('.');
+    const field = fieldParts[0] === 'workplace' ? fieldParts[1] : fieldParts[0];
     if (fieldLabels[field]) result[field] = `تحقق من ${fieldLabels[field]}.`;
   }
   return result;
@@ -156,14 +144,6 @@ export function PublicTeacherIntakePage() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const dynamicFocusTarget = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!dynamicFocusTarget.current) return;
-    document.getElementById(dynamicFocusTarget.current)?.focus();
-    dynamicFocusTarget.current = null;
-  }, [values.additionalInstitutionNames.length]);
-
   function change<K extends keyof FormValues>(field: K, value: FormValues[K]) {
     setValues((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: '' }));
@@ -182,8 +162,7 @@ export function PublicTeacherIntakePage() {
     if (Object.keys(nextErrors).length) {
       setErrorMessage('يرجى مراجعة الحقول المشار إليها قبل الإرسال.');
       const firstInvalid = Object.keys(nextErrors)[0];
-      (document.getElementById(firstInvalid)
-        ?? (firstInvalid === 'additionalInstitutionNames' ? document.getElementById('additionalInstitution-0') : null))?.focus();
+      document.getElementById(firstInvalid)?.focus();
       return;
     }
 
@@ -211,25 +190,6 @@ export function PublicTeacherIntakePage() {
     } finally {
       setSubmitting(false);
     }
-  }
-
-  function updateAdditional(index: number, value: string) {
-    const rows = [...values.additionalInstitutionNames];
-    rows[index] = value;
-    change('additionalInstitutionNames', rows);
-  }
-
-  function addInstitution() {
-    dynamicFocusTarget.current = `additionalInstitution-${values.additionalInstitutionNames.length}`;
-    change('additionalInstitutionNames', [...values.additionalInstitutionNames, '']);
-  }
-
-  function removeInstitution(index: number) {
-    const rows = values.additionalInstitutionNames.filter((_, row) => row !== index);
-    dynamicFocusTarget.current = rows.length
-      ? `additionalInstitution-${Math.min(index, rows.length - 1)}`
-      : 'add-additional-institution';
-    change('additionalInstitutionNames', rows);
   }
 
   if (success) {
@@ -303,17 +263,14 @@ export function PublicTeacherIntakePage() {
           </fieldset>
 
           <fieldset disabled={submitting}>
-            <legend>المؤسسة أو المؤسسات الابتدائية</legend>
-            <p className="public-intake-fieldset-hint">اكتب أسماء المؤسسات كما هي. لا يلزم اختيار مؤسسة من قائمة.</p>
-            <Input id="primaryInstitutionName" label="اسم المؤسسة الأساسية" required value={values.primaryInstitutionName} error={errors.primaryInstitutionName || (errors.additionalInstitutionNames && errors.primaryInstitutionName ? errors.additionalInstitutionNames : undefined)} onChange={(event) => change('primaryInstitutionName', event.currentTarget.value)} />
-            {values.additionalInstitutionNames.map((name, index) => (
-              <div className="public-intake-additional" key={`institution-${index}`}>
-                <Input id={`additionalInstitution-${index}`} label={`اسم المؤسسة الإضافية ${index + 1}`} required value={name} error={errors.additionalInstitutionNames} onChange={(event) => updateAdditional(index, event.currentTarget.value)} />
-                <Button type="button" variant="secondary" aria-label={`حذف المؤسسة الإضافية ${index + 1}`} onClick={() => removeInstitution(index)}>حذف</Button>
-              </div>
-            ))}
-            {errors.additionalInstitutionNames && !values.additionalInstitutionNames.length ? <p className="ui-field__error" role="alert">{errors.additionalInstitutionNames}</p> : null}
-            {values.additionalInstitutionNames.length < 5 ? <Button id="add-additional-institution" type="button" variant="secondary" onClick={addInstitution}>إضافة مؤسسة أخرى</Button> : null}
+            <legend>جهة العمل الحالية</legend>
+            <p className="public-intake-fieldset-hint">اكتب بيانات المؤسسة التي تعمل بها حاليًا؛ هذه بيانات مُصرّح بها وتخضع لمراجعة المفتش.</p>
+            <div className="public-intake-grid">
+              <Input id="institutionName" label="اسم المؤسسة" required value={values.institutionName} error={errors.institutionName} onChange={(event) => change('institutionName', event.currentTarget.value)} />
+              <Input id="municipality" label="بلدية العمل" required value={values.municipality} error={errors.municipality} onChange={(event) => change('municipality', event.currentTarget.value)} />
+              <Input id="institutionAddress" label="عنوان المؤسسة" required value={values.institutionAddress} error={errors.institutionAddress} onChange={(event) => change('institutionAddress', event.currentTarget.value)} />
+              <Input id="directorPhone" label="رقم هاتف مدير المؤسسة" required type="tel" inputMode="tel" dir="ltr" hint="رقم ثابت أو محمول جزائري؛ لا يعني إدخاله التحقق من ملكيته." value={values.directorPhone} error={errors.directorPhone} onChange={(event) => change('directorPhone', event.currentTarget.value)} />
+            </div>
           </fieldset>
 
           <fieldset disabled={submitting}>

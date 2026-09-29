@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { ApiError } from '../http/api-error.js';
 import { requireInspectorDistrictMembership } from '../policy/district-access.js';
 import { findPotentialDuplicateCandidates, hasPotentialDuplicateCandidates, type SubmissionSnapshot } from './duplicate-candidates.js';
+import { projectDeclaredWorkplace } from './declared-workplace.js';
 
 type InspectorIntakeDatabase = Pick<PrismaClient, 'inspectorDistrictMembership' | 'teacherSubmission'>;
 
@@ -52,13 +53,14 @@ function toSnapshot(row: {
 
 function toListItem(row: SubmissionSnapshot, hasDuplicates: boolean) {
   const profile = row.submittedProfile;
+  const declaredWorkplace = projectDeclaredWorkplace(profile);
   return {
     id: row.id,
     firstName: profileValue(profile as Prisma.JsonValue, 'firstName'),
     lastName: profileValue(profile as Prisma.JsonValue, 'lastName'),
     dateOfBirth: profileValue(profile as Prisma.JsonValue, 'dateOfBirth'),
     submittedAt: row.submittedAt,
-    primaryInstitutionName: profileValue(profile as Prisma.JsonValue, 'primaryInstitutionName'),
+    primaryInstitutionName: declaredWorkplace?.institutionName ?? '',
     status: row.status,
     hasPotentialDuplicates: hasDuplicates,
   };
@@ -109,13 +111,17 @@ export function registerInspectorSubmissionRoutes(
     }
 
     const normalizedQuery = query.q?.replace(/\s+/gu, ' ').trim();
+    const profileSearchFields: Prisma.TeacherSubmissionWhereInput[] = [
+      ...['firstName', 'lastName', 'primaryInstitutionName'].map((field) => ({
+        submittedProfile: { path: [field], string_contains: normalizedQuery ?? '', mode: 'insensitive' as const },
+      })),
+      { submittedProfile: { path: ['workplace', 'institutionName'], string_contains: normalizedQuery ?? '', mode: 'insensitive' } },
+    ];
     const where: Prisma.TeacherSubmissionWhereInput = {
       districtId: { in: districtIds },
       status: query.status,
       ...(normalizedQuery ? {
-        OR: ['firstName', 'lastName', 'primaryInstitutionName'].map((field) => ({
-          submittedProfile: { path: [field], string_contains: normalizedQuery, mode: 'insensitive' },
-        })),
+        OR: profileSearchFields,
       } : {}),
     };
     if (query.cursor) {
@@ -174,6 +180,16 @@ export function registerInspectorSubmissionRoutes(
     });
     const potentialDuplicates = findPotentialDuplicateCandidates(toSnapshot(submission), candidates.map(toSnapshot))
       .map(({ candidate, matchReasons }) => candidateSummary(candidate, matchReasons));
+    const profile = submission.submittedProfile;
+    const submittedProfileFields = [
+      'firstName', 'lastName', 'dateOfBirth', 'placeOfBirth', 'phone', 'email',
+      'professionalStatus', 'employmentDate', 'confirmationDate', 'qualifications', 'notes',
+    ];
+    const submittedProfile = Object.fromEntries(submittedProfileFields.flatMap((field) => {
+      const value = profileValue(profile, field);
+      if (!value && field !== 'notes' && field !== 'qualifications' && field !== 'confirmationDate') return [];
+      return value ? [[field, value]] : [];
+    }));
 
     response.json({
       data: {
@@ -182,7 +198,8 @@ export function registerInspectorSubmissionRoutes(
         status: submission.status,
         submittedAt: submission.submittedAt,
         acceptedTeacherId: submission.status === 'ACCEPTED' ? submission.acceptedTeacherId : null,
-        submittedProfile: submission.submittedProfile,
+        submittedProfile,
+        declaredWorkplace: projectDeclaredWorkplace(profile),
         potentialDuplicates,
       },
     });

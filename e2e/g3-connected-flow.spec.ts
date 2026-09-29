@@ -32,9 +32,10 @@ async function submitPublic(page: Page, teacher: typeof mainTeacher) {
   await page.getByLabel('تاريخ التوظيف').fill('2005-09-01');
   await page.getByLabel('تاريخ الترسيم أو التثبيت').fill('2007-09-01');
   await page.getByLabel('الشهادات والمؤهلات').fill('اختبار اصطناعي');
-  await page.getByLabel('اسم المؤسسة الأساسية').fill(`ابتدائية ${runTag}`);
-  await page.getByRole('button', { name: 'إضافة مؤسسة أخرى' }).click();
-  await page.getByLabel('اسم المؤسسة الإضافية 1').fill(`مؤسسة إضافية ${runTag}`);
+  await page.getByLabel('اسم المؤسسة').fill(`ابتدائية ${runTag}`);
+  await page.getByLabel('بلدية العمل').fill(`بلدية ${runTag}`);
+  await page.getByLabel('عنوان المؤسسة').fill(`شارع اختبار ${runTag}`);
+  await page.getByLabel('رقم هاتف مدير المؤسسة').fill('021234567');
   await page.getByLabel('ملاحظات إضافية').fill('ملاحظة اختبار اصطناعية');
   await page.getByRole('button', { name: 'إرسال البيانات' }).click();
   await expect(page.getByRole('heading', { name: 'تم استلام بياناتك' })).toBeVisible();
@@ -46,7 +47,7 @@ async function submitPublic(page: Page, teacher: typeof mainTeacher) {
   expect(row?.status).toBe('PENDING');
   expect(row?.submittedProfile).toMatchObject({
     firstName: teacher.firstName, lastName: teacher.lastName, email: teacher.email,
-    primaryInstitutionName: `ابتدائية ${runTag}`, additionalInstitutionNames: [`مؤسسة إضافية ${runTag}`],
+    workplace: { institutionName: `ابتدائية ${runTag}`, municipality: `بلدية ${runTag}`, institutionAddress: `شارع اختبار ${runTag}`, directorPhone: '+21321234567' },
   });
   return row!;
 }
@@ -85,24 +86,17 @@ test.afterAll(async () => { await db.$disconnect(); });
 
 test('G3 connected browser workflow: public intake, decisions, profile edit and persistence', async ({ page, browser }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await db.teacherSubmission.create({
-    data: {
-      districtId,
-      status: 'PENDING',
-      submittedProfile: {
-        firstName: 'مرشح', lastName: 'مشابه', dateOfBirth: '1985-03-04', placeOfBirth: 'الجزائر',
-        phone: mainTeacher.phone, email: `candidate-${runTag}@example.invalid`, professionalStatus: 'PERMANENT',
-        employmentDate: '2005-09-01', primaryInstitutionName: 'ابتدائية اصطناعية',
-      },
-    },
-  });
-
   const initialSubmissionCount = await db.teacherSubmission.count({ where: { districtId } });
   const initialTeacherCount = await db.teacher.count({ where: { districtId } });
+  await loginInspector(page);
+  await openSubmission(page, 'مرشح');
+  await expect(page.getByRole('heading', { name: 'جهة العمل المصرح بها — غير معتمدة' })).toBeVisible();
+  await expect(page.getByText('ابتدائية تجريبية')).toBeVisible();
+  await expect(page.getByText('ملحقة تاريخية')).toBeVisible();
+  await expect(page.getByText('غير متاحة').first()).toBeVisible();
   const acceptedSubmission = await submitPublic(page, mainTeacher);
   expect(await db.teacherSubmission.count({ where: { districtId } })).toBe(initialSubmissionCount + 1);
   expect(await db.teacher.count({ where: { districtId } })).toBe(initialTeacherCount);
-  await loginInspector(page);
   await openSubmission(page, mainTeacher.lastName);
   await expect(page.getByText('اختبار اصطناعي', { exact: true })).toBeVisible();
   await expect(page.getByRole('status').filter({ hasText: 'توجد طلبات مشابهة محتملة' })).toBeVisible();
@@ -121,6 +115,7 @@ test('G3 connected browser workflow: public intake, decisions, profile edit and 
     districtId, name: mainTeacher.firstName, surname: mainTeacher.lastName,
     phone: '+213555123456', email: mainTeacher.email, professionalStatus: 'PERMANENT', recordStatus: 'ACTIVE',
   });
+  expect(teacher.institutionId).toBeNull();
   expect(Object.keys(teacher)).not.toContain('notes');
   expect(await db.teacher.count({ where: { districtId, id: teacher.id } })).toBe(1);
   expect(await db.institution.count()).toBe(0);
@@ -132,8 +127,9 @@ test('G3 connected browser workflow: public intake, decisions, profile edit and 
   await profileLink.click();
   await expect(page).toHaveURL(new RegExp(`/app/teachers/${teacher.id}$`));
   await expect(page.getByRole('heading', { name: 'ملف الأستاذ' })).toBeVisible();
+  const currentInstitutionCard = page.locator('.ui-card').filter({ has: page.getByRole('heading', { name: 'المؤسسة الحالية المعتمدة' }) });
   await expect(page.getByText('نشط', { exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'المؤسسات المصرح بها' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'جهة العمل المصرح بها — غير معتمدة' })).toBeVisible();
   await expect(page.getByText(`ابتدائية ${runTag}`)).toBeVisible();
   await expect(page.getByRole('button', { name: /إسناد|أرشفة|تغيير الحالة/ })).toHaveCount(0);
 
@@ -187,6 +183,61 @@ test('G3 connected browser workflow: public intake, decisions, profile edit and 
   expect({ decidedAt: unchangedSubmission.decidedAt, decidedByInspectorId: unchangedSubmission.decidedByInspectorId, acceptedTeacherId: unchangedSubmission.acceptedTeacherId }).toEqual(originalDecision);
   await page.reload();
   await expect(page.getByText(`اسم ${runTag}`, { exact: true })).toBeVisible();
+
+  // Scenario A: explicitly review the declared workplace, then atomically create and link it.
+  await expect(page.getByRole('heading', { name: 'جهة العمل المصرح بها — غير معتمدة' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'المؤسسة الحالية المعتمدة' })).toBeVisible();
+  await expect(page.getByText('لم تُعتمد مؤسسة حالية')).toBeVisible();
+  await page.getByRole('button', { name: 'اعتماد المؤسسة' }).click();
+  const approvalDialog = page.getByRole('dialog', { name: 'اعتماد المؤسسة الحالية' });
+  await page.keyboard.press('Escape');
+  await expect(approvalDialog).not.toBeVisible();
+  await expect(page.getByRole('button', { name: 'اعتماد المؤسسة' })).toBeFocused();
+  await page.getByRole('button', { name: 'اعتماد المؤسسة' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'إنشاء مؤسسة جديدة' }).click();
+  await expect(page.getByLabel('اسم المؤسسة')).toHaveValue(`ابتدائية ${runTag}`);
+  await expect(page.getByLabel('البلدية')).toHaveValue(`بلدية ${runTag}`);
+  await expect(page.getByLabel('عنوان المؤسسة')).toHaveValue(`شارع اختبار ${runTag}`);
+  await expect(page.getByLabel('هاتف المدير')).toHaveValue('+21321234567');
+  await page.getByRole('button', { name: 'مراجعة القيم والتأكيد' }).click();
+  await expect(page.getByText('سيُنشأ سجل مؤسسة بالقيم التالية ويرتبط بالأستاذ في عملية واحدة.')).toBeVisible();
+  const createLinkResponse = page.waitForResponse((response) =>
+    response.url().endsWith(`/api/v1/teachers/${teacher.id}/current-institution`) && response.request().method() === 'PUT');
+  await page.getByRole('button', { name: 'تأكيد الاعتماد' }).click();
+  expect((await createLinkResponse).ok()).toBe(true);
+  await expect(currentInstitutionCard.getByText(`ابتدائية ${runTag}`, { exact: true })).toBeVisible();
+  await expect(page.getByText('تم تحديث المؤسسة الحالية بنجاح.')).toBeVisible();
+  expect(await db.institution.count()).toBe(1);
+  const institutionA = await db.institution.findFirstOrThrow({ where: { districtId } });
+  expect(institutionA).toMatchObject({ name: `ابتدائية ${runTag}`, municipality: `بلدية ${runTag}`, address: `شارع اختبار ${runTag}`, directorPhone: '+21321234567' });
+  expect((await db.teacher.findUniqueOrThrow({ where: { id: teacher.id } })).institutionId).toBe(institutionA.id);
+  await page.reload();
+  await expect(currentInstitutionCard.getByText(`ابتدائية ${runTag}`, { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'جهة العمل المصرح بها — غير معتمدة' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'المؤسسة الحالية المعتمدة' })).toBeVisible();
+
+  // Create B in the isolated test fixture; Scenario C changes the current link without mutating either Institution.
+  const institutionB = await db.institution.create({ data: { districtId, name: `ابتدائية ثانية ${runTag}`, municipality: `بلدية ثانية ${runTag}` } });
+  await page.getByRole('button', { name: 'تغيير المؤسسة الحالية' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'اختيار مؤسسة موجودة' }).click();
+  await page.getByLabel('البحث عن مؤسسة').fill(`ابتدائية ثانية ${runTag}`);
+  await page.getByRole('button', { name: 'بحث' }).click();
+  await page.getByRole('button', { name: new RegExp(`ابتدائية ثانية ${runTag}`) }).click();
+  await expect(page.getByText('سيُربط ملف الأستاذ بالمؤسسة المختارة. بيانات المؤسسة القائمة لن تتغير.')).toBeVisible();
+  const linkExistingResponse = page.waitForResponse((response) =>
+    response.url().endsWith(`/api/v1/teachers/${teacher.id}/current-institution`) && response.request().method() === 'PUT');
+  await page.getByRole('button', { name: 'تأكيد الاعتماد' }).click();
+  const linkResponse = await linkExistingResponse;
+  expect(linkResponse.ok()).toBe(true);
+  expect(await linkResponse.request().postDataJSON()).toEqual({ institutionId: institutionB.id, expectedInstitutionId: institutionA.id });
+  await expect(currentInstitutionCard.getByText(`ابتدائية ثانية ${runTag}`, { exact: true })).toBeVisible();
+  expect((await db.teacher.findUniqueOrThrow({ where: { id: teacher.id } })).institutionId).toBe(institutionB.id);
+  expect(await db.institution.findUniqueOrThrow({ where: { id: institutionA.id } })).toMatchObject({ name: `ابتدائية ${runTag}`, municipality: `بلدية ${runTag}` });
+  expect(await db.institution.findUniqueOrThrow({ where: { id: institutionB.id } })).toMatchObject({ name: `ابتدائية ثانية ${runTag}`, municipality: `بلدية ثانية ${runTag}` });
+  await page.reload();
+  await expect(currentInstitutionCard.getByText(`ابتدائية ثانية ${runTag}`, { exact: true })).toBeVisible();
+  await expect(page.getByText(/نقل الأستاذ|تحويل الأستاذ|سجل الانتقالات/)).toHaveCount(0);
+
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
@@ -215,4 +266,19 @@ test('G3 connected browser workflow: public intake, decisions, profile edit and 
   expect(reviewed.status).toBe('ACCEPTED');
   expect(reviewed.acceptedTeacherId).toBeTruthy();
   expect(await db.teacher.count({ where: { id: reviewed.acceptedTeacherId! } })).toBe(1);
+
+  // Scenario B: select an existing authoritative Institution for an unassigned Teacher.
+  await page.getByRole('link', { name: 'فتح ملف الأستاذ' }).click();
+  await expect(page.getByText('لم تُعتمد مؤسسة حالية')).toBeVisible();
+  await page.getByRole('button', { name: 'اعتماد المؤسسة' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'اختيار مؤسسة موجودة' }).click();
+  await page.getByLabel('البحث عن مؤسسة').fill(`ابتدائية ثانية ${runTag}`);
+  await page.getByRole('button', { name: 'بحث' }).click();
+  await page.getByRole('button', { name: new RegExp(`ابتدائية ثانية ${runTag}`) }).click();
+  const beforeExistingSelection = await db.institution.findUniqueOrThrow({ where: { id: institutionB.id } });
+  await page.getByRole('button', { name: 'تأكيد الاعتماد' }).click();
+  await expect(currentInstitutionCard.getByText(`ابتدائية ثانية ${runTag}`, { exact: true })).toBeVisible();
+  const reviewedTeacher = await db.teacher.findUniqueOrThrow({ where: { id: reviewed.acceptedTeacherId! } });
+  expect(reviewedTeacher.institutionId).toBe(institutionB.id);
+  expect(await db.institution.findUniqueOrThrow({ where: { id: institutionB.id } })).toEqual(beforeExistingSelection);
 });

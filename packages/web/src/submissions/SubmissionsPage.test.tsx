@@ -22,8 +22,8 @@ const detail: SubmissionDetail = {
     firstName: 'أمينة', lastName: 'بن صالح', dateOfBirth: '1985-03-04', placeOfBirth: 'وهران',
     phone: '+213555123456', email: 'amina@example.dz', professionalStatus: 'PERMANENT', employmentDate: '2005-09-01',
     confirmationDate: '2007-09-01', qualifications: 'شهادة جامعية', notes: 'ملاحظة من المرسل',
-    primaryInstitutionName: 'ابتدائية النور', additionalInstitutionNames: ['مدرسة إضافية'],
   },
+  declaredWorkplace: { institutionName: 'ابتدائية النور', municipality: 'وهران', institutionAddress: 'شارع النخيل', directorPhone: '+21321234567', legacyAdditionalInstitutionNames: [] },
   potentialDuplicates: [{
     id: 'candidate-2', firstName: 'أمينة', lastName: 'بن صالح', dateOfBirth: '1985-03-04', placeOfBirth: 'وهران',
     status: 'INTERNAL_REVIEW', submittedAt: '2026-09-20T09:00:00Z',
@@ -138,6 +138,8 @@ describe('TASK-032 submission detail UI', () => {
     expect(container.querySelector('[dir="rtl"]')).toBeTruthy();
     expect(screen.getByText('amina@example.dz')).toBeTruthy();
     expect(screen.getByText('ملاحظة من المرسل')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'جهة العمل المصرح بها — غير معتمدة' })).toBeTruthy();
+    expect(screen.getByText('شارع النخيل')).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'طلبات مشابهة محتملة' })).toBeTruthy();
     expect(screen.getByText('تطابق رقم الهاتف')).toBeTruthy();
     expect(screen.getByText('تطابق البريد الإلكتروني')).toBeTruthy();

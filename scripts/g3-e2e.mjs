@@ -84,7 +84,7 @@ try {
         submittedProfile: {
           firstName: 'مرشح', lastName: 'مشابه', dateOfBirth: '1985-03-04', placeOfBirth: 'الجزائر',
           phone: '+213555123456', email: 'candidate@example.invalid', professionalStatus: 'PERMANENT',
-          employmentDate: '2005-09-01', primaryInstitutionName: 'ابتدائية تجريبية',
+          employmentDate: '2005-09-01', primaryInstitutionName: 'ابتدائية تجريبية', additionalInstitutionNames: ['ملحقة تاريخية'],
         },
       },
     });

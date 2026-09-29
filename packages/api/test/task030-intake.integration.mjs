@@ -43,7 +43,7 @@ const validSubmission = {
   email: 'teacher@EXAMPLE.DZ',
   professionalStatus: 'PERMANENT',
   employmentDate: '2000-01-02',
-  primaryInstitutionName: 'ابتدائية النور',
+  workplace: { institutionName: 'ابتدائية النور', municipality: 'بلدية الجزائر', institutionAddress: 'شارع الاستقلال', directorPhone: '021234567' },
 };
 
 function approvedUrl() {
@@ -164,7 +164,7 @@ test('clean migration creates the documented snapshot table, indexes and restric
   assert.equal(fks.length, 3);
   assert.ok(fks.every(({ confdeltype, confupdtype }) => confdeltype === 'r' && confupdtype === 'c'));
   const history = await db.$queryRawUnsafe(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL)::int AS applied FROM "${schemaName}"."_prisma_migrations"`);
-  assert.deepEqual(history[0], { total: 6, applied: 6 });
+  assert.deepEqual(history[0], { total: 7, applied: 7 });
   const forbiddenTables = await db.$queryRaw`SELECT table_name FROM information_schema.tables WHERE table_schema=${schemaName} AND table_name IN ('TeacherInstitutionAssignment')`;
   assert.deepEqual(forbiddenTables, []);
   assert.equal(await db.teacher.count(), 0);
@@ -172,9 +172,7 @@ test('clean migration creates the documented snapshot table, indexes and restric
 });
 
 test('public Arabic submission returns receipt only and persists normalized PENDING snapshot', async () => {
-  const response = await request(`/api/v1/public/districts/${district.id}/submissions`, {
-    body: { ...validSubmission, additionalInstitutionNames: ['مدرسة الهدى'] },
-  });
+  const response = await request(`/api/v1/public/districts/${district.id}/submissions`);
   assert.equal(response.status, 202);
   assert.equal(response.headers.get('cache-control'), 'no-store');
   const body = await response.json();
@@ -187,7 +185,9 @@ test('public Arabic submission returns receipt only and persists normalized PEND
   assert.equal(row.submittedProfile.phone, '+213555123456');
   assert.equal(row.submittedProfile.email, 'teacher@example.dz');
   assert.equal(row.submittedProfile.firstName, 'أحمد');
-  assert.deepEqual(row.submittedProfile.additionalInstitutionNames, ['مدرسة الهدى']);
+  assert.deepEqual(row.submittedProfile.workplace, { institutionName: 'ابتدائية النور', municipality: 'بلدية الجزائر', institutionAddress: 'شارع الاستقلال', directorPhone: '+21321234567' });
+  assert.equal(Object.hasOwn(row.submittedProfile, 'primaryInstitutionName'), false);
+  assert.equal(Object.hasOwn(row.submittedProfile, 'additionalInstitutionNames'), false);
   assert.equal(await db.auditLog.count(), auditCountBefore);
   assert.equal(await db.institution.count(), 0);
 });
@@ -208,8 +208,7 @@ test('all documented Unicode field boundaries accept their limit and reject valu
     placeOfBirth: 'ج'.repeat(150),
     qualifications: 'د'.repeat(1000),
     notes: 'م'.repeat(2000),
-    primaryInstitutionName: 'و'.repeat(200),
-    additionalInstitutionNames: Array.from({ length: 5 }, (_, index) => `${index}${'ز'.repeat(199)}`),
+    workplace: { institutionName: 'و'.repeat(200), municipality: 'ز'.repeat(150), institutionAddress: 'ع'.repeat(300), directorPhone: '021234567' },
     email: `${'a'.repeat(64)}@${'a'.repeat(63)}.${'b'.repeat(63)}.${'c'.repeat(58)}.dz`,
   };
   const accepted = await request(`/api/v1/public/districts/${district.id}/submissions`, { body: atLimit });
@@ -217,13 +216,14 @@ test('all documented Unicode field boundaries accept their limit and reject valu
   for (const [field, value] of [
     ['firstName', 'ا'.repeat(101)], ['lastName', 'ب'.repeat(101)], ['placeOfBirth', 'ج'.repeat(151)],
     ['qualifications', 'د'.repeat(1001)], ['notes', 'م'.repeat(2001)],
-    ['primaryInstitutionName', 'و'.repeat(201)], ['phone', '0'.repeat(21)],
+    ['phone', '0'.repeat(21)],
     ['email', `${'a'.repeat(64)}@${'a'.repeat(63)}.${'b'.repeat(63)}.${'c'.repeat(59)}.dz`],
   ]) {
     await expectInvalid({ ...validSubmission, [field]: value }, value.slice(0, 8));
   }
-  await expectInvalid({ ...validSubmission, additionalInstitutionNames: Array(6).fill('مدرسة') });
-  await expectInvalid({ ...validSubmission, additionalInstitutionNames: ['ز'.repeat(201)] });
+  for (const [field, max] of [['institutionName', 200], ['municipality', 150], ['institutionAddress', 300]]) {
+    await expectInvalid({ ...validSubmission, workplace: { ...validSubmission.workplace, [field]: 'ز'.repeat(max + 1) } });
+  }
 });
 
 test('dates reject malformed, impossible, future, and contradictory values', async () => {
@@ -253,6 +253,13 @@ test('phone accepts documented local/international fixed and mobile forms and pe
   for (const phone of ['055512345', '0212345678', '05551234567', '+2130555123456', '1555123456']) {
     await expectInvalid({ ...validSubmission, phone });
   }
+  for (const [directorPhone, canonical] of [['0555123456', '+213555123456'], ['021234567', '+21321234567']]) {
+    const response = await request(`/api/v1/public/districts/${district.id}/submissions`, { body: { ...validSubmission, workplace: { ...validSubmission.workplace, directorPhone } } });
+    assert.equal(response.status, 202);
+    const receipt = await response.json();
+    const saved = await db.teacherSubmission.findUnique({ where: { id: receipt.data.receiptId } });
+    assert.equal(saved.submittedProfile.workplace.directorPhone, canonical);
+  }
 });
 
 test('email is validated and only its domain is normalized', async () => {
@@ -268,16 +275,27 @@ test('strict payload, nulls, whitespace, control characters, and malformed JSON 
   await expectInvalid({ ...validSubmission, extra: 'private-test-value' });
   await expectInvalid({ ...validSubmission, qualifications: null });
   await expectInvalid({ ...validSubmission, notes: '  ' });
-  await expectInvalid({ ...validSubmission, primaryInstitutionName: '   ' });
+  await expectInvalid({ ...validSubmission, workplace: { ...validSubmission.workplace, institutionName: '   ' } });
+  await expectInvalid({ ...validSubmission, workplace: { ...validSubmission.workplace, directorPhone: 'x' } });
+  await expectInvalid({ ...validSubmission, workplace: { ...validSubmission.workplace, directorPhone: '0'.repeat(21) } });
+  await expectInvalid({ ...validSubmission, workplace: { ...validSubmission.workplace, directorPhone: '021234567             ' } });
+  for (const field of ['institutionName', 'municipality', 'institutionAddress', 'directorPhone']) {
+    const missing = { ...validSubmission.workplace }; delete missing[field];
+    await expectInvalid({ ...validSubmission, workplace: missing });
+    await expectInvalid({ ...validSubmission, workplace: { ...validSubmission.workplace, [field]: null } });
+    await expectInvalid({ ...validSubmission, workplace: { ...validSubmission.workplace, [field]: '  ' } });
+  }
+  await expectInvalid({ ...validSubmission, workplace: null });
+  await expectInvalid({ ...validSubmission, workplace: { ...validSubmission.workplace, unexpected: 'private-test-value' } });
+  await expectInvalid({ ...validSubmission, primaryInstitutionName: 'legacy' });
+  await expectInvalid({ ...validSubmission, additionalInstitutionNames: ['legacy'] });
   await expectInvalid({ ...validSubmission, firstName: 'أحمد\u0000' });
   const malformed = await request(`/api/v1/public/districts/${district.id}/submissions`, { rawBody: '{bad-json' });
   assert.equal(malformed.status, 400);
   assert.equal((await malformed.text()).includes('bad-json'), false);
 });
 
-test('institution duplicates reject after normalization and six additional declarations are rejected', async () => {
-  await expectInvalid({ ...validSubmission, additionalInstitutionNames: ['ابتدائية   النور'] });
-  await expectInvalid({ ...validSubmission, additionalInstitutionNames: ['مدرسة أ', ' مدرسة   أ '] });
+test('exactly one new workplace is accepted with normalized Arabic values', async () => {
   const accepted = await request(`/api/v1/public/districts/${district.id}/submissions`, { body: validSubmission });
   assert.equal(accepted.status, 202);
 });
@@ -319,10 +337,22 @@ test('public POST changes only TeacherSubmission rows and never logs PII', async
   const initialAudit = await db.auditLog.count();
   const initialInstitutions = await db.institution.count();
   const initialTeachers = await db.teacher.count();
-  const response = await request(`/api/v1/public/districts/${district.id}/submissions`, {
-    body: { ...validSubmission, firstName: 'UNIQUE_PRIVATE_NAME', email: 'private@example.invalid' },
-  });
+  const observedLogs = [];
+  const originalLogMethods = Object.fromEntries(['log', 'info', 'warn', 'error', 'debug'].map((method) => [method, globalThis.console[method]]));
+  for (const method of Object.keys(originalLogMethods)) globalThis.console[method] = (...args) => observedLogs.push(args.map(String).join(' '));
+  let response;
+  try {
+    response = await request(`/api/v1/public/districts/${district.id}/submissions`, {
+      body: { ...validSubmission, firstName: 'UNIQUE_PRIVATE_NAME', email: 'private@example.invalid', workplace: { institutionName: 'PRIVATE_INSTITUTION', municipality: 'PRIVATE_MUNICIPALITY', institutionAddress: 'PRIVATE_ADDRESS', directorPhone: '021234567' } },
+    });
+  } finally {
+    for (const [method, original] of Object.entries(originalLogMethods)) globalThis.console[method] = original;
+  }
   assert.equal(response.status, 202);
+  const logs = observedLogs.join('\n');
+  for (const value of ['UNIQUE_PRIVATE_NAME', 'private@example.invalid', 'PRIVATE_INSTITUTION', 'PRIVATE_MUNICIPALITY', 'PRIVATE_ADDRESS', '021234567']) {
+    assert.equal(logs.includes(value), false, value);
+  }
   assert.equal(await db.teacherSubmission.count(), initialSubmissions + 1);
   assert.equal(await db.auditLog.count(), initialAudit);
   assert.equal(await db.institution.count(), initialInstitutions);
