@@ -8,6 +8,7 @@ import { registerTeacherSubmissionRoutes } from './intake/routes.js';
 import { registerInspectorSubmissionRoutes } from './intake/inspector-routes.js';
 import { registerSubmissionDecisionRoute } from './intake/decision-routes.js';
 import { registerTeacherProfileRoutes } from './teachers/routes.js';
+import { registerTeacherDirectoryRoutes } from './teachers/directory-routes.js';
 import { registerWeeklyScheduleRoutes } from './schedules/routes.js';
 
 const port = Number(process.env.PORT ?? 3001);
@@ -21,6 +22,7 @@ createApp((app) => {
   registerTeacherSubmissionRoutes(app, prisma);
   registerInspectorSubmissionRoutes(app, prisma, requireInspector);
   registerSubmissionDecisionRoute(app, prisma, requireInspector);
+  registerTeacherDirectoryRoutes(app, prisma, requireInspector);
   registerTeacherProfileRoutes(app, prisma, requireInspector);
   registerWeeklyScheduleRoutes(app, prisma, requireInspector);
 }).listen(port);

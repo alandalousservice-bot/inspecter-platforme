@@ -39,7 +39,7 @@ export function calendarDate(value: string): boolean {
 
 export const dateField = z.string().trim().refine(calendarDate, 'تاريخ غير صالح.');
 
-function normalizeAlgerianPhone(raw: string): string | null {
+export function normalizeAlgerianPhone(raw: string): string | null {
   const value = raw.trim();
   if (value.length > 20 || !/^[+0-9 ]+$/u.test(value)) return null;
   const compact = value.replace(/ /gu, '');
