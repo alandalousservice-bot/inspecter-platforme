@@ -213,6 +213,19 @@ export type PedagogicalVisit = {
   createdAt: string;
   updatedAt: string;
 };
+export type InspectionReportContent = {
+  levelClass: string | null; lessonTopic: string | null; pedagogicalObservations: string | null;
+  strengths: string | null; improvementAreas: string | null; guidanceRecommendations: string | null; inspectorConclusion: string | null;
+};
+export type InspectionReport = InspectionReportContent & {
+  id: string; visitId: string; reportType: 'PEDAGOGICAL_ACCOMPANIMENT'; templateSource: 'INSPECTOR_AUTHORED';
+  templateVersion: 1; status: 'DRAFT' | 'FINAL'; revision: number; finalizedAt: string | null; finalizedByInspectorId: string | null;
+  finalizedInspectorNameSnapshot: string | null; finalizedInspectorSurnameSnapshot: string | null;
+  finalizedTeacherNameSnapshot: string | null; finalizedTeacherSurnameSnapshot: string | null; createdAt: string; updatedAt: string;
+  displayIdentity: { inspector: { name: string; surname: string } | null; teacher: { name: string; surname: string } };
+  visit: { id: string; status: PedagogicalVisitStatus; academicYear: string; scheduledStartAt: string; scheduledEndAt: string;
+    occurredAt: string | null; institution: { id: string; name: string }; teacher: { id: string } };
+};
 export type VisitFilters = {
   districtId?: string; teacherId?: string; institutionId?: string;
   status?: PedagogicalVisitStatus; from?: string; to?: string; limit?: number; cursor?: string;
@@ -238,7 +251,7 @@ export async function getPedagogicalVisit(id: string) {
   return response.json() as Promise<{ data: { visit: PedagogicalVisit } }>;
 }
 
-async function visitMutation<T>(path: string, method: 'POST' | 'PATCH', body: unknown): Promise<T> {
+async function visitMutation<T>(path: string, method: 'POST' | 'PATCH' | 'PUT', body: unknown): Promise<T> {
   const csrfToken = csrfCookie();
   if (!csrfToken) throw new ApiRequestError('تعذر التحقق من الطلب. أعد تحميل الصفحة ثم حاول مجددًا.');
   const response = await fetch(path, { method, credentials: 'same-origin',
@@ -261,6 +274,20 @@ export type PedagogicalVisitPatch =
 
 export function patchPedagogicalVisit(id: string, input: PedagogicalVisitPatch) {
   return visitMutation<{ data: { visit: PedagogicalVisit } }>(`/api/v1/visits/${encodeURIComponent(id)}`, 'PATCH', input);
+}
+
+export async function getInspectionReport(visitId: string): Promise<{ data: { report: InspectionReport | null } }> {
+  const response = await fetch(`/api/v1/visits/${encodeURIComponent(visitId)}/report`, { credentials: 'same-origin' });
+  if (!response.ok) return readFailure(response);
+  return response.json() as Promise<{ data: { report: InspectionReport | null } }>;
+}
+
+export function saveInspectionReport(visitId: string, input: InspectionReportContent & { expectedRevision: number | null }) {
+  return visitMutation<{ data: { report: InspectionReport } }>(`/api/v1/visits/${encodeURIComponent(visitId)}/report`, 'PUT', input);
+}
+
+export function finalizeInspectionReport(reportId: string, expectedRevision: number) {
+  return visitMutation<{ data: { report: InspectionReport } }>(`/api/v1/reports/${encodeURIComponent(reportId)}/finalize`, 'POST', { expectedRevision });
 }
 
 export async function getWeeklySchedule(teacherId: string, academicYear: string): Promise<{ data: { schedule: WeeklySchedule | null } }> {

@@ -12,6 +12,7 @@ import { registerTeacherProfileRoutes } from './teachers/routes.js';
 import { registerTeacherDirectoryRoutes } from './teachers/directory-routes.js';
 import { registerWeeklyScheduleRoutes } from './schedules/routes.js';
 import { registerPedagogicalVisitRoutes } from './visits/routes.js';
+import { registerInspectionReportRoutes } from './reports/routes.js';
 
 const port = Number(process.env.PORT ?? 3001);
 const prisma = new PrismaClient();
@@ -29,4 +30,5 @@ createApp((app) => {
   registerTeacherProfileRoutes(app, prisma, requireInspector);
   registerWeeklyScheduleRoutes(app, prisma, requireInspector);
   registerPedagogicalVisitRoutes(app, prisma, requireInspector);
+  registerInspectionReportRoutes(app, prisma, requireInspector);
 }).listen(port);

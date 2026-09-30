@@ -68,9 +68,9 @@ before(async () => {
   await admin.$executeRawUnsafe(`CREATE SCHEMA "${upgradeSchema}"`);
   migrate(urlFor(raw, schema));
   const history = await admin.$queryRawUnsafe(`SELECT migration_name FROM "${schema}"."_prisma_migrations" ORDER BY started_at`);
-  assert.equal(history.length, 10); assert.equal(history.at(-1).migration_name, '20260930010000_task_052a_inspector_professional_identity');
-  const reportTable = await admin.$queryRawUnsafe(`SELECT to_regclass('"${schema}"."InspectionReport"') IS NULL AS absent`);
-  assert.equal(reportTable[0].absent, true);
+  assert.equal(history.length, 11); assert.equal(history.at(-1).migration_name, '20260930020000_task_052_inspection_report');
+  const reportTable = await admin.$queryRawUnsafe(`SELECT to_regclass('"${schema}"."InspectionReport"') IS NOT NULL AS present`);
+  assert.equal(reportTable[0].present, true);
   temp = mkdtempSync(join(tmpdir(), 'task052a-upgrade-'));
   const oldMigrations = join(temp, 'migrations');
   cpSync(join(migrations, 'migration_lock.toml'), join(temp, 'migration_lock.toml'));

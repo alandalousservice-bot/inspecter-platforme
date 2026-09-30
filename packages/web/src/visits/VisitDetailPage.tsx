@@ -127,6 +127,7 @@ export function VisitDetailPage() {
         </form> : null}
       </CardContent></Card> : <Card><CardHeader title="سجل الزيارة" description="هذه الحالة نهائية؛ تبقى تفاصيل الزيارة متاحة للقراءة." /></Card>}
       <p className="visit-inline-note">للاطلاع على المؤسسة الحالية المعتمدة أو بيانات الأستاذ، افتح <Link to={`/app/teachers/${encodeURIComponent(visit.teacher.id)}`}>ملف الأستاذ</Link>. لا يغيّر ذلك مؤسسة الزيارة المحفوظة أعلاه.</p>
+      <Link to={`/app/visits/${encodeURIComponent(visit.id)}/report`}>تقرير المرافقة البيداغوجية</Link>
       <Link to={`/app/teachers/${encodeURIComponent(visit.teacher.id)}/schedules`}>عرض التوزيع الأسبوعي للأستاذ</Link>
     </> : null}
 

@@ -220,14 +220,15 @@ describe('TASK-051 visit management UI', () => {
     expect(mocks.patchPedagogicalVisit.mock.calls[2][1]).toMatchObject({ scheduleWarningAcknowledgement: 'VISIT_OUTSIDE_WEEKLY_SCHEDULE' });
   });
 
-  it('shows historical institution separately and provides Teacher/schedule links without a report section', async () => {
+  it('shows historical institution separately and links to the report without exposing its content', async () => {
     renderRoute(`/app/visits/${visit.id}`);
     expect(await screen.findByRole('heading', { name: 'تفاصيل الزيارة' })).toBeTruthy();
     expect(screen.getByText('المؤسسة كما كانت وقت التخطيط')).toBeTruthy();
     expect(screen.getByText(/لا تتغير بتغير المؤسسة الحالية للأستاذ/)).toBeTruthy();
     expect(screen.getByRole('link', { name: 'محمد علي' }).getAttribute('href')).toBe(`/app/teachers/${teacher.id}`);
     expect(screen.getByRole('link', { name: 'عرض التوزيع الأسبوعي للأستاذ' }).getAttribute('href')).toBe(`/app/teachers/${teacher.id}/schedules`);
-    expect(screen.queryByText(/تقرير|تقييم|توصيات/)).toBeNull();
+    expect(screen.getByRole('link', { name: 'تقرير المرافقة البيداغوجية' }).getAttribute('href')).toBe(`/app/visits/${visit.id}/report`);
+    expect(screen.queryByText(/ملاحظات التقرير|خلاصة المفتش/)).toBeNull();
   });
 
   it('shows both Algiers calendar dates across midnight at minute precision', async () => {

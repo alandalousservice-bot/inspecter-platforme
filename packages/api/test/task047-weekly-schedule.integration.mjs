@@ -88,8 +88,9 @@ before(async () => {
   await admin.$executeRawUnsafe(`CREATE SCHEMA "${upgradeSchema}"`);
 
   tempRoot = mkdtempSync(join(tmpdir(), 'task047-prisma-upgrade-'));
-  const cleanBundle = migrationBundle('clean', ['20260929070000_task_050_pedagogical_visit', '20260930010000_task_052a_inspector_professional_identity']);
-  const upgradeBundle = migrationBundle('upgrade', [migrationName, '20260929070000_task_050_pedagogical_visit', '20260930010000_task_052a_inspector_professional_identity']);
+  const reportMigration = '20260930020000_task_052_inspection_report';
+  const cleanBundle = migrationBundle('clean', ['20260929070000_task_050_pedagogical_visit', '20260930010000_task_052a_inspector_professional_identity', reportMigration]);
+  const upgradeBundle = migrationBundle('upgrade', [migrationName, '20260929070000_task_050_pedagogical_visit', '20260930010000_task_052a_inspector_professional_identity', reportMigration]);
   const cleanUrl = schemaUrl(baseUrl, cleanSchema);
   runPrisma(['migrate', 'deploy'], cleanUrl, cleanBundle.schema);
   runPrisma(['migrate', 'status'], cleanUrl, cleanBundle.schema);

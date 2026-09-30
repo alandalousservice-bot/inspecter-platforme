@@ -14,7 +14,13 @@ export function createApp(
   app.disable('x-powered-by');
   app.use(requestIdMiddleware);
   app.use(options.publicSubmissionRateLimiter ?? createPublicSubmissionRateLimiter());
-  app.use(express.json({ limit: '32kb' }));
+  app.use(express.json({ limit: '32kb', verify: (request, _response, buffer) => {
+    const requestUrl = request.url ?? '';
+    if (/^\/api\/v1\/visits\/[^/]+\/report(?:\?|$)/u.test(requestUrl)
+      || /^\/api\/v1\/reports\/[^/]+\/finalize(?:\?|$)/u.test(requestUrl)) {
+      (request as typeof request & { rawBody?: string }).rawBody = buffer.toString('utf8');
+    }
+  } }));
 
   app.get('/api/v1/health', (_request, response) => {
     response.json({ data: { status: 'ok' } });

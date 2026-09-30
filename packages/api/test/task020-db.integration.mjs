@@ -202,8 +202,8 @@ after(async () => {
                COUNT(*) FILTER (WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL)::int AS applied
         FROM "${schemaName}"."_prisma_migrations"
       `);
-      assert.deepEqual(history[0], { total: 10, applied: 10 });
-      log('TASK-020 second deploy/status: PASS; migration history: 10/10 applied');
+      assert.deepEqual(history[0], { total: 11, applied: 11 });
+      log('TASK-020 second deploy/status: PASS; migration history: 11/11 applied');
       void secondDeploy;
     }
   } catch (error) {
@@ -225,6 +225,7 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
   assert.deepEqual(tables.map(({ tablename }) => tablename), [
     'AuditLog',
     'District',
+    'InspectionReport',
     'Inspector',
     'InspectorDistrictMembership',
     'Institution',
@@ -279,7 +280,7 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
   `;
   const primaryKeys = constraints.filter((constraint) => constraint.contype === 'p');
   assert.deepEqual(primaryKeys.map(({ source_table }) => source_table).sort(), [
-    'AuditLog', 'District', 'Inspector', 'InspectorDistrictMembership', 'Institution', 'PedagogicalVisit', 'Session', 'Teacher', 'TeacherSubmission', 'WeeklySchedule', 'WeeklyScheduleSlot',
+    'AuditLog', 'District', 'InspectionReport', 'Inspector', 'InspectorDistrictMembership', 'Institution', 'PedagogicalVisit', 'Session', 'Teacher', 'TeacherSubmission', 'WeeklySchedule', 'WeeklyScheduleSlot',
   ]);
   const foreignKeys = constraints.filter((constraint) => constraint.contype === 'f');
   assert.deepEqual(foreignKeys.map(({ source_table, target_table, confdeltype, confupdtype }) => ({
@@ -287,6 +288,8 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
   })).sort((a, b) => a.source_table.localeCompare(b.source_table) || a.target_table.localeCompare(b.target_table)), [
     { source_table: 'AuditLog', target_table: 'District', confdeltype: 'r', confupdtype: 'c' },
     { source_table: 'AuditLog', target_table: 'Inspector', confdeltype: 'r', confupdtype: 'c' },
+    { source_table: 'InspectionReport', target_table: 'Inspector', confdeltype: 'r', confupdtype: 'r' },
+    { source_table: 'InspectionReport', target_table: 'PedagogicalVisit', confdeltype: 'r', confupdtype: 'r' },
     { source_table: 'InspectorDistrictMembership', target_table: 'District', confdeltype: 'r', confupdtype: 'c' },
     { source_table: 'InspectorDistrictMembership', target_table: 'Inspector', confdeltype: 'r', confupdtype: 'c' },
     { source_table: 'Institution', target_table: 'District', confdeltype: 'r', confupdtype: 'c' },
@@ -312,6 +315,7 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
   `;
   const expectedIndexes = [
     'Institution_districtId_name_idx',
+    'InspectionReport_finalizedByInspectorId_idx',
     'PedagogicalVisit_districtId_scheduledStartAt_id_idx',
     'PedagogicalVisit_teacherId_scheduledStartAt_idx',
     'PedagogicalVisit_inspectorId_scheduledStartAt_idx',
@@ -331,7 +335,7 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
   assert.match(emailUniqueIndex.indexdef, /\bemail\b/i);
   const uniqueIndexes = indexes.filter((index) => index.indexdef.includes('UNIQUE') && !index.indexname.endsWith('_pkey'));
   assert.deepEqual(uniqueIndexes.map(({ indexname }) => indexname), [
-    'Inspector_email_key', 'Institution_id_districtId_key', 'Session_tokenHash_key', 'TeacherSubmission_acceptedTeacherId_key', 'WeeklySchedule_teacherId_academicYear_key',
+    'InspectionReport_visitId_key', 'Inspector_email_key', 'Institution_id_districtId_key', 'Session_tokenHash_key', 'TeacherSubmission_acceptedTeacherId_key', 'WeeklySchedule_teacherId_academicYear_key',
   ]);
 
   const migrationHistory = await prismaClient.$queryRawUnsafe(`
@@ -339,7 +343,7 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
            COUNT(*) FILTER (WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL)::int AS applied
     FROM "${schemaName}"."_prisma_migrations"
   `);
-  assert.deepEqual(migrationHistory[0], { total: 10, applied: 10 });
+  assert.deepEqual(migrationHistory[0], { total: 11, applied: 11 });
 
   await t.test('creates the four models with UUIDs, nullability, and resolvable relations', async () => {
     const runId = randomBytes(6).toString('hex');

@@ -35,6 +35,7 @@ model Inspector {
   auditEvents        AuditLog[]
   decidedSubmissions TeacherSubmission[]           @relation("TeacherSubmissionDecider")
   visits             PedagogicalVisit[]
+  finalizedReports   InspectionReport[]
 }
 
 model InspectorDistrictMembership {
@@ -143,29 +144,59 @@ model WeeklySchedule {
 }
 
 model PedagogicalVisit {
-  id                      String      @id @default(uuid()) @db.Uuid
-  districtId              String      @db.Uuid
-  inspectorId             String      @db.Uuid
-  teacherId               String      @db.Uuid
-  institutionId           String      @db.Uuid
+  id                      String            @id @default(uuid()) @db.Uuid
+  districtId              String            @db.Uuid
+  inspectorId             String            @db.Uuid
+  teacherId               String            @db.Uuid
+  institutionId           String            @db.Uuid
   institutionNameSnapshot String
   academicYear            String
-  scheduledStartAt        DateTime    @db.Timestamp(3)
-  scheduledEndAt          DateTime    @db.Timestamp(3)
-  occurredAt              DateTime?   @db.Timestamp(3)
-  status                  String      @default("PLANNED")
-  revision                Int         @default(1)
-  createdAt               DateTime    @default(now())
-  updatedAt               DateTime    @updatedAt
-  district                District    @relation(fields: [districtId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  inspector               Inspector   @relation(fields: [inspectorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  teacher                 Teacher     @relation(fields: [teacherId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  institution             Institution @relation(fields: [institutionId, districtId], references: [id, districtId], onDelete: Restrict, onUpdate: Restrict)
+  scheduledStartAt        DateTime          @db.Timestamp(3)
+  scheduledEndAt          DateTime          @db.Timestamp(3)
+  occurredAt              DateTime?         @db.Timestamp(3)
+  status                  String            @default("PLANNED")
+  revision                Int               @default(1)
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+  district                District          @relation(fields: [districtId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  inspector               Inspector         @relation(fields: [inspectorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  teacher                 Teacher           @relation(fields: [teacherId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  institution             Institution       @relation(fields: [institutionId, districtId], references: [id, districtId], onDelete: Restrict, onUpdate: Restrict)
+  report                  InspectionReport?
 
   @@index([districtId, scheduledStartAt(sort: Desc), id(sort: Desc)])
   @@index([teacherId, scheduledStartAt])
   @@index([inspectorId, scheduledStartAt])
   @@index([institutionId, scheduledStartAt])
+}
+
+model InspectionReport {
+  id                                String           @id @default(uuid()) @db.Uuid
+  visitId                           String           @unique @db.Uuid
+  reportType                        String           @default("PEDAGOGICAL_ACCOMPANIMENT")
+  templateSource                    String           @default("INSPECTOR_AUTHORED")
+  templateVersion                   Int              @default(1)
+  status                            String           @default("DRAFT")
+  revision                          Int              @default(1)
+  levelClass                        String?
+  lessonTopic                       String?
+  pedagogicalObservations           String?
+  strengths                         String?
+  improvementAreas                  String?
+  guidanceRecommendations           String?
+  inspectorConclusion               String?
+  finalizedAt                       DateTime?        @db.Timestamp(3)
+  finalizedByInspectorId            String?          @db.Uuid
+  finalizedInspectorNameSnapshot    String?
+  finalizedInspectorSurnameSnapshot String?
+  finalizedTeacherNameSnapshot      String?
+  finalizedTeacherSurnameSnapshot   String?
+  createdAt                         DateTime         @default(now())
+  updatedAt                         DateTime         @updatedAt
+  visit                             PedagogicalVisit @relation(fields: [visitId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  finalizedByInspector              Inspector?       @relation(fields: [finalizedByInspectorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([finalizedByInspectorId])
 }
 
 model WeeklyScheduleSlot {

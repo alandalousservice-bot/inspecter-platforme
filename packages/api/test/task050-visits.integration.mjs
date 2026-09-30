@@ -80,7 +80,7 @@ before(async () => {
   runPrisma(['migrate', 'deploy'], cleanUrl);
   runPrisma(['migrate', 'status'], cleanUrl);
   const history = await admin.$queryRawUnsafe(`SELECT migration_name,finished_at FROM "${cleanSchema}"."_prisma_migrations" ORDER BY started_at`);
-  assert.equal(history.length, 10); assert.equal(history.at(-1)?.migration_name, '20260930010000_task_052a_inspector_professional_identity');
+  assert.equal(history.length, 11); assert.equal(history.at(-1)?.migration_name, '20260930020000_task_052_inspection_report');
   assert.ok(history.some((row) => row.migration_name === migrationName)); assert.ok(history.every((row) => row.finished_at));
 
   tempRoot = mkdtempSync(join(tmpdir(), 'task050-prisma-upgrade-'));
@@ -88,7 +88,7 @@ before(async () => {
   const copiedSchema = join(tempRoot, 'schema.prisma');
   cpSync(join(migrationsDir, 'migration_lock.toml'), join(tempRoot, 'migration_lock.toml'));
   for (const entry of readdirSync(migrationsDir, { withFileTypes: true })) {
-    if (entry.isDirectory() && entry.name !== migrationName) cpSync(join(migrationsDir, entry.name), join(copiedMigrations, entry.name), { recursive: true });
+    if (entry.isDirectory() && entry.name !== migrationName && entry.name !== '20260930020000_task_052_inspection_report') cpSync(join(migrationsDir, entry.name), join(copiedMigrations, entry.name), { recursive: true });
   }
   cpSync(schemaPath, copiedSchema);
   const upgradeUrl = schemaUrl(rawUrl, upgradeSchema);

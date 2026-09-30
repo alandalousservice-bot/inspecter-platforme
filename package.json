@@ -17,6 +17,7 @@
     "e2e:task045": "node scripts/task045-e2e.mjs",
     "e2e:task051": "node scripts/task051-e2e.mjs",
     "e2e:task052a": "node scripts/task052a-e2e.mjs",
+    "e2e:task052": "node scripts/task052-e2e.mjs",
     "smoke": "node --test tests/smoke.test.mjs"
   },
   "devDependencies": {
