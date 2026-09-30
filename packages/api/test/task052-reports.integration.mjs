@@ -12,6 +12,7 @@ import process from 'node:process';
 import { createApp } from '../dist/app.js';
 import { registerAuthRoutes, requireAuthenticatedInspector } from '../dist/identity/auth-routes.js';
 import { registerInspectionReportRoutes } from '../dist/reports/routes.js';
+import { registerFollowUpRoutes } from '../dist/followups/routes.js';
 
 const require = createRequire(import.meta.url);
 const apiDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -21,8 +22,7 @@ const schemaFile = join(apiDir, 'prisma', 'schema.prisma');
 const prismaPackage = require.resolve('prisma/package.json');
 const prismaCli = resolve(dirname(prismaPackage), JSON.parse(readFileSync(prismaPackage, 'utf8')).bin.prisma);
 const { PrismaClient } = require('@prisma/client');
-const migrationName = '20260930020000_task_052_inspection_report';
-const laterMigrationName = '20260930120000_task_053a_visit_type';
+const migration054Name = '20260930150000_task_054_inspector_visit_report_v1';
 let admin, db, server, baseUrl, cleanSchema, upgradeSchema, tempRoot, inspector, otherInspector, inactiveInspector, district, institution, teacher, cookies, otherCookies;
 let visitSequence = 0;
 const password = `task052-${randomUUID()}`;
@@ -54,13 +54,24 @@ async function call(path, method = 'GET', body, selected = cookies, omitCsrf = f
   return fetch(`${baseUrl}${path}`, { method, headers, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 }
 function content(overrides = {}) { return { expectedRevision: null, levelClass: 'السنة الرابعة', lessonTopic: 'الألعاب', pedagogicalObservations: 'ملاحظة\nميدانية', strengths: null, improvementAreas: null, guidanceRecommendations: null, inspectorConclusion: 'خلاصة', ...overrides }; }
-async function makeVisit(status = 'PLANNED') {
+async function makeVisit(status = 'PLANNED', visitType = null) {
   visitSequence += 1;
   const start = new Date(Date.UTC(2028, 0, visitSequence, 8));
   return db.pedagogicalVisit.create({ data: { districtId: district.id, inspectorId: inspector.id, teacherId: teacher.id, institutionId: institution.id,
     institutionNameSnapshot: 'المؤسسة التاريخية', academicYear: '2026-2027', scheduledStartAt: start, scheduledEndAt: new Date(start.getTime() + 3600000),
-    ...(status === 'COMPLETED' ? { status, occurredAt: new Date() } : { status }) } });
+    visitType, ...(status === 'COMPLETED' ? { status, occurredAt: new Date() } : { status }) } });
 }
+
+const v1Blank = () => ({
+  educationDirectorateText: null, administrativeDivisionText: null, teacherClassificationText: null, teacherGradeText: null,
+  teacherNationalityText: null, teacherEffectiveDateText: null, teacherLastInspectionText: null, teacherAppointmentText: null,
+  teacherProfessionalFrameworkText: null, actualLessonDurationText: null, studentCount: null, studentsPresentCount: null,
+  studentsAbsentCount: null, lessonObjective: null, pedagogicalGuidanceText: null, practicalGuidanceText: null,
+  visitStrengthsText: null, visitImprovementAreasText: null, tenureConclusionText: null, generalAssessmentText: null,
+  markText: null, markWordsText: null, pedagogicalMark: null,
+});
+const v1Content = (overrides = {}) => ({ expectedRevision: null, levelClass: 'السنة الرابعة', lessonTopic: 'الألعاب',
+  inspectorConclusion: 'خلاصة التقرير', inspectorVisitV1: { ...v1Blank(), ...overrides }, observations: [] });
 
 before(async () => {
   const raw = approvedUrl();
@@ -71,25 +82,40 @@ before(async () => {
   await admin.$executeRawUnsafe(`CREATE SCHEMA "${cleanSchema}"`); await admin.$executeRawUnsafe(`CREATE SCHEMA "${upgradeSchema}"`);
   migrate(schemaUrl(raw, cleanSchema));
   const history = await admin.$queryRawUnsafe(`SELECT migration_name,finished_at FROM "${cleanSchema}"."_prisma_migrations" ORDER BY started_at`);
-  assert.equal(history.length, 13); assert.equal(history.at(-1).migration_name, laterMigrationName); assert.ok(history.every((row) => row.finished_at));
+  assert.equal(history.length, 14); assert.equal(history.at(-1).migration_name, migration054Name); assert.ok(history.every((row) => row.finished_at));
   tempRoot = mkdtempSync(join(tmpdir(), 'task052-migrations-'));
   const oldMigrations = join(tempRoot, 'migrations'); cpSync(join(migrationsDir, 'migration_lock.toml'), join(tempRoot, 'migration_lock.toml'));
-  for (const item of readdirSync(migrationsDir, { withFileTypes: true })) if (item.isDirectory() && ![migrationName, '20260930030000_task_053_follow_up', laterMigrationName].includes(item.name)) cpSync(join(migrationsDir, item.name), join(oldMigrations, item.name), { recursive: true });
+  for (const item of readdirSync(migrationsDir, { withFileTypes: true })) if (item.isDirectory() && item.name !== migration054Name) cpSync(join(migrationsDir, item.name), join(oldMigrations, item.name), { recursive: true });
   const oldSchema = join(tempRoot, 'schema.prisma'); cpSync(schemaFile, oldSchema);
   const upgradeUrl = schemaUrl(raw, upgradeSchema); migrate(upgradeUrl, oldSchema);
   const legacy = new PrismaClient({ datasources: { db: { url: upgradeUrl } } });
-  const oldDistrict = await legacy.district.create({ data: { name: 'TASK-052 preserved district' } });
+  const oldDistrict = await legacy.district.create({ data: { name: 'TASK-054 preserved district' } });
   const oldInspector = await legacy.inspector.create({ data: { email: `old-${suffix}@example.invalid`, passwordHash: 'synthetic', status: 'ACTIVE' } });
   const oldInstitution = await legacy.institution.create({ data: { districtId: oldDistrict.id, name: 'Legacy institution' } });
   const oldTeacher = await legacy.teacher.create({ data: { districtId: oldDistrict.id, institutionId: oldInstitution.id, name: 'Legacy', surname: 'Teacher' } });
-  const oldVisitId = randomUUID();
-  await legacy.$executeRaw`INSERT INTO "PedagogicalVisit" ("id","districtId","inspectorId","teacherId","institutionId","institutionNameSnapshot","academicYear","scheduledStartAt","scheduledEndAt","updatedAt") VALUES (${oldVisitId}::uuid,${oldDistrict.id}::uuid,${oldInspector.id}::uuid,${oldTeacher.id}::uuid,${oldInstitution.id}::uuid,'Legacy historical snapshot','2026-2027','2027-01-01T08:00:00Z'::timestamp,'2027-01-01T09:00:00Z'::timestamp,now())`;
+  const oldVisit = await legacy.pedagogicalVisit.create({ data: { districtId: oldDistrict.id, inspectorId: oldInspector.id, teacherId: oldTeacher.id,
+    institutionId: oldInstitution.id, institutionNameSnapshot: 'Legacy historical snapshot', academicYear: '2026-2027', visitType: 'GUIDANCE',
+    scheduledStartAt: new Date('2027-01-01T08:00:00Z'), scheduledEndAt: new Date('2027-01-01T09:00:00Z'), status: 'COMPLETED', occurredAt: new Date('2027-01-01T09:00:00Z') } });
+  const oldDraftVisit = await legacy.pedagogicalVisit.create({ data: { districtId: oldDistrict.id, inspectorId: oldInspector.id, teacherId: oldTeacher.id,
+    institutionId: oldInstitution.id, institutionNameSnapshot: 'Legacy draft snapshot', academicYear: '2026-2027', visitType: 'GUIDANCE',
+    scheduledStartAt: new Date('2027-01-02T08:00:00Z'), scheduledEndAt: new Date('2027-01-02T09:00:00Z') } });
+  const oldFinalId = randomUUID(); const oldDraftId = randomUUID(); const oldFollowUpId = randomUUID();
+  await legacy.$executeRaw`INSERT INTO "InspectionReport" ("id","visitId","status","revision","levelClass","lessonTopic","inspectorConclusion","finalizedAt","finalizedByInspectorId","finalizedInspectorNameSnapshot","finalizedInspectorSurnameSnapshot","finalizedTeacherNameSnapshot","finalizedTeacherSurnameSnapshot","updatedAt") VALUES (${oldFinalId}::uuid,${oldVisit.id}::uuid,'FINAL',2,'قديم','موضوع','خلاصة',now(),${oldInspector.id}::uuid,'مفتش قديم','لقب','أستاذ قديم','لقب أستاذ',now())`;
+  await legacy.$executeRaw`INSERT INTO "InspectionReport" ("id","visitId","updatedAt") VALUES (${oldDraftId}::uuid,${oldDraftVisit.id}::uuid,now())`;
+  await legacy.$executeRaw`INSERT INTO "FollowUp" ("id","reportId","ownerInspectorId","note","dueDate","updatedAt") VALUES (${oldFollowUpId}::uuid,${oldFinalId}::uuid,${oldInspector.id}::uuid,'متابعة محفوظة','2027-02-01'::date,now())`;
   await legacy.$disconnect();
-  cpSync(join(migrationsDir, migrationName), join(oldMigrations, migrationName), { recursive: true }); migrate(upgradeUrl, oldSchema);
+  cpSync(join(migrationsDir, migration054Name), join(oldMigrations, migration054Name), { recursive: true }); migrate(upgradeUrl, oldSchema);
   const upgraded = new PrismaClient({ datasources: { db: { url: upgradeUrl } } });
-  const preservedVisit = await upgraded.$queryRaw`SELECT "institutionNameSnapshot" FROM "PedagogicalVisit" WHERE "id"=${oldVisitId}::uuid`;
-  assert.equal(preservedVisit[0]?.institutionNameSnapshot, 'Legacy historical snapshot');
-  assert.equal(await upgraded.inspectionReport.count(), 0); await upgraded.$disconnect();
+  const preservedVisit = await upgraded.pedagogicalVisit.findUniqueOrThrow({ where: { id: oldVisit.id } });
+  assert.equal(preservedVisit.institutionNameSnapshot, 'Legacy historical snapshot'); assert.equal(preservedVisit.visitType, 'GUIDANCE');
+  const preservedFinal = await upgraded.inspectionReport.findUniqueOrThrow({ where: { id: oldFinalId } });
+  assert.equal(preservedFinal.reportType, 'PEDAGOGICAL_ACCOMPANIMENT'); assert.equal(preservedFinal.status, 'FINAL');
+  assert.equal(preservedFinal.inspectorConclusion, 'خلاصة'); assert.equal(preservedFinal.pedagogicalMark, null);
+  assert.equal((await upgraded.inspectionReport.findUniqueOrThrow({ where: { id: oldDraftId } })).status, 'DRAFT');
+  assert.equal((await upgraded.followUp.findUniqueOrThrow({ where: { id: oldFollowUpId } })).note, 'متابعة محفوظة');
+  const upgradeHistory = await admin.$queryRawUnsafe(`SELECT migration_name,finished_at FROM "${upgradeSchema}"."_prisma_migrations" ORDER BY started_at`);
+  assert.equal(upgradeHistory.length, 14); assert.equal(upgradeHistory.at(-1).migration_name, migration054Name); assert.ok(upgradeHistory.every((row) => row.finished_at));
+  await upgraded.$disconnect();
 
   db = new PrismaClient({ datasources: { db: { url: schemaUrl(raw, cleanSchema) } } }); await db.$connect();
   const { hashPassword } = await import('../dist/identity/password.js'); const passwordHash = await hashPassword(password);
@@ -100,7 +126,7 @@ before(async () => {
   await db.inspectorDistrictMembership.createMany({ data: [inspector, otherInspector, inactiveInspector].map((item) => ({ inspectorId: item.id, districtId: district.id, role: 'INSPECTOR', validFrom: new Date(Date.now() - 60_000) })) });
   institution = await db.institution.create({ data: { districtId: district.id, name: 'المؤسسة وقت الزيارة' } });
   teacher = await db.teacher.create({ data: { districtId: district.id, institutionId: institution.id, name: 'ليلى', surname: 'علي', email: 'pii@example.invalid', phone: '+213555000000' } });
-  server = createApp((app) => { registerAuthRoutes(app, db); registerInspectionReportRoutes(app, db, requireAuthenticatedInspector(db)); }).listen(0, '127.0.0.1');
+  server = createApp((app) => { registerAuthRoutes(app, db); const requireInspector = requireAuthenticatedInspector(db); registerInspectionReportRoutes(app, db, requireInspector); registerFollowUpRoutes(app, db, requireInspector); }).listen(0, '127.0.0.1');
   await new Promise((resolve, reject) => { server.once('listening', resolve); server.once('error', reject); }); baseUrl = `http://127.0.0.1:${server.address().port}`;
   const active = await login(inspector); assert.equal(active.response.status, 200); cookies = active.cookies;
   const other = await login(otherInspector); assert.equal(other.response.status, 200); otherCookies = other.cookies;
@@ -243,5 +269,115 @@ test('TASK-052 migration invariants, scoped report lifecycle, privacy, concurren
       assert.equal((await db.inspectionReport.findUniqueOrThrow({ where: { id: draft.id } })).status, 'DRAFT');
       assert.equal(await db.auditLog.count({ where: { entityId: draft.id, action: 'INSPECTION_REPORT_FINALIZED' } }), 0);
     } finally { await db.$executeRaw`DROP TRIGGER task052_fail_report_audit ON "AuditLog"`; await db.$executeRaw`DROP FUNCTION task052_fail_report_audit()`; }
+  });
+
+  await t.test('TASK-054 dictionary, V1 persistence, applicability, snapshots, finalization and FollowUp compatibility', async () => {
+    const dictionaryPath = '/api/v1/report-templates/inspector-visit/v1';
+    assert.equal((await call(dictionaryPath, 'GET', undefined, [])).status, 401);
+    const dictionaryResponse = await call(dictionaryPath); assert.equal(dictionaryResponse.status, 200);
+    assert.equal(dictionaryResponse.headers.get('cache-control'), 'no-store');
+    const dictionary = (await dictionaryResponse.json()).data;
+    assert.deepEqual([dictionary.reportType, dictionary.templateSource, dictionary.templateVersion], ['INSPECTOR_VISIT', 'PRODUCT_OWNER_ADOPTED', 1]);
+    assert.equal(dictionary.criteria.length, 23); assert.deepEqual(dictionary.criteria.map((item) => item.sourceOrder), Array.from({ length: 23 }, (_, i) => i + 1));
+    assert.notEqual(dictionary.criteria[4].criterionKey, dictionary.criteria[7].criterionKey);
+
+    const promotion = await makeVisit('COMPLETED', 'PROMOTION_EVALUATION');
+    const reportPath = `/api/v1/visits/${promotion.id}/inspector-visit-report`;
+    assert.equal((await call(`/api/v1/visits/${promotion.id}/report`, 'PUT', content())).status, 409);
+    assert.equal((await call(reportPath, 'PUT', v1Content(), cookies, true)).status, 403);
+    const unknownKey = await call(reportPath, 'PUT', { ...v1Content(), surprise: 'not echoed' }); assert.equal(unknownKey.status, 400);
+    const unknownCriterionPayload = v1Content(); unknownCriterionPayload.observations = [{ criterionKey: 'unknown', valueText: 'نص' }];
+    const unknownCriterion = await call(reportPath, 'PUT', unknownCriterionPayload); assert.equal(unknownCriterion.status, 400);
+    const duplicateCriterionPayload = v1Content(); duplicateCriterionPayload.observations = [
+      { criterionKey: 'field_planning', valueText: 'ملاحظة' }, { criterionKey: 'field_planning', valueText: 'أخرى' },
+    ];
+    assert.equal((await call(reportPath, 'PUT', duplicateCriterionPayload)).status, 400);
+    const rejectedMarkValues = ['-0.01', '20.01', '14.257', 'نص'];
+    for (const pedagogicalMark of rejectedMarkValues) {
+      assert.equal((await call(reportPath, 'PUT', v1Content({ pedagogicalMark }))).status, 400);
+    }
+    const attendanceInvalid = await call(reportPath, 'PUT', v1Content({ studentCount: 10, studentsPresentCount: 7, studentsAbsentCount: 2 }));
+    assert.equal(attendanceInvalid.status, 400);
+    const validPayload = v1Content({ pedagogicalMark: '14', studentCount: 10, studentsPresentCount: 7, studentsAbsentCount: 3,
+      educationDirectorateText: ' مديرية   التربية ', visitStrengthsText: 'قوة\r\nملحوظة',
+      pedagogicalGuidanceText: ' توجيه ', });
+    validPayload.observations = [{ criterionKey: 'field_planning', valueText: '  جيّد  ' }, { criterionKey: 'educational_unit_preparation', valueText: 'موجود' }];
+    const createdResponse = await call(reportPath, 'PUT', validPayload); assert.equal(createdResponse.status, 201);
+    let created = (await createdResponse.json()).data.report;
+    assert.equal(created.reportType, 'INSPECTOR_VISIT'); assert.equal(created.templateSource, 'PRODUCT_OWNER_ADOPTED'); assert.equal(created.templateVersion, 1);
+    assert.equal(created.revision, 1); assert.equal(created.inspectorVisitV1.pedagogicalMark, '14');
+    assert.equal(created.inspectorVisitV1.educationDirectorateText, 'مديرية التربية');
+    assert.equal(created.inspectorVisitV1.visitStrengthsText, 'قوة\nملحوظة');
+    assert.deepEqual(created.inspectorVisitV1.observations.map((item) => item.criterionKey), ['field_planning', 'educational_unit_preparation']);
+    assert.equal(created.displayContext.visitType, 'PROMOTION_EVALUATION');
+    assert.equal(JSON.stringify(created).includes('not echoed'), false);
+    assert.equal((await call(`/api/v1/visits/${promotion.id}/report`, 'GET')).status, 200);
+    const equivalentValue = { ...validPayload, expectedRevision: 1,
+      inspectorVisitV1: { ...validPayload.inspectorVisitV1, pedagogicalMark: '14.00' } };
+    assert.equal((await call(reportPath, 'PUT', equivalentValue)).status, 200);
+    created = (await (await call(`/api/v1/visits/${promotion.id}/report`)).json()).data.report; assert.equal(created.revision, 1);
+    const updatedPayload = v1Content({ pedagogicalMark: '14.25', visitStrengthsText: null });
+    updatedPayload.expectedRevision = 1;
+    updatedPayload.observations = validPayload.observations;
+    const updated = await call(reportPath, 'PUT', updatedPayload); assert.equal(updated.status, 200);
+    const updatedReport = (await updated.json()).data.report; assert.equal(updatedReport.revision, 2);
+    assert.equal(updatedReport.inspectorVisitV1.pedagogicalMark, '14.25'); assert.equal(updatedReport.inspectorVisitV1.visitStrengthsText, null);
+    assert.equal((await call(reportPath, 'PUT', { ...updatedPayload, expectedRevision: 1 })).status, 409);
+    assert.equal((await call(reportPath, 'GET', undefined, otherCookies)).status, 404);
+    const persisted = await db.inspectionReport.findUniqueOrThrow({ where: { visitId: promotion.id }, include: { observations: true } });
+    assert.ok(persisted.pedagogicalMark instanceof Object); assert.equal(persisted.pedagogicalMark.toFixed(2), '14.25');
+    await assert.rejects(db.inspectionReportObservation.create({ data: { reportId: persisted.id, criterionKey: 'field_planning', valueText: 'مكرر' } }));
+    await assert.rejects(db.$executeRaw`INSERT INTO "InspectionReportObservation" ("id","reportId","criterionKey","valueText","updatedAt") VALUES (${randomUUID()}::uuid,${persisted.id}::uuid,'unknown_criterion','نص',now())`);
+    await assert.rejects(db.$executeRaw`INSERT INTO "InspectionReportObservation" ("id","reportId","reportType","templateVersion","criterionKey","valueText","updatedAt") VALUES (${randomUUID()}::uuid,${persisted.id}::uuid,'PEDAGOGICAL_ACCOMPANIMENT',1,'field_ground','نص',now())`);
+    await assert.rejects(db.$executeRaw`UPDATE "InspectionReport" SET "pedagogicalMark"=20.01 WHERE "id"=${persisted.id}::uuid`);
+
+    const guidance = await makeVisit('COMPLETED', 'GUIDANCE'); const guidancePath = `/api/v1/visits/${guidance.id}/inspector-visit-report`;
+    assert.equal((await call(guidancePath, 'PUT', v1Content({ pedagogicalMark: '0' }))).status, 400);
+    assert.equal((await call(guidancePath, 'PUT', v1Content({ pedagogicalMark: '20' }))).status, 400);
+    assert.equal((await call(guidancePath, 'PUT', v1Content())).status, 201);
+    const tenure = await makeVisit('COMPLETED', 'TENURE_CONFIRMATION'); const tenurePath = `/api/v1/visits/${tenure.id}/inspector-visit-report`;
+    assert.equal((await call(tenurePath, 'PUT', v1Content({ tenureConclusionText: 'استنتاج مهني' }))).status, 201);
+    const tenureWrong = await makeVisit('COMPLETED', 'EXCEPTIONAL');
+    assert.equal((await call(`/api/v1/visits/${tenureWrong.id}/inspector-visit-report`, 'PUT', v1Content({ tenureConclusionText: 'استنتاج' }))).status, 400);
+    const reportingByOtherType = await makeVisit('COMPLETED', 'MONITORING_FOLLOW_UP');
+    assert.equal((await call(`/api/v1/visits/${reportingByOtherType.id}/inspector-visit-report`, 'PUT', v1Content({ markText: '12', markWordsText: 'اثنا عشر' }))).status, 201);
+    const zeroMarkVisit = await makeVisit('COMPLETED', 'PROMOTION_EVALUATION');
+    const zeroMark = await call(`/api/v1/visits/${zeroMarkVisit.id}/inspector-visit-report`, 'PUT', v1Content({ pedagogicalMark: '0' })); assert.equal(zeroMark.status, 201);
+
+    const snapshotTeacher = await db.teacher.update({ where: { id: teacher.id }, data: { birthDate: new Date('1988-04-02T00:00:00.000Z'), placeOfBirth: 'مكان الميلاد', qualifications: 'شهادة مهنية' } });
+    await db.district.update({ where: { id: district.id }, data: { name: 'مقاطعة وقت الاعتماد' } });
+    await db.institution.update({ where: { id: institution.id }, data: { municipality: 'بلدية وقت الاعتماد' } });
+    const finalVisit = await makeVisit('COMPLETED', 'PROMOTION_EVALUATION');
+    const finalPath = `/api/v1/visits/${finalVisit.id}/inspector-visit-report`;
+    const finalDraft = (await (await call(finalPath, 'PUT', v1Content({ pedagogicalMark: '20.00', studentCount: 0, studentsPresentCount: 0, studentsAbsentCount: 0 }))).json()).data.report;
+    const finalizedResponse = await call(`/api/v1/reports/${finalDraft.id}/finalize`, 'POST', { expectedRevision: 1 }); assert.equal(finalizedResponse.status, 200);
+    const finalReport = (await finalizedResponse.json()).data.report; assert.equal(finalReport.status, 'FINAL'); assert.equal(finalReport.revision, 2);
+    assert.equal(finalReport.inspectorVisitV1.pedagogicalMark, '20'); assert.equal(finalReport.displayContext.teacherBirthDate, '1988-04-02');
+    assert.equal(finalReport.displayContext.teacherPlaceOfBirth, 'مكان الميلاد'); assert.equal(finalReport.displayContext.teacherQualifications, 'شهادة مهنية');
+    assert.equal(finalReport.displayContext.districtName, 'مقاطعة وقت الاعتماد'); assert.equal(finalReport.displayContext.institutionMunicipality, 'بلدية وقت الاعتماد');
+    const finalAudit = await db.auditLog.findFirstOrThrow({ where: { entityId: finalDraft.id, action: 'INSPECTION_REPORT_FINALIZED' } }); assert.deepEqual(finalAudit.metadata, {});
+    await db.teacher.update({ where: { id: snapshotTeacher.id }, data: { placeOfBirth: 'تغيير لاحق', qualifications: 'تغيير لاحق' } });
+    await db.district.update({ where: { id: district.id }, data: { name: 'مقاطعة لاحقة' } });
+    const reloaded = (await (await call(`/api/v1/visits/${finalVisit.id}/report`)).json()).data.report;
+    assert.equal(reloaded.displayContext.districtName, 'مقاطعة وقت الاعتماد'); assert.equal(reloaded.displayContext.teacherQualifications, 'شهادة مهنية');
+    assert.equal((await call(`/api/v1/reports/${finalDraft.id}/finalize`, 'POST', { expectedRevision: 2 })).status, 409);
+    const finalUpdate = v1Content(); finalUpdate.expectedRevision = 2;
+    assert.equal((await call(finalPath, 'PUT', finalUpdate)).status, 409);
+    const followUpResponse = await call(`/api/v1/reports/${finalDraft.id}/follow-ups`, 'POST', { note: 'متابعة تقرير V1', dueDate: '2028-01-01' }); assert.equal(followUpResponse.status, 201);
+    const followUp = (await followUpResponse.json()).data.followUp;
+    const completedFollowUp = await call(`/api/v1/follow-ups/${followUp.id}`, 'PATCH', { operation: 'COMPLETE', expectedRevision: 1 }); assert.equal(completedFollowUp.status, 200);
+    assert.equal((await (await call(`/api/v1/visits/${finalVisit.id}/report`)).json()).data.report.revision, 2);
+  });
+
+  await t.test('V1 creation and revision races have one winner', async () => {
+    const racingVisit = await makeVisit('COMPLETED', 'GUIDANCE'); const path = `/api/v1/visits/${racingVisit.id}/inspector-visit-report`;
+    const race = await Promise.all([call(path, 'PUT', v1Content()), call(path, 'PUT', v1Content())]);
+    assert.deepEqual(race.map((response) => response.status).sort(), [201, 409]);
+    const report = await db.inspectionReport.findUniqueOrThrow({ where: { visitId: racingVisit.id } });
+    const updateA = v1Content({ pedagogicalGuidanceText: 'أ' }); updateA.expectedRevision = 1;
+    const updateB = v1Content({ pedagogicalGuidanceText: 'ب' }); updateB.expectedRevision = 1;
+    const updates = await Promise.all([call(path, 'PUT', updateA), call(path, 'PUT', updateB)]);
+    assert.deepEqual(updates.map((response) => response.status).sort(), [200, 409]);
+    assert.equal((await db.inspectionReport.findUniqueOrThrow({ where: { id: report.id } })).revision, 2);
   });
 });

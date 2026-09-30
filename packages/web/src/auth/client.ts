@@ -232,6 +232,29 @@ export type InspectionReport = InspectionReportContent & {
   visit: { id: string; status: PedagogicalVisitStatus; academicYear: string; scheduledStartAt: string; scheduledEndAt: string;
     occurredAt: string | null; institution: { id: string; name: string }; teacher: { id: string } };
 };
+export type InspectorVisitV1Fields = {
+  educationDirectorateText: string | null; administrativeDivisionText: string | null;
+  teacherClassificationText: string | null; teacherGradeText: string | null; teacherNationalityText: string | null;
+  teacherEffectiveDateText: string | null; teacherLastInspectionText: string | null; teacherAppointmentText: string | null;
+  teacherProfessionalFrameworkText: string | null; actualLessonDurationText: string | null;
+  studentCount: number | null; studentsPresentCount: number | null; studentsAbsentCount: number | null;
+  lessonObjective: string | null; pedagogicalGuidanceText: string | null; practicalGuidanceText: string | null;
+  visitStrengthsText: string | null; visitImprovementAreasText: string | null; tenureConclusionText: string | null;
+  generalAssessmentText: string | null; markText: string | null; markWordsText: string | null; pedagogicalMark: string | null;
+};
+export type InspectorVisitCriterion = { criterionKey: string; sectionKey: string; sourceOrder: number; label: string; valueKind: 'OPTIONAL_SHORT_TEXT' };
+export type InspectorVisitReport = Omit<InspectionReport, 'reportType' | 'templateSource' | 'pedagogicalObservations' | 'strengths' | 'improvementAreas' | 'guidanceRecommendations' | 'visit'> & {
+  reportType: 'INSPECTOR_VISIT'; templateSource: 'PRODUCT_OWNER_ADOPTED';
+  pedagogicalObservations: null; strengths: null; improvementAreas: null; guidanceRecommendations: null;
+  visit: Omit<InspectionReport['visit'], 'scheduledStartAt' | 'scheduledEndAt'> & {
+    scheduledStartAt: string | null; scheduledEndAt: string | null; actualStartAt: string | null; actualEndAt: string | null;
+    visitType: PedagogicalVisitType; intervalKind: 'SCHEDULED' | 'ACTUAL_RETROSPECTIVE';
+  };
+  inspectorVisitV1: InspectorVisitV1Fields & { observations: Array<{ criterionKey: string; valueText: string }> };
+  displayContext: { teacherBirthDate: string | null; teacherPlaceOfBirth: string | null; teacherQualifications: string | null;
+    districtName: string | null; institutionMunicipality: string | null; visitType: PedagogicalVisitType };
+};
+export type InspectionReportReadModel = InspectionReport | InspectorVisitReport;
 export type FollowUp = {
   id: string; reportId: string; ownerInspectorId: string; status: 'OPEN' | 'COMPLETED'; note: string; dueDate: string;
   completionNote: string | null; completedAt: string | null; revision: number; createdAt: string; updatedAt: string;
@@ -295,12 +318,36 @@ export async function getInspectionReport(visitId: string): Promise<{ data: { re
   return response.json() as Promise<{ data: { report: InspectionReport | null } }>;
 }
 
+export async function getInspectionReportReadModel(visitId: string): Promise<{ data: { report: InspectionReportReadModel | null } }> {
+  const response = await fetch(`/api/v1/visits/${encodeURIComponent(visitId)}/report`, { credentials: 'same-origin' });
+  if (!response.ok) return readFailure(response);
+  return response.json() as Promise<{ data: { report: InspectionReportReadModel | null } }>;
+}
+
+export async function getInspectorVisitCriteria(): Promise<{ data: { reportType: 'INSPECTOR_VISIT'; templateSource: 'PRODUCT_OWNER_ADOPTED'; templateVersion: 1; criteria: InspectorVisitCriterion[] } }> {
+  const response = await fetch('/api/v1/report-templates/inspector-visit/v1', { credentials: 'same-origin' });
+  if (!response.ok) return readFailure(response);
+  return response.json() as Promise<{ data: { reportType: 'INSPECTOR_VISIT'; templateSource: 'PRODUCT_OWNER_ADOPTED'; templateVersion: 1; criteria: InspectorVisitCriterion[] } }>;
+}
+
 export function saveInspectionReport(visitId: string, input: InspectionReportContent & { expectedRevision: number | null }) {
   return visitMutation<{ data: { report: InspectionReport } }>(`/api/v1/visits/${encodeURIComponent(visitId)}/report`, 'PUT', input);
 }
 
+export type InspectorVisitReportInput = {
+  expectedRevision: number | null; levelClass: string | null; lessonTopic: string | null; inspectorConclusion: string | null;
+  inspectorVisitV1: InspectorVisitV1Fields;
+  observations: Array<{ criterionKey: string; valueText: string }>;
+};
+export function saveInspectorVisitReport(visitId: string, input: InspectorVisitReportInput) {
+  return visitMutation<{ data: { report: InspectorVisitReport } }>(`/api/v1/visits/${encodeURIComponent(visitId)}/inspector-visit-report`, 'PUT', input);
+}
+
 export function finalizeInspectionReport(reportId: string, expectedRevision: number) {
   return visitMutation<{ data: { report: InspectionReport } }>(`/api/v1/reports/${encodeURIComponent(reportId)}/finalize`, 'POST', { expectedRevision });
+}
+export function finalizeInspectorVisitReport(reportId: string, expectedRevision: number) {
+  return visitMutation<{ data: { report: InspectorVisitReport } }>(`/api/v1/reports/${encodeURIComponent(reportId)}/finalize`, 'POST', { expectedRevision });
 }
 
 export async function listReportFollowUps(reportId: string, options: { limit?: number; cursor?: string } = {}) {

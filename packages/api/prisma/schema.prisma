@@ -176,33 +176,78 @@ model PedagogicalVisit {
 }
 
 model InspectionReport {
-  id                                String           @id @default(uuid()) @db.Uuid
-  visitId                           String           @unique @db.Uuid
-  reportType                        String           @default("PEDAGOGICAL_ACCOMPANIMENT")
-  templateSource                    String           @default("INSPECTOR_AUTHORED")
-  templateVersion                   Int              @default(1)
-  status                            String           @default("DRAFT")
-  revision                          Int              @default(1)
-  levelClass                        String?
-  lessonTopic                       String?
-  pedagogicalObservations           String?
-  strengths                         String?
-  improvementAreas                  String?
-  guidanceRecommendations           String?
-  inspectorConclusion               String?
-  finalizedAt                       DateTime?        @db.Timestamp(3)
-  finalizedByInspectorId            String?          @db.Uuid
-  finalizedInspectorNameSnapshot    String?
-  finalizedInspectorSurnameSnapshot String?
-  finalizedTeacherNameSnapshot      String?
-  finalizedTeacherSurnameSnapshot   String?
-  createdAt                         DateTime         @default(now())
-  updatedAt                         DateTime         @updatedAt
-  visit                             PedagogicalVisit @relation(fields: [visitId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  finalizedByInspector              Inspector?       @relation(fields: [finalizedByInspectorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  followUps                         FollowUp[]
+  id                                       String                        @id @default(uuid()) @db.Uuid
+  visitId                                  String                        @unique @db.Uuid
+  reportType                               String                        @default("PEDAGOGICAL_ACCOMPANIMENT")
+  templateSource                           String                        @default("INSPECTOR_AUTHORED")
+  templateVersion                          Int                           @default(1)
+  status                                   String                        @default("DRAFT")
+  revision                                 Int                           @default(1)
+  levelClass                               String?
+  lessonTopic                              String?
+  pedagogicalObservations                  String?
+  strengths                                String?
+  improvementAreas                         String?
+  guidanceRecommendations                  String?
+  inspectorConclusion                      String?
+  finalizedAt                              DateTime?                     @db.Timestamp(3)
+  finalizedByInspectorId                   String?                       @db.Uuid
+  finalizedInspectorNameSnapshot           String?
+  finalizedInspectorSurnameSnapshot        String?
+  finalizedTeacherNameSnapshot             String?
+  finalizedTeacherSurnameSnapshot          String?
+  educationDirectorateText                 String?
+  administrativeDivisionText               String?
+  teacherClassificationText                String?
+  teacherGradeText                         String?
+  teacherNationalityText                   String?
+  teacherEffectiveDateText                 String?
+  teacherLastInspectionText                String?
+  teacherAppointmentText                   String?
+  teacherProfessionalFrameworkText         String?
+  actualLessonDurationText                 String?
+  studentCount                             Int?
+  studentsPresentCount                     Int?
+  studentsAbsentCount                      Int?
+  lessonObjective                          String?
+  pedagogicalGuidanceText                  String?
+  practicalGuidanceText                    String?
+  visitStrengthsText                       String?
+  visitImprovementAreasText                String?
+  tenureConclusionText                     String?
+  generalAssessmentText                    String?
+  markText                                 String?
+  markWordsText                            String?
+  pedagogicalMark                          Decimal?                      @db.Decimal(4, 2)
+  finalizedTeacherBirthDateSnapshot        DateTime?                     @db.Date
+  finalizedTeacherPlaceOfBirthSnapshot     String?
+  finalizedTeacherQualificationsSnapshot   String?
+  finalizedDistrictNameSnapshot            String?
+  finalizedInstitutionMunicipalitySnapshot String?
+  createdAt                                DateTime                      @default(now())
+  updatedAt                                DateTime                      @updatedAt
+  visit                                    PedagogicalVisit              @relation(fields: [visitId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  finalizedByInspector                     Inspector?                    @relation(fields: [finalizedByInspectorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  followUps                                FollowUp[]
+  observations                             InspectionReportObservation[]
 
+  @@unique([id, reportType, templateVersion])
   @@index([finalizedByInspectorId])
+}
+
+model InspectionReportObservation {
+  id              String           @id @default(uuid()) @db.Uuid
+  reportId        String           @db.Uuid
+  reportType      String           @default("INSPECTOR_VISIT")
+  templateVersion Int              @default(1)
+  criterionKey    String
+  valueText       String
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  report          InspectionReport @relation(fields: [reportId, reportType, templateVersion], references: [id, reportType, templateVersion], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([reportId, criterionKey])
+  @@index([reportId, reportType, templateVersion])
 }
 
 model FollowUp {

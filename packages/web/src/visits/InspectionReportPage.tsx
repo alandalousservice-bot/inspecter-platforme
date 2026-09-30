@@ -3,6 +3,8 @@ import { Link, useParams } from 'react-router';
 import { ApiRequestError, createFollowUp, finalizeInspectionReport, getInspectionReport, getPedagogicalVisit, listReportFollowUps, saveInspectionReport, type FollowUp, type InspectionReport, type InspectionReportContent, type PedagogicalVisit } from '../auth/client';
 import { Button, Card, CardContent, CardHeader, Dialog, EmptyState, ErrorState, LoadingState, SuccessState } from '../ui';
 import { formatAlgiers } from './time';
+import { InspectorVisitReportV1Page } from './InspectorVisitReportV1Page';
+import type { InspectionReportReadModel, InspectorVisitReport } from '../auth/client';
 import './inspection-report.css';
 
 const fields: Array<{ key: keyof InspectionReportContent; label: string; max: number; prose?: boolean; required?: boolean }> = [
@@ -19,6 +21,27 @@ const statusLabels = { PLANNED: 'مخططة', COMPLETED: 'مكتملة', CANCELL
 const codePoints = (value: string) => Array.from(value).length;
 
 export function InspectionReportPage() {
+  const { id = '' } = useParams();
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [routing, setRouting] = useState<{ visit: PedagogicalVisit; report: InspectionReportReadModel | null } | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    Promise.all([getPedagogicalVisit(id), getInspectionReport(id)]).then(([visitResult, reportResult]) => {
+      if (!mounted) return;
+      setRouting({ visit: visitResult.data.visit, report: reportResult.data.report as InspectionReportReadModel | null });
+    }).catch(() => { if (mounted) setFailed(true); }).finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
+  }, [id]);
+  if (loading) return <main className="report-page" dir="rtl"><LoadingState label="جارٍ تحميل التقرير…" /></main>;
+  if (failed || !routing) return <main className="report-page" dir="rtl"><ErrorState title="تعذر تحميل التقرير" description="تحقق من الاتصال أو صلاحية الوصول ثم أعد المحاولة." /></main>;
+  if (routing.report?.reportType === 'INSPECTOR_VISIT' || (!routing.report && routing.visit.visitType !== null)) {
+    return <InspectorVisitReportV1Page visit={routing.visit} initialReport={routing.report?.reportType === 'INSPECTOR_VISIT' ? routing.report as InspectorVisitReport : null} />;
+  }
+  return <LegacyInspectionReportPage />;
+}
+
+function LegacyInspectionReportPage() {
   const { id = '' } = useParams();
   const [visit, setVisit] = useState<PedagogicalVisit | null>(null);
   const [report, setReport] = useState<InspectionReport | null>(null);
