@@ -46,6 +46,16 @@ TASK-050 وفق [ADR-031](DECISIONS.md#adr-031--pedagogicalvisit-scheduling-and-
 
 اختبر POST/GET list/detail/PATCH RESCHEDULE/COMPLETE/CANCEL بحالات status المسموحة والنهايات النهائية، `occurredAt` المطلوب عند COMPLETE فقط، no-op، `expectedRevision` وسباقين على revision واحدة، رفض إعادة الجدولة بعد تغيّر المؤسسة/تعطيل Teacher، وعدم تغيير سياق Visit التاريخي. افحص Session ACTIVE وCSRF وعضوية District الحالية ومسؤولية inspector و404 عام خارج النطاق، filter AND و`total`/cursor ثابت وصفحات بعد تغيير المرشح، وبيانات القائمة الدنيا بلا هاتف/بريد أو report fields، query bounded بلا N+1. لكل mutation فعلي حدث AuditLog واحد بالـmetadata المسموحة فقط وفي المعاملة نفسها، وفشل append يرجع العمل، ولا audit للقراءة أو no-op؛ لا PII أو body أو تفاصيل DB في logs/errors. لا UI أو Playwright جديد ضمن TASK-050؛ TASK-051 تختبر الواجهة لاحقًا.
 
+## TASK-051 — Visit management UI
+
+UI/unit: مسارات القائمة/الإنشاء/التفصيل والتنقل؛ تحميل/فراغ/خطأ/إعادة محاولة، `page.total` وترتيب الخادم ومؤشرات next/previous وإعادة الصفحة الأولى بعد تغيير المرشحات، `districtId/teacherId/institutionId/status/from/to` فقط مع `from` شامل و`to` حصري، وعدم طلب تفصيل/ملف لكل صف أو كشف الهاتف/البريد. اختبر منتقي Teacher ببحث `q` خادمي محدود وصفحاته، حالة 0/1/عدة مقاطعات وخطأ context، مسح الاختيار عند تغيير المقاطعة، Teacher بلا مؤسسة، وTeacher غير نشط أو مؤسسة تغيرت برد الخادم. لا Visit free-text search أو تحميل كل الأساتذة.
+
+اختبر تحقق السنة `YYYY-YYYY` المتتابعة وبداية/نهاية صريحتين، منع double-submit، إدخال/عرض `Africa/Algiers` عند اختلاف timezone الجهاز، تحويل ISO offset/UTC، عبور منتصف الليل وإظهار تاريخ الطرفين، وعدم إظهار ثوانٍ أو اشتقاق سنة/مدة. اختبر إنشاء ناجحًا وتفصيلًا بلقطة المؤسسة التاريخية حتى مع اختلاف المؤسسة الحالية، ورابط الملف/الجدول، بلا قسم تقرير. اختبر RESCHEDULE للسنة والطرفين فقط، تحذيري `VISIT_WEEKLY_SCHEDULE_MISSING` و`VISIT_OUTSIDE_WEEKLY_SCHEDULE` مع عدم الإرسال مجددًا دون إقرار فعل صريح وبقاء نفس المدخلات، إبطال الإقرار عند تغييرها، و`VISIT_SCHEDULE_CONTEXT_CHANGED` دون retry آلي. اختبر COMPLETE بوقت إنجاز صريح غير مستقبلي وبلا بيانات تقرير، وCANCEL بتأكيد بلا سبب، واختفاء الأفعال في الحالات النهائية.
+
+اختبر `VISIT_REVISION_CONFLICT` و`VISIT_STATE_CONFLICT` بتحديث يدوي ثم إعادة قرار، و`VISIT_OVERLAP_CONFLICT` دون كشف زيارة أخرى، و`VISIT_WORKPLACE_CHANGED`/`VISIT_WORKPLACE_UNAVAILABLE`/`TEACHER_CURRENT_INSTITUTION_REQUIRED`/`TEACHER_INACTIVE` برد آمن، و404 عام وvalidation ورسالة شبكة عامة. اختبر RTL وlabels وfocus trap/return وEscape عند الأمان وkeyboard و200% zoom وmobile card/list ومفردات عربية غير تقريرية؛ لا ألوان خاصة بالمهمة.
+
+Connected browser على Vite + API + PostgreSQL الاختبار المعزولة وفق آلية G3/G4 القائمة وبfixtures اصطناعية: إنشاء داخل جدول، وإنشاء خارجه بتحذير ثم تأكيد صريح، إعادة جدولة، سباق revision بتحديث ثانٍ، إكمال، إلغاء، بقاء اسم مؤسسة الزيارة القديم بعد تغيير اسم/رابط مؤسسة Teacher، والتنقل list→detail→Teacher والعودة المرشحة؛ لا يعيد اختبار invariants DB الكاملة لـTASK-050. شغّل بوابات typecheck/lint/tests/build/diff-check؛ لا Production ولا migration جديدة في TASK-051.
+
 عند كل task: tests الخاصة به، typecheck، lint، build عند تغير wiring، regression مرتبط بالموديول. Gate المرحلي يتطلب الأدلة لا مجرد نجاح الأمر. لا يجري اختبارات إنتاج أو migrations عليه في هذه المرحلة.
 
 ## Connected browser gate

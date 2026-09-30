@@ -10,6 +10,9 @@ import { SubmissionDetailPage } from './submissions/SubmissionDetailPage';
 import { TeacherProfilePage } from './teachers/TeacherProfilePage';
 import { TeacherDirectoryPage } from './teachers/TeacherDirectoryPage';
 import { WeeklySchedulePage } from './teachers/WeeklySchedulePage';
+import { VisitCreatePage } from './visits/VisitCreatePage';
+import { VisitDetailPage } from './visits/VisitDetailPage';
+import { VisitListPage } from './visits/VisitListPage';
 import './ui/tokens.css';
 import './ui/shell.css';
 import './ui/primitives.css';
@@ -31,6 +34,9 @@ createRoot(root).render(
           <Route path="teachers" element={<TeacherDirectoryPage />} />
           <Route path="teachers/:id" element={<TeacherProfilePage />} />
           <Route path="teachers/:id/schedules" element={<WeeklySchedulePage />} />
+          <Route path="visits" element={<VisitListPage />} />
+          <Route path="visits/new" element={<VisitCreatePage />} />
+          <Route path="visits/:id" element={<VisitDetailPage />} />
         </Route>
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="*" element={<Navigate to="/login" replace />} />

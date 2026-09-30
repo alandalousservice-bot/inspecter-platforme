@@ -15,6 +15,7 @@
     "test:db": "npm run test:db --workspace @inspector/api",
     "e2e:g3": "node scripts/g3-e2e.mjs",
     "e2e:task045": "node scripts/task045-e2e.mjs",
+    "e2e:task051": "node scripts/task051-e2e.mjs",
     "smoke": "node --test tests/smoke.test.mjs"
   },
   "devDependencies": {

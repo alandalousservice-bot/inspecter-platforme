@@ -1,11 +1,12 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const task045 = process.env.TASK045_E2E === '1';
+const task051 = process.env.TASK051_E2E === '1';
 if (!process.env.G3_E2E_DATABASE_URL) throw new Error('Run connected browser tests with the isolated E2E command.');
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: task045 ? 'task045-teacher-directory.spec.ts' : 'g3-connected-flow.spec.ts',
+  testMatch: task051 ? 'task051-pedagogical-visits.spec.ts' : task045 ? 'task045-teacher-directory.spec.ts' : 'g3-connected-flow.spec.ts',
   fullyParallel: false,
   workers: 1,
   timeout: 120_000,

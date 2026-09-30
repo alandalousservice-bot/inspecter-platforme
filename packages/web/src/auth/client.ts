@@ -177,6 +177,71 @@ export type WeeklyScheduleSlot = {
 export type WeeklySchedule = { id: string; teacherId: string; academicYear: string; revision: number; slots: WeeklyScheduleSlot[] };
 export type WeeklyScheduleSlotInput = Omit<WeeklyScheduleSlot, 'id'>;
 
+export type PedagogicalVisitStatus = 'PLANNED' | 'COMPLETED' | 'CANCELLED';
+export type PedagogicalVisit = {
+  id: string;
+  districtId: string;
+  teacher: { id: string; name: string; surname: string };
+  institution: { id: string; name: string };
+  academicYear: string;
+  scheduledStartAt: string;
+  scheduledEndAt: string;
+  occurredAt: string | null;
+  status: PedagogicalVisitStatus;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+};
+export type VisitFilters = {
+  districtId?: string; teacherId?: string; institutionId?: string;
+  status?: PedagogicalVisitStatus; from?: string; to?: string; limit?: number; cursor?: string;
+};
+export type VisitPage = { limit: number; nextCursor: string | null; total: number };
+export type ScheduleWarningCode = 'VISIT_WEEKLY_SCHEDULE_MISSING' | 'VISIT_OUTSIDE_WEEKLY_SCHEDULE';
+
+export async function listPedagogicalVisits(options: VisitFilters = {}) {
+  const query = new URLSearchParams();
+  for (const key of ['districtId', 'teacherId', 'institutionId', 'status', 'from', 'to', 'cursor'] as const) {
+    const value = options[key];
+    if (value) query.set(key, value);
+  }
+  query.set('limit', String(options.limit ?? 25));
+  const response = await fetch(`/api/v1/visits?${query}`, { credentials: 'same-origin' });
+  if (!response.ok) return readFailure(response);
+  return response.json() as Promise<{ data: PedagogicalVisit[]; page: VisitPage }>;
+}
+
+export async function getPedagogicalVisit(id: string) {
+  const response = await fetch(`/api/v1/visits/${encodeURIComponent(id)}`, { credentials: 'same-origin' });
+  if (!response.ok) return readFailure(response);
+  return response.json() as Promise<{ data: { visit: PedagogicalVisit } }>;
+}
+
+async function visitMutation<T>(path: string, method: 'POST' | 'PATCH', body: unknown): Promise<T> {
+  const csrfToken = csrfCookie();
+  if (!csrfToken) throw new ApiRequestError('تعذر التحقق من الطلب. أعد تحميل الصفحة ثم حاول مجددًا.');
+  const response = await fetch(path, { method, credentials: 'same-origin',
+    headers: { 'content-type': 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify(body) });
+  if (!response.ok) return readFailure(response);
+  return response.json() as Promise<T>;
+}
+
+export function createPedagogicalVisit(input: {
+  teacherId: string; academicYear: string; scheduledStartAt: string; scheduledEndAt: string;
+  scheduleWarningAcknowledgement?: ScheduleWarningCode;
+}) {
+  return visitMutation<{ data: { visit: PedagogicalVisit } }>('/api/v1/visits', 'POST', input);
+}
+
+export type PedagogicalVisitPatch =
+  | { operation: 'RESCHEDULE'; expectedRevision: number; academicYear: string; scheduledStartAt: string; scheduledEndAt: string; scheduleWarningAcknowledgement?: ScheduleWarningCode }
+  | { operation: 'COMPLETE'; expectedRevision: number; occurredAt: string }
+  | { operation: 'CANCEL'; expectedRevision: number };
+
+export function patchPedagogicalVisit(id: string, input: PedagogicalVisitPatch) {
+  return visitMutation<{ data: { visit: PedagogicalVisit } }>(`/api/v1/visits/${encodeURIComponent(id)}`, 'PATCH', input);
+}
+
 export async function getWeeklySchedule(teacherId: string, academicYear: string): Promise<{ data: { schedule: WeeklySchedule | null } }> {
   const query = new URLSearchParams({ academicYear });
   const response = await fetch(`/api/v1/teachers/${encodeURIComponent(teacherId)}/schedules?${query}`, { credentials: 'same-origin' });

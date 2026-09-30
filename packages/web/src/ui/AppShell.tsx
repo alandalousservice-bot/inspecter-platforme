@@ -19,6 +19,7 @@ export function AppShell({ children, headerAction }: AppShellProps) {
             <NavLink to="/app/submissions">طلبات الأساتذة</NavLink>
             <NavLink to="/app/institutions">المؤسسات</NavLink>
             <NavLink to="/app/teachers">دليل الأساتذة</NavLink>
+            <NavLink to="/app/visits">الزيارات التربوية</NavLink>
           </nav>
         </aside>
         <main id="main-content" className="app-main" tabIndex={-1}>
