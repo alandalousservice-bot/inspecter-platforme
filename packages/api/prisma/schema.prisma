@@ -152,8 +152,11 @@ model PedagogicalVisit {
   institutionId           String            @db.Uuid
   institutionNameSnapshot String
   academicYear            String
-  scheduledStartAt        DateTime          @db.Timestamp(3)
-  scheduledEndAt          DateTime          @db.Timestamp(3)
+  visitType               String?
+  scheduledStartAt        DateTime?         @db.Timestamp(3)
+  scheduledEndAt          DateTime?         @db.Timestamp(3)
+  actualStartAt           DateTime?         @db.Timestamp(3)
+  actualEndAt             DateTime?         @db.Timestamp(3)
   occurredAt              DateTime?         @db.Timestamp(3)
   status                  String            @default("PLANNED")
   revision                Int               @default(1)
@@ -166,6 +169,7 @@ model PedagogicalVisit {
   report                  InspectionReport?
 
   @@index([districtId, scheduledStartAt(sort: Desc), id(sort: Desc)])
+  @@index([districtId, visitType])
   @@index([teacherId, scheduledStartAt])
   @@index([inspectorId, scheduledStartAt])
   @@index([institutionId, scheduledStartAt])

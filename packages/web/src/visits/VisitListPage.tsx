@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { ApiRequestError, getCurrentDistricts, listPedagogicalVisits, type DistrictOption, type Institution, type PedagogicalVisit, type PedagogicalVisitStatus, type TeacherDirectoryItem, type VisitFilters } from '../auth/client';
+import { ApiRequestError, getCurrentDistricts, listPedagogicalVisits, type DistrictOption, type Institution, type PedagogicalVisit, type PedagogicalVisitStatus, type PedagogicalVisitType, type TeacherDirectoryItem, type VisitFilters } from '../auth/client';
 import { Button, Card, CardContent, CardHeader, DataTable, EmptyState, ErrorState, Input, LoadingState, type DataTableColumn } from '../ui';
 import { InstitutionPicker, TeacherPicker } from './VisitPickers';
 import { formatAlgiers, localDateTimeToOffset, nextLocalDate } from './time';
@@ -8,7 +8,16 @@ import './visits.css';
 
 const PAGE_SIZE = 25;
 const statusLabels: Record<PedagogicalVisitStatus, string> = { PLANNED: 'مخططة', COMPLETED: 'مكتملة', CANCELLED: 'ملغاة' };
-const allowedKeys = ['districtId', 'teacherId', 'institutionId', 'status', 'fromDate', 'toDate'] as const;
+const allowedKeys = ['districtId', 'teacherId', 'institutionId', 'status', 'visitType', 'fromDate', 'toDate'] as const;
+const visitTypeLabels: Record<PedagogicalVisitType, string> = {
+  GUIDANCE: 'زيارة توجيهية / تكوينية', TENURE_CONFIRMATION: 'زيارة التثبيت / الترسيم',
+  PROMOTION_EVALUATION: 'زيارة الترقية / التقييم', MONITORING_FOLLOW_UP: 'زيارة المراقبة والمتابعة', EXCEPTIONAL: 'زيارة استثنائية',
+};
+function visitTypeLabel(type: PedagogicalVisitType | null) { return type ? visitTypeLabels[type] : 'نوع الزيارة غير موثق (سجل سابق)'; }
+function intervalLabel(visit: PedagogicalVisit) {
+  const start = visit.actualStartAt ?? visit.scheduledStartAt; const end = visit.actualEndAt ?? visit.scheduledEndAt;
+  return start && end ? `${formatAlgiers(start)} — ${formatAlgiers(end)}` : 'الفترة غير متاحة';
+}
 
 function normalizeParams(params: URLSearchParams) {
   const next = new URLSearchParams();
@@ -18,7 +27,7 @@ function normalizeParams(params: URLSearchParams) {
 
 function buildFilters(params: URLSearchParams, cursor?: string): VisitFilters {
   const filters: VisitFilters = { limit: PAGE_SIZE };
-  for (const key of ['districtId', 'teacherId', 'institutionId', 'status'] as const) {
+  for (const key of ['districtId', 'teacherId', 'institutionId', 'status', 'visitType'] as const) {
     const value = params.get(key);
     if (value) Object.assign(filters, { [key]: value });
   }
@@ -80,7 +89,8 @@ export function VisitListPage() {
     { id: 'teacher', header: 'الأستاذ', render: (visit) => <Link to={`/app/visits/${encodeURIComponent(visit.id)}${filterKey ? `?${filterKey}` : ''}`}>{visit.teacher.name} {visit.teacher.surname}</Link> },
     ...(districts.length > 1 ? [{ id: 'district', header: 'المقاطعة', render: (visit: PedagogicalVisit) => districts.find((district) => district.id === visit.districtId)?.name ?? 'ضمن النطاق الحالي' }] : []),
     { id: 'institution', header: 'مؤسسة الزيارة وقت التخطيط', render: (visit) => visit.institution.name },
-    { id: 'time', header: 'موعد الزيارة', render: (visit) => <span dir="auto">{formatAlgiers(visit.scheduledStartAt)} — {formatAlgiers(visit.scheduledEndAt)}</span> },
+    { id: 'visitType', header: 'نوع الزيارة', render: (visit) => visitTypeLabel(visit.visitType) },
+    { id: 'time', header: 'الفترة', render: (visit) => <><small>{visit.intervalKind === 'ACTUAL_RETROSPECTIVE' ? 'الفترة الفعلية للزيارة' : 'الموعد المخطط'}</small><span dir="auto">{intervalLabel(visit)}</span></> },
     { id: 'status', header: 'الحالة', render: (visit) => <span className={`visit-status visit-status--${visit.status.toLowerCase()}`}>{statusLabels[visit.status]}</span> },
   ], [districts, filterKey]);
 
@@ -105,6 +115,7 @@ export function VisitListPage() {
       {!teacherScope && districts.length > 1 ? <p>اختر مقاطعة لتحديد أستاذ أو مؤسسة.</p> : null}
       {institutionScope ? <InstitutionPicker districtId={institutionScope} selected={institution} onSelect={(value) => { setInstitution(value); updateFilters({ institutionId: value?.id }); }} /> : null}
       <div className="visit-filter"><label className="ui-field__label" htmlFor="visit-filter-status">حالة الزيارة</label><select id="visit-filter-status" className="ui-input" value={params.get('status') ?? ''} onChange={(event) => updateFilters({ status: event.currentTarget.value || undefined })}><option value="">كل الحالات</option><option value="PLANNED">مخططة</option><option value="COMPLETED">مكتملة</option><option value="CANCELLED">ملغاة</option></select></div>
+      <div className="visit-filter"><label className="ui-field__label" htmlFor="visit-filter-type">نوع الزيارة</label><select id="visit-filter-type" className="ui-input" value={params.get('visitType') ?? ''} onChange={(event) => updateFilters({ visitType: event.currentTarget.value || undefined })}><option value="">كل الأنواع، بما فيها السجلات السابقة غير الموثقة</option>{Object.entries(visitTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
       <form className="visit-date-filter" onSubmit={applyDateFilter}>
         <Input id="visit-filter-from" name="fromDate" label="من تاريخ الموعد" type="date" defaultValue={params.get('fromDate') ?? ''} />
         <Input id="visit-filter-to" name="toDate" label="إلى تاريخ الموعد (شامل)" type="date" defaultValue={params.get('toDate') ?? ''} />
@@ -124,7 +135,8 @@ export function VisitListPage() {
             <h2><Link to={`/app/visits/${encodeURIComponent(visit.id)}${filterKey ? `?${filterKey}` : ''}`}>{visit.teacher.name} {visit.teacher.surname}</Link></h2>
             {districts.length > 1 ? <p><strong>المقاطعة:</strong> {districts.find((district) => district.id === visit.districtId)?.name ?? 'ضمن النطاق الحالي'}</p> : null}
             <p><strong>مؤسسة الزيارة وقت التخطيط:</strong> {visit.institution.name}</p>
-            <p><strong>موعد الزيارة:</strong> <span dir="auto">{formatAlgiers(visit.scheduledStartAt)} — {formatAlgiers(visit.scheduledEndAt)}</span></p>
+            <p><strong>نوع الزيارة:</strong> {visitTypeLabel(visit.visitType)}</p>
+            <p><strong>{visit.intervalKind === 'ACTUAL_RETROSPECTIVE' ? 'الفترة الفعلية للزيارة:' : 'الموعد المخطط:'}</strong> <span dir="auto">{intervalLabel(visit)}</span></p>
             <p><strong>الحالة:</strong> <span className={`visit-status visit-status--${visit.status.toLowerCase()}`}>{statusLabels[visit.status]}</span></p>
           </article>)}</div>
           <nav className="visit-pagination" aria-label="صفحات الزيارات"><span>صفحة {pageIndex + 1} — إجمالي النتائج: {total}</span>

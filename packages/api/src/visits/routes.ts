@@ -8,6 +8,7 @@ import { requireInspectorDistrictMembership } from '../policy/district-access.js
 import { parseOffsetTimestamp, scheduleWarning, yearSchemaValid, type ScheduleWarning } from './planning.js';
 
 const uuid = z.string().uuid();
+const visitType = z.enum(['GUIDANCE', 'TENURE_CONFIRMATION', 'PROMOTION_EVALUATION', 'MONITORING_FOLLOW_UP', 'EXCEPTIONAL']);
 const offsetDate = z.string().refine((value) => {
   try { parseOffsetTimestamp(value); return true; } catch { return false; }
 }, 'قيمة غير صالحة.');
@@ -15,6 +16,7 @@ const year = z.string().refine(yearSchemaValid, 'قيمة غير صالحة.');
 const listSchema = z.object({
   districtId: uuid.optional(), teacherId: uuid.optional(), institutionId: uuid.optional(),
   status: z.enum(['PLANNED', 'COMPLETED', 'CANCELLED']).optional(),
+  visitType: visitType.optional(),
   from: offsetDate.optional(), to: offsetDate.optional(),
   limit: z.string().regex(/^\d+$/u).transform(Number).pipe(z.number().int().min(1).max(100)).optional().transform((n) => n ?? 25),
   cursor: uuid.optional(),
@@ -23,9 +25,14 @@ const listSchema = z.object({
     context.addIssue({ code: 'custom', path: ['to'], message: 'قيمة غير صالحة.' });
   }
 });
-const createSchema = z.object({ teacherId: uuid, academicYear: year, scheduledStartAt: offsetDate, scheduledEndAt: offsetDate,
+const scheduledCreateSchema = z.object({ teacherId: uuid, academicYear: year, visitType, scheduledStartAt: offsetDate, scheduledEndAt: offsetDate,
   scheduleWarningAcknowledgement: z.enum(['VISIT_WEEKLY_SCHEDULE_MISSING', 'VISIT_OUTSIDE_WEEKLY_SCHEDULE']).optional() }).strict()
   .refine((input) => parseOffsetTimestamp(input.scheduledStartAt) < parseOffsetTimestamp(input.scheduledEndAt), { path: ['scheduledEndAt'], message: 'قيمة غير صالحة.' });
+const retrospectiveCreateSchema = z.object({ teacherId: uuid, academicYear: year, visitType: z.literal('EXCEPTIONAL'), actualStartAt: offsetDate,
+  actualEndAt: offsetDate, institutionContextConfirmed: z.literal(true) }).strict()
+  .refine((input) => parseOffsetTimestamp(input.actualStartAt) < parseOffsetTimestamp(input.actualEndAt), { path: ['actualEndAt'], message: 'قيمة غير صالحة.' })
+  .refine((input) => parseOffsetTimestamp(input.actualEndAt).getTime() <= Date.now(), { path: ['actualEndAt'], message: 'قيمة غير صالحة.' });
+const createSchema = z.union([scheduledCreateSchema, retrospectiveCreateSchema]);
 const expectedRevision = z.number().int().positive();
 const patchSchema = z.discriminatedUnion('operation', [
   z.object({ operation: z.literal('RESCHEDULE'), expectedRevision, academicYear: year, scheduledStartAt: offsetDate, scheduledEndAt: offsetDate,
@@ -33,21 +40,28 @@ const patchSchema = z.discriminatedUnion('operation', [
     .refine((input) => parseOffsetTimestamp(input.scheduledStartAt) < parseOffsetTimestamp(input.scheduledEndAt), { path: ['scheduledEndAt'], message: 'قيمة غير صالحة.' }),
   z.object({ operation: z.literal('COMPLETE'), expectedRevision, occurredAt: offsetDate }).strict(),
   z.object({ operation: z.literal('CANCEL'), expectedRevision }).strict(),
+  z.object({ operation: z.literal('SET_VISIT_TYPE'), expectedRevision, visitType }).strict(),
 ]);
 
 const notFound = () => new ApiError(404, 'NOT_FOUND', 'المورد غير موجود ضمن نطاق الوصول.');
-const conflict = (code: 'TEACHER_INACTIVE' | 'TEACHER_CURRENT_INSTITUTION_REQUIRED' | 'VISIT_WORKPLACE_UNAVAILABLE' | 'VISIT_WORKPLACE_CHANGED' | 'VISIT_SCHEDULE_CONTEXT_CHANGED' | 'VISIT_WEEKLY_SCHEDULE_MISSING' | 'VISIT_OUTSIDE_WEEKLY_SCHEDULE' | 'VISIT_OVERLAP_CONFLICT' | 'VISIT_REVISION_CONFLICT' | 'VISIT_STATE_CONFLICT') =>
+const conflict = (code: 'TEACHER_INACTIVE' | 'TEACHER_CURRENT_INSTITUTION_REQUIRED' | 'VISIT_WORKPLACE_UNAVAILABLE' | 'VISIT_WORKPLACE_CHANGED' | 'VISIT_SCHEDULE_CONTEXT_CHANGED' | 'VISIT_WEEKLY_SCHEDULE_MISSING' | 'VISIT_OUTSIDE_WEEKLY_SCHEDULE' | 'VISIT_OVERLAP_CONFLICT' | 'VISIT_REVISION_CONFLICT' | 'VISIT_STATE_CONFLICT' | 'VISIT_TYPE_LOCKED') =>
   new ApiError(409, code, 'تعذر تنفيذ العملية. حدّث البيانات أو تحقق من أهلية الأستاذ والموعد.');
-const includeProjection = { teacher: { select: { id: true, name: true, surname: true } } } as const;
-type VisitWithTeacher = PedagogicalVisit & { teacher: { id: string; name: string; surname: string } };
+const includeProjection = { teacher: { select: { id: true, name: true, surname: true } }, report: { select: { id: true } } } as const;
+type VisitWithTeacher = PedagogicalVisit & { teacher: { id: string; name: string; surname: string }; report: { id: string } | null };
 
 function projection(visit: VisitWithTeacher) {
   return {
     id: visit.id, districtId: visit.districtId,
     teacher: { id: visit.teacher.id, name: visit.teacher.name, surname: visit.teacher.surname },
     institution: { id: visit.institutionId, name: visit.institutionNameSnapshot },
-    academicYear: visit.academicYear, scheduledStartAt: visit.scheduledStartAt.toISOString(),
-    scheduledEndAt: visit.scheduledEndAt.toISOString(), occurredAt: visit.occurredAt?.toISOString() ?? null,
+    academicYear: visit.academicYear, visitType: visit.visitType,
+    scheduledStartAt: visit.scheduledStartAt?.toISOString() ?? null,
+    scheduledEndAt: visit.scheduledEndAt?.toISOString() ?? null,
+    actualStartAt: visit.actualStartAt?.toISOString() ?? null,
+    actualEndAt: visit.actualEndAt?.toISOString() ?? null,
+    intervalKind: visit.actualStartAt ? 'ACTUAL_RETROSPECTIVE' : 'SCHEDULED',
+    visitTypeEditable: visit.status !== 'CANCELLED' && visit.actualStartAt === null && visit.scheduledStartAt !== null && visit.report === null,
+    occurredAt: visit.occurredAt?.toISOString() ?? null,
     status: visit.status, revision: visit.revision, createdAt: visit.createdAt.toISOString(), updatedAt: visit.updatedAt.toISOString(),
   };
 }
@@ -81,18 +95,18 @@ function verifyAcknowledgement(warning: ScheduleWarning | undefined, acknowledge
   if (!warning && acknowledgement) throw conflict('VISIT_SCHEDULE_CONTEXT_CHANGED');
 }
 
-function toWhere(input: z.infer<typeof listSchema>, inspectorId: string, districtIds: string[]): Prisma.PedagogicalVisitWhereInput {
-  return {
-    inspectorId,
-    districtId: input.districtId ?? { in: districtIds },
-    ...(input.teacherId ? { teacherId: input.teacherId } : {}),
-    ...(input.institutionId ? { institutionId: input.institutionId } : {}),
-    ...(input.status ? { status: input.status } : {}),
-    ...(input.from || input.to ? { scheduledStartAt: {
-      ...(input.from ? { gte: parseOffsetTimestamp(input.from) } : {}),
-      ...(input.to ? { lt: parseOffsetTimestamp(input.to) } : {}),
-    } } : {}),
-  };
+function listConditions(input: z.infer<typeof listSchema>, inspectorId: string, districtIds: string[]) {
+  const conditions: Prisma.Sql[] = [Prisma.sql`"inspectorId" = ${inspectorId}::uuid`];
+  const districtFilter = input.districtId ? [input.districtId] : districtIds;
+  if (!districtFilter.length) return Prisma.sql`FALSE`;
+  conditions.push(Prisma.sql`"districtId" IN (${Prisma.join(districtFilter.map((id) => Prisma.sql`${id}::uuid`))})`);
+  if (input.teacherId) conditions.push(Prisma.sql`"teacherId" = ${input.teacherId}::uuid`);
+  if (input.institutionId) conditions.push(Prisma.sql`"institutionId" = ${input.institutionId}::uuid`);
+  if (input.status) conditions.push(Prisma.sql`"status" = ${input.status}`);
+  if (input.visitType) conditions.push(Prisma.sql`"visitType" = ${input.visitType}`);
+  if (input.from) conditions.push(Prisma.sql`COALESCE("actualStartAt", "scheduledStartAt") >= ${parseOffsetTimestamp(input.from)}`);
+  if (input.to) conditions.push(Prisma.sql`COALESCE("actualStartAt", "scheduledStartAt") < ${parseOffsetTimestamp(input.to)}`);
+  return Prisma.join(conditions, ' AND ');
 }
 
 function sendProjection(response: Response, visit: VisitWithTeacher) {
@@ -112,23 +126,30 @@ export function registerPedagogicalVisitRoutes(app: Express, database: PrismaCli
     });
     const districtIds = memberships.map((membership) => membership.districtId);
     if (input.districtId && !districtIds.includes(input.districtId)) throw notFound();
-    const where = toWhere(input, inspectorId, districtIds);
-    const total = districtIds.length ? await database.pedagogicalVisit.count({ where }) : 0;
-    let cursorVisit: { id: string; scheduledStartAt: Date } | undefined;
+    const where = listConditions(input, inspectorId, districtIds);
+    const totals = await database.$queryRaw<Array<{ total: number }>>(Prisma.sql`SELECT count(*)::int AS total FROM "PedagogicalVisit" WHERE ${where}`);
+    let cursorVisit: { id: string } | undefined;
     if (input.cursor) {
-      cursorVisit = await database.pedagogicalVisit.findFirst({ where: { ...where, id: input.cursor }, select: { id: true, scheduledStartAt: true } }) ?? undefined;
+      const cursorRows = await database.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+        SELECT "id"
+        FROM "PedagogicalVisit" WHERE ${where} AND "id" = ${input.cursor}::uuid LIMIT 1`);
+      cursorVisit = cursorRows[0];
       if (!cursorVisit) throw notFound();
     }
-    const pageWhere: Prisma.PedagogicalVisitWhereInput = cursorVisit ? { AND: [where, { OR: [
-      { scheduledStartAt: { lt: cursorVisit.scheduledStartAt } },
-      { scheduledStartAt: cursorVisit.scheduledStartAt, id: { lt: cursorVisit.id } },
-    ] }] } : where;
-    const rows = districtIds.length ? await database.pedagogicalVisit.findMany({
-      where: pageWhere, orderBy: [{ scheduledStartAt: 'desc' }, { id: 'desc' }], take: input.limit + 1, include: includeProjection,
-    }) : [];
-    const hasNext = rows.length > input.limit;
-    const items = rows.slice(0, input.limit);
-    response.json({ data: items.map((visit) => projection(visit)), page: { limit: input.limit, nextCursor: hasNext ? items.at(-1)?.id ?? null : null, total } });
+    const afterCursor = cursorVisit ? Prisma.sql`AND (COALESCE("actualStartAt", "scheduledStartAt"), "id") < (
+      (SELECT COALESCE("actualStartAt", "scheduledStartAt") FROM "PedagogicalVisit" WHERE "id" = ${cursorVisit.id}::uuid),
+      ${cursorVisit.id}::uuid
+    )` : Prisma.empty;
+    const pageRows = await database.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT "id" FROM "PedagogicalVisit" WHERE ${where} ${afterCursor}
+      ORDER BY COALESCE("actualStartAt", "scheduledStartAt") DESC, "id" DESC
+      LIMIT ${input.limit + 1}`);
+    const hasNext = pageRows.length > input.limit;
+    const pageIds = pageRows.slice(0, input.limit).map((row) => row.id);
+    const fetched = pageIds.length ? await database.pedagogicalVisit.findMany({ where: { id: { in: pageIds } }, include: includeProjection }) : [];
+    const byId = new Map(fetched.map((visit) => [visit.id, visit]));
+    const items = pageIds.map((id) => byId.get(id)).filter((visit): visit is VisitWithTeacher => Boolean(visit));
+    response.json({ data: items.map((visit) => projection(visit)), page: { limit: input.limit, nextCursor: hasNext ? pageIds.at(-1) ?? null : null, total: totals[0]?.total ?? 0 } });
   });
 
   app.post('/api/v1/visits', async (request, response) => {
@@ -136,10 +157,11 @@ export function registerPedagogicalVisitRoutes(app: Express, database: PrismaCli
     const parsed = createSchema.safeParse(request.body);
     if (!parsed.success) throw new ApiError(400, 'VALIDATION_ERROR', 'تحقق من البيانات المدخلة.', { _form: ['قيمة غير صالحة.'] });
     const input = parsed.data;
+    const isScheduled = 'scheduledStartAt' in input;
     const inspectorId = response.locals.inspectorId as string;
     const requestId = response.locals.requestId as string;
-    const start = parseOffsetTimestamp(input.scheduledStartAt);
-    const end = parseOffsetTimestamp(input.scheduledEndAt);
+    const start = parseOffsetTimestamp(isScheduled ? input.scheduledStartAt : input.actualStartAt);
+    const end = parseOffsetTimestamp(isScheduled ? input.scheduledEndAt : input.actualEndAt);
     try {
       const created = await database.$transaction(async (tx) => {
         const locked = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "Teacher" WHERE id = ${input.teacherId}::uuid FOR UPDATE`;
@@ -152,16 +174,22 @@ export function registerPedagogicalVisitRoutes(app: Express, database: PrismaCli
         await tx.$queryRaw`SELECT id FROM "Institution" WHERE id = ${teacher.institutionId}::uuid FOR UPDATE`;
         const institution = await tx.institution.findUnique({ where: { id: teacher.institutionId } });
         if (!institution || institution.districtId !== teacher.districtId || institution.archivedAt !== null) throw conflict('VISIT_WORKPLACE_UNAVAILABLE');
-        const warning = await inspectSchedule(tx, teacher.id, input.academicYear, start, end);
-        verifyAcknowledgement(warning, input.scheduleWarningAcknowledgement);
+        const warning = isScheduled ? await inspectSchedule(tx, teacher.id, input.academicYear, start, end) : undefined;
+        if (isScheduled) verifyAcknowledgement(warning, input.scheduleWarningAcknowledgement);
         const visit = await tx.pedagogicalVisit.create({ data: {
           districtId: teacher.districtId, inspectorId, teacherId: teacher.id,
           institutionId: institution.id, institutionNameSnapshot: institution.name,
-          academicYear: input.academicYear, scheduledStartAt: start, scheduledEndAt: end,
+          academicYear: input.academicYear, visitType: input.visitType,
+          ...(isScheduled
+            ? { scheduledStartAt: start, scheduledEndAt: end }
+            : { scheduledStartAt: null, scheduledEndAt: null, actualStartAt: start, actualEndAt: end, status: 'COMPLETED', occurredAt: end }),
         }, include: includeProjection });
         await appendAuditEvent(tx, { source: 'HTTP', actorInspectorId: inspectorId, districtId: visit.districtId,
           action: AuditAction.PEDAGOGICAL_VISIT_CREATED, entityType: 'PedagogicalVisit', entityId: visit.id, requestId,
-          metadata: warning ? { scheduleWarningCode: warning } : {} });
+          metadata: { visitType: input.visitType, ...(isScheduled ? (warning ? { scheduleWarningCode: warning } : {}) : { intervalKind: 'ACTUAL_RETROSPECTIVE' }) } });
+        if (!isScheduled) await appendAuditEvent(tx, { source: 'HTTP', actorInspectorId: inspectorId, districtId: visit.districtId,
+          action: AuditAction.PEDAGOGICAL_VISIT_COMPLETED, entityType: 'PedagogicalVisit', entityId: visit.id, requestId,
+          metadata: { fromStatus: null, toStatus: 'COMPLETED' } });
         return visit;
       });
       response.status(201).json({ data: { visit: projection(created) } });
@@ -198,9 +226,23 @@ export function registerPedagogicalVisitRoutes(app: Express, database: PrismaCli
         if (!current) throw notFound();
         await requireInspectorDistrictMembership(tx, inspectorId, current.districtId, nowDate());
         if (current.revision !== input.expectedRevision) throw conflict('VISIT_REVISION_CONFLICT');
+        if (input.operation === 'SET_VISIT_TYPE') {
+          if (current.status === 'CANCELLED' || current.actualStartAt !== null || current.scheduledStartAt === null) throw conflict('VISIT_TYPE_LOCKED');
+          const existingReport = await tx.inspectionReport.findUnique({ where: { visitId: current.id }, select: { id: true } });
+          if (existingReport) throw conflict('VISIT_TYPE_LOCKED');
+          if (current.visitType === input.visitType) return current;
+          const updated = await tx.pedagogicalVisit.update({ where: { id: current.id }, data: {
+            visitType: input.visitType, revision: { increment: 1 },
+          }, include: includeProjection });
+          await appendAuditEvent(tx, { source: 'HTTP', actorInspectorId: inspectorId, districtId: current.districtId,
+            action: AuditAction.PEDAGOGICAL_VISIT_UPDATED, entityType: 'PedagogicalVisit', entityId: current.id, requestId,
+            metadata: { changedFields: ['visitType'] } });
+          return updated;
+        }
         if (current.status !== 'PLANNED') throw conflict('VISIT_STATE_CONFLICT');
 
         if (input.operation === 'RESCHEDULE') {
+          if (current.scheduledStartAt === null || current.scheduledEndAt === null) throw conflict('VISIT_STATE_CONFLICT');
           const teacherLock = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "Teacher" WHERE id = ${current.teacherId}::uuid FOR UPDATE`;
           if (!teacherLock.length) throw conflict('VISIT_WORKPLACE_CHANGED');
           const teacher = await tx.teacher.findUnique({ where: { id: current.teacherId } });
@@ -212,7 +254,7 @@ export function registerPedagogicalVisitRoutes(app: Express, database: PrismaCli
           const end = parseOffsetTimestamp(input.scheduledEndAt);
           const changedFields = (['scheduledStartAt', 'scheduledEndAt', 'academicYear'] as const).filter((field) => {
             if (field === 'academicYear') return input.academicYear !== current.academicYear;
-            return (field === 'scheduledStartAt' ? start : end).getTime() !== (field === 'scheduledStartAt' ? current.scheduledStartAt : current.scheduledEndAt).getTime();
+            return (field === 'scheduledStartAt' ? start : end).getTime() !== (field === 'scheduledStartAt' ? current.scheduledStartAt! : current.scheduledEndAt!).getTime();
           });
           if (!changedFields.length) return current;
           const warning = await inspectSchedule(tx, current.teacherId, input.academicYear, start, end);

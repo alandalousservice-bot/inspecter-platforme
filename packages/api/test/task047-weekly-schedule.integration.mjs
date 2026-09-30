@@ -90,8 +90,9 @@ before(async () => {
   tempRoot = mkdtempSync(join(tmpdir(), 'task047-prisma-upgrade-'));
   const reportMigration = '20260930020000_task_052_inspection_report';
   const followUpMigration = '20260930030000_task_053_follow_up';
-  const cleanBundle = migrationBundle('clean', ['20260929070000_task_050_pedagogical_visit', '20260930010000_task_052a_inspector_professional_identity', reportMigration, followUpMigration]);
-  const upgradeBundle = migrationBundle('upgrade', [migrationName, '20260929070000_task_050_pedagogical_visit', '20260930010000_task_052a_inspector_professional_identity', reportMigration, followUpMigration]);
+  const visitTypeMigration = '20260930120000_task_053a_visit_type';
+  const cleanBundle = migrationBundle('clean', ['20260929070000_task_050_pedagogical_visit', '20260930010000_task_052a_inspector_professional_identity', reportMigration, followUpMigration, visitTypeMigration]);
+  const upgradeBundle = migrationBundle('upgrade', [migrationName, '20260929070000_task_050_pedagogical_visit', '20260930010000_task_052a_inspector_professional_identity', reportMigration, followUpMigration, visitTypeMigration]);
   const cleanUrl = schemaUrl(baseUrl, cleanSchema);
   runPrisma(['migrate', 'deploy'], cleanUrl, cleanBundle.schema);
   runPrisma(['migrate', 'status'], cleanUrl, cleanBundle.schema);

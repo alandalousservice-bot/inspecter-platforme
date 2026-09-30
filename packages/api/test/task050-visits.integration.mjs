@@ -58,7 +58,7 @@ async function call(path, method = 'GET', body, selectedCookies = cookies, omitC
   if (selectedCookies && method !== 'GET' && !omitCsrf) headers['x-csrf-token'] = csrf(selectedCookies);
   return fetch(`${baseUrl}${path}`, { method, headers, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 }
-function bodyFor(start, end, teacherId = teacher.id) { return { teacherId, academicYear: '2026-2027', scheduledStartAt: start, scheduledEndAt: end }; }
+function bodyFor(start, end, teacherId = teacher.id) { return { teacherId, academicYear: '2026-2027', scheduledStartAt: start, scheduledEndAt: end, visitType: 'GUIDANCE' }; }
 
 before(async () => {
   const rawUrl = approvedUrl();
@@ -80,7 +80,7 @@ before(async () => {
   runPrisma(['migrate', 'deploy'], cleanUrl);
   runPrisma(['migrate', 'status'], cleanUrl);
   const history = await admin.$queryRawUnsafe(`SELECT migration_name,finished_at FROM "${cleanSchema}"."_prisma_migrations" ORDER BY started_at`);
-  assert.equal(history.length, 12); assert.equal(history.at(-1)?.migration_name, '20260930030000_task_053_follow_up');
+  assert.equal(history.length, 13); assert.equal(history.at(-1)?.migration_name, '20260930120000_task_053a_visit_type');
   assert.ok(history.some((row) => row.migration_name === migrationName)); assert.ok(history.every((row) => row.finished_at));
 
   tempRoot = mkdtempSync(join(tmpdir(), 'task050-prisma-upgrade-'));
@@ -88,7 +88,7 @@ before(async () => {
   const copiedSchema = join(tempRoot, 'schema.prisma');
   cpSync(join(migrationsDir, 'migration_lock.toml'), join(tempRoot, 'migration_lock.toml'));
   for (const entry of readdirSync(migrationsDir, { withFileTypes: true })) {
-    if (entry.isDirectory() && entry.name !== migrationName && entry.name !== '20260930020000_task_052_inspection_report' && entry.name !== '20260930030000_task_053_follow_up') cpSync(join(migrationsDir, entry.name), join(copiedMigrations, entry.name), { recursive: true });
+    if (entry.isDirectory() && entry.name !== '20260930120000_task_053a_visit_type') cpSync(join(migrationsDir, entry.name), join(copiedMigrations, entry.name), { recursive: true });
   }
   cpSync(schemaPath, copiedSchema);
   const upgradeUrl = schemaUrl(rawUrl, upgradeSchema);
@@ -99,14 +99,21 @@ before(async () => {
   const oldInspector = await baseDb.inspector.create({ data: { email: `task050-g4-${randomUUID()}@example.invalid`, passwordHash: 'synthetic-hash', status: 'ACTIVE' } });
   const oldInstitution = await baseDb.institution.create({ data: { districtId: oldDistrict.id, name: 'G4 original institution' } });
   const oldTeacher = await baseDb.teacher.create({ data: { districtId: oldDistrict.id, institutionId: oldInstitution.id, name: 'G4', surname: 'Teacher' } });
+  const oldVisitId = randomUUID();
+  await baseDb.$executeRaw`INSERT INTO "PedagogicalVisit" ("id","districtId","inspectorId","teacherId","institutionId","institutionNameSnapshot","academicYear","scheduledStartAt","scheduledEndAt","occurredAt","status","revision","createdAt","updatedAt") VALUES (${oldVisitId}::uuid,${oldDistrict.id}::uuid,${oldInspector.id}::uuid,${oldTeacher.id}::uuid,${oldInstitution.id}::uuid,${oldInstitution.name},'2026-2027','2027-01-01T08:00:00Z'::timestamp,'2027-01-01T09:00:00Z'::timestamp,'2027-01-01T09:05:00Z'::timestamp,'COMPLETED',2,now(),now())`;
+  const oldReport = await baseDb.inspectionReport.create({ data: { visitId: oldVisitId, status: 'DRAFT' } });
+  const oldFollowUp = await baseDb.followUp.create({ data: { reportId: oldReport.id, ownerInspectorId: oldInspector.id, note: 'Upgrade preservation fixture', dueDate: new Date('2027-02-01T00:00:00Z') } });
   await baseDb.$disconnect();
-  cpSync(join(migrationsDir, migrationName), join(copiedMigrations, migrationName), { recursive: true });
+  cpSync(join(migrationsDir, '20260930120000_task_053a_visit_type'), join(copiedMigrations, '20260930120000_task_053a_visit_type'), { recursive: true });
   runPrisma(['migrate', 'deploy'], upgradeUrl, copiedSchema);
   const upgraded = new PrismaClient({ datasources: { db: { url: upgradeUrl } } });
   await upgraded.$connect();
   assert.equal((await upgraded.teacher.findUniqueOrThrow({ where: { id: oldTeacher.id } })).institutionId, oldInstitution.id);
   assert.equal(await upgraded.inspector.count({ where: { id: oldInspector.id } }), 1);
-  assert.equal((await upgraded.$queryRaw`SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema=${upgradeSchema} AND table_name='PedagogicalVisit'`)[0].n, 1);
+  const upgradedVisit = await upgraded.pedagogicalVisit.findUniqueOrThrow({ where: { id: oldVisitId } });
+  assert.equal(upgradedVisit.visitType, null); assert.equal(upgradedVisit.scheduledStartAt.toISOString(), '2027-01-01T08:00:00.000Z');
+  assert.equal((await upgraded.inspectionReport.findUniqueOrThrow({ where: { id: oldReport.id } })).visitId, oldVisitId);
+  assert.equal((await upgraded.followUp.findUniqueOrThrow({ where: { id: oldFollowUp.id } })).reportId, oldReport.id);
   await upgraded.$disconnect();
 
   db = new PrismaClient({ datasources: { db: { url: cleanUrl } }, log: [{ level: 'query', emit: 'event' }] });
@@ -150,14 +157,14 @@ test('TASK-050 migration, visit API lifecycle, privacy, scope, concurrency and a
   const path = '/api/v1/visits';
   await t.test('migration constraints, FK history and bounded indexes', async () => {
     const constraints = await db.$queryRaw`SELECT conname,contype,confdeltype,confupdtype,pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE connamespace=${cleanSchema}::regnamespace`;
-    for (const name of ['PedagogicalVisit_status_check','PedagogicalVisit_academicYear_check','PedagogicalVisit_time_order_check','PedagogicalVisit_occurredAt_status_check','PedagogicalVisit_revision_positive_check','PedagogicalVisit_institutionNameSnapshot_nonempty_check']) assert.ok(constraints.some((item) => item.conname === name && item.contype === 'c'));
+    for (const name of ['PedagogicalVisit_status_check','PedagogicalVisit_academicYear_check','PedagogicalVisit_time_order_check','PedagogicalVisit_occurredAt_status_check','PedagogicalVisit_revision_positive_check','PedagogicalVisit_institutionNameSnapshot_nonempty_check','PedagogicalVisit_visitType_check','PedagogicalVisit_interval_shape_check']) assert.ok(constraints.some((item) => item.conname === name && item.contype === 'c'));
     for (const name of ['PedagogicalVisit_districtId_fkey','PedagogicalVisit_inspectorId_fkey','PedagogicalVisit_teacherId_fkey','PedagogicalVisit_institutionId_districtId_fkey']) {
       const fk = constraints.find((item) => item.conname === name); assert.equal(fk?.contype, 'f'); assert.equal(fk?.confdeltype, 'r'); assert.equal(fk?.confupdtype, 'r');
     }
     assert.ok(constraints.some((item) => item.conname === 'PedagogicalVisit_inspector_no_overlapping_active_visit' && item.contype === 'x'));
     assert.ok(constraints.some((item) => item.conname === 'PedagogicalVisit_teacher_no_overlapping_active_visit' && item.contype === 'x'));
     const indexes = await db.$queryRaw`SELECT indexname FROM pg_indexes WHERE schemaname=${cleanSchema} AND tablename='PedagogicalVisit'`;
-    assert.equal(indexes.length, 7);
+    assert.equal(indexes.length, 9);
     const base = { districtId: district.id, inspectorId: otherInspector.id, teacherId: otherTeacher.id, institutionId: secondInstitution.id,
       institutionNameSnapshot: 'Original institution', academicYear: '2026-2027', scheduledStartAt: new Date('2026-09-28T07:30:00Z'), scheduledEndAt: new Date('2026-09-28T08:30:00Z') };
     await assert.rejects(db.pedagogicalVisit.create({ data: { ...base, academicYear: '2026-2028' } }));
@@ -168,6 +175,7 @@ test('TASK-050 migration, visit API lifecycle, privacy, scope, concurrency and a
     await assert.rejects(db.pedagogicalVisit.create({ data: { ...base, institutionNameSnapshot: '  ' } }));
     const defaulted = await db.pedagogicalVisit.create({ data: { ...base, scheduledStartAt: new Date('2026-09-28T09:00:00Z'), scheduledEndAt: new Date('2026-09-28T10:00:00Z') } });
     assert.equal(defaulted.status, 'PLANNED'); assert.equal(defaulted.revision, 1); assert.equal(defaulted.occurredAt, null);
+    await assert.rejects(db.$executeRaw`INSERT INTO "PedagogicalVisit" ("id","districtId","inspectorId","teacherId","institutionId","institutionNameSnapshot","academicYear","visitType","scheduledStartAt","scheduledEndAt","updatedAt") VALUES (${randomUUID()}::uuid,${district.id}::uuid,${inspector.id}::uuid,${teacher.id}::uuid,${institution.id}::uuid,'Invalid type','2026-2027','NOT_A_VISIT_TYPE','2027-03-01T08:00:00Z'::timestamp,'2027-03-01T09:00:00Z'::timestamp,now())`);
     await assert.rejects(db.institution.delete({ where: { id: institution.id } }));
   });
 
@@ -192,9 +200,102 @@ test('TASK-050 migration, visit API lifecycle, privacy, scope, concurrency and a
     assert.equal((await call(`${path}?status=PLANNED&status=CANCELLED`)).status, 400);
   });
 
-  const create = async (start, end, targetTeacher = teacher) => call(path, 'POST', bodyFor(start, end, targetTeacher.id));
+  const create = async (start, end, targetTeacher = teacher, targetType = 'GUIDANCE') => call(path, 'POST', { ...bodyFor(start, end, targetTeacher.id), visitType: targetType });
+  await t.test('explicit canonical types, strict validation, legacy null read, and server-side filter', async () => {
+    const values = ['GUIDANCE', 'TENURE_CONFIRMATION', 'PROMOTION_EVALUATION', 'MONITORING_FOLLOW_UP', 'EXCEPTIONAL'];
+    const created = [];
+    for (const [index, value] of values.entries()) {
+      const start = new Date(Date.UTC(2027, 0, 4 + index, 8));
+      const response = await create(start.toISOString(), new Date(start.getTime() + 30 * 60_000).toISOString(), teacher, value);
+      assert.equal(response.status, 201, `${value} should be accepted`);
+      const visit = (await response.json()).data.visit;
+      assert.equal(visit.visitType, value); created.push(visit);
+      const detail = await call(`${path}/${visit.id}`);
+      assert.equal((await detail.json()).data.visit.visitType, value);
+      const filtered = await call(`${path}?visitType=${value}`);
+      assert.equal(filtered.status, 200);
+      const page = await filtered.json(); assert.ok(page.data.some((item) => item.id === visit.id));
+      assert.ok(page.data.every((item) => item.visitType === value));
+      const event = await db.auditLog.findFirstOrThrow({ where: { entityId: visit.id, action: 'PEDAGOGICAL_VISIT_CREATED' } });
+      assert.deepEqual(event.metadata, { visitType: value });
+    }
+    for (const payload of [
+      (() => { const missingType = bodyFor('2027-01-10T08:00:00Z', '2027-01-10T09:00:00Z'); delete missingType.visitType; return missingType; })(),
+      { ...bodyFor('2027-01-10T08:00:00Z', '2027-01-10T09:00:00Z'), visitType: null },
+      { ...bodyFor('2027-01-10T08:00:00Z', '2027-01-10T09:00:00Z'), visitType: 'guidance' },
+      { ...bodyFor('2027-01-10T08:00:00Z', '2027-01-10T09:00:00Z'), visitType: 'OTHER' },
+    ]) {
+      const rejected = await call(path, 'POST', payload);
+      assert.equal(rejected.status, 400); assert.equal((await rejected.json()).error.code, 'VALIDATION_ERROR');
+    }
+    assert.equal((await call(`${path}?visitType=OTHER`)).status, 400);
+    const legacy = await db.pedagogicalVisit.create({ data: { districtId: district.id, inspectorId: inspector.id, teacherId: teacher.id,
+      institutionId: institution.id, institutionNameSnapshot: institution.name, academicYear: '2026-2027',
+      scheduledStartAt: new Date('2027-01-10T10:00:00Z'), scheduledEndAt: new Date('2027-01-10T11:00:00Z') } });
+    assert.equal(legacy.visitType, null);
+    const legacyRead = await call(`${path}/${legacy.id}`); assert.equal((await legacyRead.json()).data.visit.visitType, null);
+    const legacyListed = await call(path); assert.equal((await legacyListed.json()).data.some((item) => item.id === legacy.id && item.visitType === null), true);
+    assert.equal(created.length, values.length);
+  });
+
+  await t.test('visit type correction follows revision, no-op, report freeze, and cancelled freeze', async () => {
+    const start = new Date('2027-02-01T08:00:00Z');
+    const createdResponse = await create(start.toISOString(), new Date(start.getTime() + 30 * 60_000).toISOString());
+    const createdVisit = (await createdResponse.json()).data.visit;
+    const changed = await call(`${path}/${createdVisit.id}`, 'PATCH', { operation: 'SET_VISIT_TYPE', expectedRevision: 1, visitType: 'PROMOTION_EVALUATION' });
+    assert.equal(changed.status, 200); const changedVisit = (await changed.json()).data.visit;
+    assert.equal(changedVisit.visitType, 'PROMOTION_EVALUATION'); assert.equal(changedVisit.revision, 2);
+    const eventCount = await db.auditLog.count({ where: { entityId: createdVisit.id, action: 'PEDAGOGICAL_VISIT_UPDATED' } });
+    const noop = await call(`${path}/${createdVisit.id}`, 'PATCH', { operation: 'SET_VISIT_TYPE', expectedRevision: 2, visitType: 'PROMOTION_EVALUATION' });
+    assert.equal(noop.status, 200); assert.equal((await noop.json()).data.visit.revision, 2);
+    assert.equal(await db.auditLog.count({ where: { entityId: createdVisit.id, action: 'PEDAGOGICAL_VISIT_UPDATED' } }), eventCount);
+    const stale = await call(`${path}/${createdVisit.id}`, 'PATCH', { operation: 'SET_VISIT_TYPE', expectedRevision: 1, visitType: 'GUIDANCE' });
+    assert.equal(stale.status, 409); assert.equal((await stale.json()).error.code, 'VISIT_REVISION_CONFLICT');
+    const raceStart = new Date('2027-02-03T08:00:00Z');
+    const raceVisit = (await (await create(raceStart.toISOString(), new Date(raceStart.getTime() + 30 * 60_000).toISOString())).json()).data.visit;
+    const competing = await Promise.all(['TENURE_CONFIRMATION', 'MONITORING_FOLLOW_UP'].map((visitType) => call(`${path}/${raceVisit.id}`, 'PATCH', { operation: 'SET_VISIT_TYPE', expectedRevision: 1, visitType })));
+    assert.deepEqual(competing.map((item) => item.status).sort(), [200, 409]);
+    assert.equal((await db.pedagogicalVisit.findUniqueOrThrow({ where: { id: raceVisit.id } })).revision, 2);
+    assert.equal(await db.auditLog.count({ where: { entityId: raceVisit.id, action: 'PEDAGOGICAL_VISIT_UPDATED' } }), 1);
+    const completedStart = new Date('2027-02-04T08:00:00Z');
+    const completedVisit = (await (await create(completedStart.toISOString(), new Date(completedStart.getTime() + 30 * 60_000).toISOString())).json()).data.visit;
+    assert.equal((await call(`${path}/${completedVisit.id}`, 'PATCH', { operation: 'COMPLETE', expectedRevision: 1, occurredAt: '2026-09-29T08:30:00Z' })).status, 200);
+    const completedType = await call(`${path}/${completedVisit.id}`, 'PATCH', { operation: 'SET_VISIT_TYPE', expectedRevision: 2, visitType: 'TENURE_CONFIRMATION' });
+    assert.equal(completedType.status, 200); assert.equal((await completedType.json()).data.visit.revision, 3);
+    await db.inspectionReport.create({ data: { visitId: createdVisit.id } });
+    const reportLocked = await call(`${path}/${createdVisit.id}`, 'PATCH', { operation: 'SET_VISIT_TYPE', expectedRevision: 2, visitType: 'GUIDANCE' });
+    assert.equal(reportLocked.status, 409); assert.equal((await reportLocked.json()).error.code, 'VISIT_TYPE_LOCKED');
+    const cancelledStart = new Date('2027-02-02T08:00:00Z');
+    const cancelledVisit = (await (await create(cancelledStart.toISOString(), new Date(cancelledStart.getTime() + 30 * 60_000).toISOString())).json()).data.visit;
+    assert.equal((await call(`${path}/${cancelledVisit.id}`, 'PATCH', { operation: 'CANCEL', expectedRevision: 1 })).status, 200);
+    const cancelledLocked = await call(`${path}/${cancelledVisit.id}`, 'PATCH', { operation: 'SET_VISIT_TYPE', expectedRevision: 2, visitType: 'GUIDANCE' });
+    assert.equal(cancelledLocked.status, 409); assert.equal((await cancelledLocked.json()).error.code, 'VISIT_TYPE_LOCKED');
+  });
+
+  await t.test('exceptional retrospective visit uses actual interval and does not require weekly schedule', async () => {
+    const noScheduleTeacher = await db.teacher.create({ data: { districtId: district.id, institutionId: institution.id, name: 'استثنائي', surname: 'دون جدول' } });
+    const payload = { teacherId: noScheduleTeacher.id, academicYear: '2026-2027', visitType: 'EXCEPTIONAL',
+      actualStartAt: '2026-02-10T08:00:00+01:00', actualEndAt: '2026-02-10T09:00:00+01:00', institutionContextConfirmed: true };
+    const response = await call(path, 'POST', payload);
+    assert.equal(response.status, 201); const visit = (await response.json()).data.visit;
+    assert.equal(visit.status, 'COMPLETED'); assert.equal(visit.scheduledStartAt, null); assert.equal(visit.scheduledEndAt, null);
+    assert.equal(visit.actualStartAt, '2026-02-10T07:00:00.000Z'); assert.equal(visit.actualEndAt, '2026-02-10T08:00:00.000Z');
+    assert.equal(visit.occurredAt, visit.actualEndAt); assert.equal(visit.intervalKind, 'ACTUAL_RETROSPECTIVE');
+    assert.equal((await db.pedagogicalVisit.findUniqueOrThrow({ where: { id: visit.id } })).visitType, 'EXCEPTIONAL');
+    assert.equal(await db.auditLog.count({ where: { entityId: visit.id, action: 'PEDAGOGICAL_VISIT_CREATED' } }), 1);
+    assert.equal(await db.auditLog.count({ where: { entityId: visit.id, action: 'PEDAGOGICAL_VISIT_COMPLETED' } }), 1);
+    const invalid = await call(path, 'POST', { ...payload, visitType: 'GUIDANCE' }); assert.equal(invalid.status, 400);
+    const unconfirmed = await call(path, 'POST', { ...payload, institutionContextConfirmed: false }); assert.equal(unconfirmed.status, 400);
+    const scheduledEndAt = new Date('2026-02-10T08:30:00Z');
+    const overlap = await db.pedagogicalVisit.create({ data: { districtId: district.id, inspectorId: inspector.id, teacherId: noScheduleTeacher.id,
+      institutionId: institution.id, institutionNameSnapshot: institution.name, academicYear: '2026-2027', visitType: 'GUIDANCE',
+      scheduledStartAt: new Date('2026-02-10T07:30:00Z'), scheduledEndAt } }).catch(() => null);
+    assert.equal(overlap, null);
+  });
   await t.test('create, projection privacy, list filters, stable cursor, total and detail', async () => {
-    const response = await create('2026-09-28T08:30:00+01:00', '2026-09-28T09:30:00+01:00');
+    const listTeacher = await db.teacher.create({ data: { districtId: district.id, institutionId: institution.id, name: 'قائمة', surname: 'مستقلة' } });
+    await db.weeklySchedule.create({ data: { teacherId: listTeacher.id, academicYear: '2026-2027', slots: { create: Array.from({ length: 7 }, (_, i) => ({ dayOfWeek: i + 1, startMinute: 0, endMinute: 1440 })) } } });
+    const response = await create('2026-09-28T08:30:00+01:00', '2026-09-28T09:30:00+01:00', listTeacher);
     assert.equal(response.status, 201); assert.equal(response.headers.get('cache-control'), 'no-store');
     const visit = (await response.json()).data.visit;
     assert.equal(visit.status, 'PLANNED'); assert.equal(visit.revision, 1); assert.equal(visit.institution.name, 'Original institution');
@@ -202,16 +303,18 @@ test('TASK-050 migration, visit API lifecycle, privacy, scope, concurrency and a
     assert.equal(JSON.stringify(visit).includes('private@example.invalid'), false); assert.equal(JSON.stringify(visit).includes('+213555555555'), false);
     assert.equal('report' in visit, false); assert.equal('inspectorId' in visit, false);
     const event = await db.auditLog.findFirstOrThrow({ where: { entityId: visit.id, action: 'PEDAGOGICAL_VISIT_CREATED' } });
-    assert.deepEqual(event.metadata, {}); assert.equal(event.districtId, district.id); assert.equal(event.actorInspectorId, inspector.id);
+    assert.deepEqual(event.metadata, { visitType: 'GUIDANCE' }); assert.equal(event.districtId, district.id); assert.equal(event.actorInspectorId, inspector.id);
     const detail = await call(`${path}/${visit.id}`); assert.equal(detail.status, 200); assert.equal((await detail.json()).data.visit.institution.name, 'Original institution');
     const otherOwner = await call(`${path}/${visit.id}`, 'GET', undefined, otherCookies); assert.equal(otherOwner.status, 404);
-    const next = await create('2026-09-29T08:30:00+01:00', '2026-09-29T09:30:00+01:00'); assert.equal(next.status, 201);
-    const third = await create('2026-09-30T08:30:00+01:00', '2026-09-30T09:30:00+01:00', otherTeacher); assert.equal(third.status, 201);
+    const next = await create('2026-09-29T08:30:00+01:00', '2026-09-29T09:30:00+01:00', listTeacher); assert.equal(next.status, 201);
+    const third = await create('2026-09-30T08:30:00+01:00', '2026-09-30T09:30:00+01:00', listTeacher); assert.equal(third.status, 201);
+    const otherTeacherVisit = await create('2026-10-02T08:30:00+01:00', '2026-10-02T09:30:00+01:00', otherTeacher); assert.equal(otherTeacherVisit.status, 201);
+    const differentInspector = await call(path, 'POST', bodyFor('2026-10-01T08:30:00+01:00', '2026-10-01T09:30:00+01:00', otherTeacher.id), otherCookies); assert.equal(differentInspector.status, 201);
     visitQueryCount = 0;
-    const page1 = await call(`${path}?limit=1&districtId=${district.id}`); assert.equal(page1.status, 200);
+    const page1 = await call(`${path}?limit=1&districtId=${district.id}&teacherId=${listTeacher.id}`); assert.equal(page1.status, 200);
     assert.ok(visitQueryCount <= 3, `bounded Visit reads expected, actual query count ${visitQueryCount}`);
     const pageData1 = await page1.json(); assert.equal(pageData1.page.total, 3); assert.equal(pageData1.data.length, 1); assert.ok(pageData1.page.nextCursor);
-    const page2Response = await call(`${path}?limit=1&districtId=${district.id}&cursor=${pageData1.page.nextCursor}`); const page2 = await page2Response.json();
+    const page2Response = await call(`${path}?limit=1&districtId=${district.id}&teacherId=${listTeacher.id}&cursor=${pageData1.page.nextCursor}`); const page2 = await page2Response.json();
     assert.equal(page2.data.length, 1); assert.notEqual(page2.data[0].id, pageData1.data[0].id);
     const filtered = await call(`${path}?teacherId=${otherTeacher.id}&status=PLANNED`); assert.equal(filtered.status, 200);
     assert.equal((await filtered.json()).page.total, 1);
@@ -284,7 +387,7 @@ test('TASK-050 migration, visit API lifecycle, privacy, scope, concurrency and a
     assert.equal(accepted.status, 201);
     const created = (await accepted.json()).data.visit;
     const audit = await db.auditLog.findFirstOrThrow({ where: { entityId: created.id, action: 'PEDAGOGICAL_VISIT_CREATED' } });
-    assert.deepEqual(audit.metadata, { scheduleWarningCode: 'VISIT_OUTSIDE_WEEKLY_SCHEDULE' });
+    assert.deepEqual(audit.metadata, { visitType: 'GUIDANCE', scheduleWarningCode: 'VISIT_OUTSIDE_WEEKLY_SCHEDULE' });
   });
 
   await t.test('overlap exclusions reject conflicts, allow adjacent/different parties, and concurrent create has one winner', async () => {

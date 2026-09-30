@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
-import { ApiRequestError, getPedagogicalVisit, patchPedagogicalVisit, type PedagogicalVisit, type PedagogicalVisitPatch, type PedagogicalVisitStatus, type ScheduleWarningCode } from '../auth/client';
+import { ApiRequestError, getPedagogicalVisit, patchPedagogicalVisit, type PedagogicalVisit, type PedagogicalVisitPatch, type PedagogicalVisitStatus, type PedagogicalVisitType, type ScheduleWarningCode } from '../auth/client';
 import { Button, Card, CardContent, CardHeader, Dialog, ErrorState, Input, LoadingState, SuccessState } from '../ui';
 import { formatAlgiers, localDateTimeToOffset, utcToLocalDateTime } from './time';
 import './visits.css';
@@ -11,6 +11,10 @@ const statusLabels: Record<PedagogicalVisitStatus, string> = { PLANNED: 'مخط�
 const warningText: Record<ScheduleWarningCode, string> = {
   VISIT_WEEKLY_SCHEDULE_MISSING: 'لا يوجد توزيع أسبوعي مسجل لهذا الأستاذ والسنة الدراسية.',
   VISIT_OUTSIDE_WEEKLY_SCHEDULE: 'الموعد لا يقع بالكامل ضمن التوزيع الأسبوعي المسجل.',
+};
+const visitTypeLabels: Record<PedagogicalVisitType, string> = {
+  GUIDANCE: 'زيارة توجيهية / تكوينية', TENURE_CONFIRMATION: 'زيارة التثبيت / الترسيم',
+  PROMOTION_EVALUATION: 'زيارة الترقية / التقييم', MONITORING_FOLLOW_UP: 'زيارة المراقبة والمتابعة', EXCEPTIONAL: 'زيارة استثنائية',
 };
 
 function friendlyError(error: unknown) {
@@ -24,6 +28,7 @@ function friendlyError(error: unknown) {
     NOT_FOUND: 'الزيارة غير متاحة ضمن نطاق الوصول الحالي.',
     VISIT_REVISION_CONFLICT: 'تغيّرت الزيارة منذ تحميلها. حدّث البيانات وراجع العملية قبل المحاولة.',
     VISIT_STATE_CONFLICT: 'تغيّرت الزيارة أو حالتها منذ تحميلها. حدّث البيانات لمراجعة الإجراء المتاح.',
+    VISIT_TYPE_LOCKED: 'لا يمكن تغيير نوع الزيارة في حالتها الحالية أو بعد إنشاء تقرير مرتبط بها.',
     VALIDATION_ERROR: 'تحقق من الوقت المدخل ثم أعد المحاولة.',
   };
   return map[error.code ?? ''] ?? 'تعذر تنفيذ العملية. أعد المحاولة بعد مراجعة البيانات.';
@@ -47,19 +52,31 @@ export function VisitDetailPage() {
   const [warning, setWarning] = useState<WarningState | null>(null);
   const [dialogAction, setDialogAction] = useState<DialogAction>(null);
   const [occurredAt, setOccurredAt] = useState('');
+  const [editingVisitType, setEditingVisitType] = useState(false);
+  const [nextVisitType, setNextVisitType] = useState<PedagogicalVisitType | ''>('');
 
   const load = useCallback(async () => {
     setLoading(true); setLoadError(false);
-    try { const result = await getPedagogicalVisit(id); setVisit(result.data.visit); setYear(result.data.visit.academicYear); }
+    try { const result = await getPedagogicalVisit(id); setVisit(result.data.visit); setYear(result.data.visit.academicYear); setNextVisitType(result.data.visit.visitType ?? ''); }
     catch { setLoadError(true); setVisit(undefined); }
     finally { setLoading(false); }
   }, [id]);
   useEffect(() => { void load(); }, [load, refresh]);
 
   function startReschedule() {
-    if (!visit) return;
+    if (!visit?.scheduledStartAt || !visit.scheduledEndAt) return;
     setYear(visit.academicYear); setStart(utcToLocalDateTime(visit.scheduledStartAt)); setEnd(utcToLocalDateTime(visit.scheduledEndAt));
     setWarning(null); setFormError(''); setOperationError(''); setRescheduling(true);
+  }
+
+  async function saveVisitType() {
+    if (!visit || !nextVisitType || busy) return;
+    setBusy(true); setOperationError('');
+    try {
+      await patchPedagogicalVisit(id, { operation: 'SET_VISIT_TYPE', expectedRevision: visit.revision, visitType: nextVisitType });
+      setEditingVisitType(false); setNotice('تم تحديث نوع الزيارة.'); await load();
+    } catch (error) { setOperationError(friendlyError(error)); }
+    finally { setBusy(false); }
   }
 
   async function applyReschedule(payload: Extract<PedagogicalVisitPatch, { operation: 'RESCHEDULE' }>, acknowledgement?: ScheduleWarningCode) {
@@ -108,12 +125,16 @@ export function VisitDetailPage() {
       {operationError ? <ErrorState title={operationError} action={operationError.includes('تغيّرت الزيارة') ? <Button variant="secondary" onClick={() => { setOperationError(''); setRefresh((value) => value + 1); }}>تحديث البيانات</Button> : undefined} /> : null}
       <Card><CardHeader title="معلومات الزيارة" description={`السنة الدراسية ${visit.academicYear}`} action={<span className={`visit-status visit-status--${visit.status.toLowerCase()}`}>{statusLabels[visit.status]}</span>} />
         <CardContent><dl className="visit-facts">
-          <div><dt>موعد الزيارة</dt><dd><span dir="auto">{formatAlgiers(visit.scheduledStartAt)}</span> — <span dir="auto">{formatAlgiers(visit.scheduledEndAt)}</span></dd></div>
+          <div><dt>نوع الزيارة</dt><dd>{visit.visitType ? visitTypeLabels[visit.visitType] : 'نوع الزيارة غير موثق (سجل سابق)'}</dd></div>
+          <div><dt>{visit.intervalKind === 'ACTUAL_RETROSPECTIVE' ? 'الفترة الفعلية للزيارة' : 'الموعد المخطط'}</dt><dd>{visit.actualStartAt && visit.actualEndAt ? <><span dir="auto">{formatAlgiers(visit.actualStartAt)}</span> — <span dir="auto">{formatAlgiers(visit.actualEndAt)}</span></> : visit.scheduledStartAt && visit.scheduledEndAt ? <><span dir="auto">{formatAlgiers(visit.scheduledStartAt)}</span> — <span dir="auto">{formatAlgiers(visit.scheduledEndAt)}</span></> : 'الفترة غير متاحة'}</dd></div>
           <div><dt>الأستاذ</dt><dd><Link to={`/app/teachers/${encodeURIComponent(visit.teacher.id)}`}>{visit.teacher.name} {visit.teacher.surname}</Link></dd></div>
           <div><dt>مؤسسة الزيارة وقت التخطيط</dt><dd>{visit.institution.name}<small> هذه هي اللقطة المحفوظة للزيارة، ولا تتغير بتغير المؤسسة الحالية للأستاذ.</small></dd></div>
           {visit.occurredAt ? <div><dt>وقت الإنجاز الفعلي</dt><dd dir="auto">{formatAlgiers(visit.occurredAt)}</dd></div> : null}
         </dl></CardContent>
       </Card>
+      {visit.visitTypeEditable ? <Card><CardHeader title="نوع الزيارة" description="يمكن تصحيح النوع حتى إنشاء أي تقرير مرتبط، باستخدام رقم المراجعة الحالي." /><CardContent>
+        {editingVisitType ? <div className="visit-field"><label className="ui-field__label" htmlFor="visit-detail-type">نوع الزيارة</label><select id="visit-detail-type" className="ui-input" value={nextVisitType} disabled={busy} onChange={(event) => setNextVisitType(event.currentTarget.value as PedagogicalVisitType | '')}><option value="">اختر نوع الزيارة</option>{Object.entries(visitTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><div className="visit-actions"><Button disabled={busy || !nextVisitType} onClick={() => void saveVisitType()}>{busy ? 'جارٍ الحفظ…' : 'حفظ نوع الزيارة'}</Button><Button variant="secondary" disabled={busy} onClick={() => { setEditingVisitType(false); setNextVisitType(visit.visitType ?? ''); }}>إلغاء</Button></div></div> : <Button variant="secondary" disabled={busy} onClick={() => setEditingVisitType(true)}>تصحيح نوع الزيارة</Button>}
+      </CardContent></Card> : null}
       {visit.status === 'PLANNED' ? <Card><CardHeader title="إجراءات الزيارة" description="تُحفظ الزيارة التاريخية؛ لا يمكن إعادة فتح الحالة النهائية." /><CardContent>
         {!rescheduling ? <div className="visit-actions"><Button variant="secondary" disabled={busy} onClick={startReschedule}>إعادة جدولة</Button><Button disabled={busy} onClick={() => { setDialogAction('complete'); setFormError(''); }}>إكمال الزيارة</Button><Button variant="danger" disabled={busy} onClick={() => { setDialogAction('cancel'); setFormError(''); }}>إلغاء الزيارة</Button></div> : null}
         {rescheduling ? <form className="visit-form" onSubmit={submitReschedule} aria-busy={busy}>
@@ -127,7 +148,7 @@ export function VisitDetailPage() {
         </form> : null}
       </CardContent></Card> : <Card><CardHeader title="سجل الزيارة" description="هذه الحالة نهائية؛ تبقى تفاصيل الزيارة متاحة للقراءة." /></Card>}
       <p className="visit-inline-note">للاطلاع على المؤسسة الحالية المعتمدة أو بيانات الأستاذ، افتح <Link to={`/app/teachers/${encodeURIComponent(visit.teacher.id)}`}>ملف الأستاذ</Link>. لا يغيّر ذلك مؤسسة الزيارة المحفوظة أعلاه.</p>
-      <Link to={`/app/visits/${encodeURIComponent(visit.id)}/report`}>تقرير المرافقة البيداغوجية</Link>
+      {visit.visitType === null ? <Link to={`/app/visits/${encodeURIComponent(visit.id)}/report`}>تقرير المرافقة البيداغوجية</Link> : <p className="visit-inline-note">يرتبط مسار التقرير بنوع الزيارة، وسيظهر في مرحلة التقرير المخصصة.</p>}
       <Link to={`/app/teachers/${encodeURIComponent(visit.teacher.id)}/schedules`}>عرض التوزيع الأسبوعي للأستاذ</Link>
     </> : null}
 

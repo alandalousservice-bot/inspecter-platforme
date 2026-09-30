@@ -22,7 +22,7 @@ const prismaPackage = require.resolve('prisma/package.json');
 const prismaCli = resolve(dirname(prismaPackage), JSON.parse(readFileSync(prismaPackage, 'utf8')).bin.prisma);
 const { PrismaClient } = require('@prisma/client');
 const migrationName = '20260930020000_task_052_inspection_report';
-const laterMigrationName = '20260930030000_task_053_follow_up';
+const laterMigrationName = '20260930120000_task_053a_visit_type';
 let admin, db, server, baseUrl, cleanSchema, upgradeSchema, tempRoot, inspector, otherInspector, inactiveInspector, district, institution, teacher, cookies, otherCookies;
 let visitSequence = 0;
 const password = `task052-${randomUUID()}`;
@@ -71,10 +71,10 @@ before(async () => {
   await admin.$executeRawUnsafe(`CREATE SCHEMA "${cleanSchema}"`); await admin.$executeRawUnsafe(`CREATE SCHEMA "${upgradeSchema}"`);
   migrate(schemaUrl(raw, cleanSchema));
   const history = await admin.$queryRawUnsafe(`SELECT migration_name,finished_at FROM "${cleanSchema}"."_prisma_migrations" ORDER BY started_at`);
-  assert.equal(history.length, 12); assert.equal(history.at(-1).migration_name, laterMigrationName); assert.ok(history.every((row) => row.finished_at));
+  assert.equal(history.length, 13); assert.equal(history.at(-1).migration_name, laterMigrationName); assert.ok(history.every((row) => row.finished_at));
   tempRoot = mkdtempSync(join(tmpdir(), 'task052-migrations-'));
   const oldMigrations = join(tempRoot, 'migrations'); cpSync(join(migrationsDir, 'migration_lock.toml'), join(tempRoot, 'migration_lock.toml'));
-  for (const item of readdirSync(migrationsDir, { withFileTypes: true })) if (item.isDirectory() && item.name !== migrationName && item.name !== laterMigrationName) cpSync(join(migrationsDir, item.name), join(oldMigrations, item.name), { recursive: true });
+  for (const item of readdirSync(migrationsDir, { withFileTypes: true })) if (item.isDirectory() && ![migrationName, '20260930030000_task_053_follow_up', laterMigrationName].includes(item.name)) cpSync(join(migrationsDir, item.name), join(oldMigrations, item.name), { recursive: true });
   const oldSchema = join(tempRoot, 'schema.prisma'); cpSync(schemaFile, oldSchema);
   const upgradeUrl = schemaUrl(raw, upgradeSchema); migrate(upgradeUrl, oldSchema);
   const legacy = new PrismaClient({ datasources: { db: { url: upgradeUrl } } });
@@ -82,12 +82,13 @@ before(async () => {
   const oldInspector = await legacy.inspector.create({ data: { email: `old-${suffix}@example.invalid`, passwordHash: 'synthetic', status: 'ACTIVE' } });
   const oldInstitution = await legacy.institution.create({ data: { districtId: oldDistrict.id, name: 'Legacy institution' } });
   const oldTeacher = await legacy.teacher.create({ data: { districtId: oldDistrict.id, institutionId: oldInstitution.id, name: 'Legacy', surname: 'Teacher' } });
-  const oldVisit = await legacy.pedagogicalVisit.create({ data: { districtId: oldDistrict.id, inspectorId: oldInspector.id, teacherId: oldTeacher.id, institutionId: oldInstitution.id,
-    institutionNameSnapshot: 'Legacy historical snapshot', academicYear: '2026-2027', scheduledStartAt: new Date('2027-01-01T08:00:00Z'), scheduledEndAt: new Date('2027-01-01T09:00:00Z') } });
+  const oldVisitId = randomUUID();
+  await legacy.$executeRaw`INSERT INTO "PedagogicalVisit" ("id","districtId","inspectorId","teacherId","institutionId","institutionNameSnapshot","academicYear","scheduledStartAt","scheduledEndAt","updatedAt") VALUES (${oldVisitId}::uuid,${oldDistrict.id}::uuid,${oldInspector.id}::uuid,${oldTeacher.id}::uuid,${oldInstitution.id}::uuid,'Legacy historical snapshot','2026-2027','2027-01-01T08:00:00Z'::timestamp,'2027-01-01T09:00:00Z'::timestamp,now())`;
   await legacy.$disconnect();
   cpSync(join(migrationsDir, migrationName), join(oldMigrations, migrationName), { recursive: true }); migrate(upgradeUrl, oldSchema);
   const upgraded = new PrismaClient({ datasources: { db: { url: upgradeUrl } } });
-  assert.equal((await upgraded.pedagogicalVisit.findUniqueOrThrow({ where: { id: oldVisit.id } })).institutionNameSnapshot, 'Legacy historical snapshot');
+  const preservedVisit = await upgraded.$queryRaw`SELECT "institutionNameSnapshot" FROM "PedagogicalVisit" WHERE "id"=${oldVisitId}::uuid`;
+  assert.equal(preservedVisit[0]?.institutionNameSnapshot, 'Legacy historical snapshot');
   assert.equal(await upgraded.inspectionReport.count(), 0); await upgraded.$disconnect();
 
   db = new PrismaClient({ datasources: { db: { url: schemaUrl(raw, cleanSchema) } } }); await db.$connect();

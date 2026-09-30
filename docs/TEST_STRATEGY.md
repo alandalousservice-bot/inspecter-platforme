@@ -1,5 +1,7 @@
 # Test Strategy v0.1
 
+[ADR-034 المعتمدة](DECISIONS.md#adr-034--product-owner-adopted-inspector-visit-report-template) لا تُشغل اختبارات الآن. عند تنفيذ عقدها تُضاف اختبارات clean+upgrade تُبقي FINAL/DRAFT وFollowUps القديمة كما هي، والنوع الجديد/الإصدار ومفاتيح المعايير النوعية الاختيارية، وإتمام مسودة بلا خانات ورقية اختيارية، والعلامة والتقدير اليدويين بلا حساب أو سلم، واللقطات والتزامن والنهائي الثابت، وAuditLog إتمام ذري بلا PII، وFollowUp من النوع الجديد، ومحرر RTL ثم طباعة A4 متعددة الصفحات بترتيب المصدر. تبقى regressions TASK-052/053 وG5 مطلوبة. [تفصيل مصفوفة الاختبار المستقبلية](architecture/INSPECTOR_VISIT_REPORT_TEMPLATE.md).
+
 تحدد [IMPLEMENTATION_PLAN](IMPLEMENTATION_PLAN.md) الحد الأدنى لكل مهمة؛ لا تختبر تفاصيل داخلية بلا قيمة. Unit بـVitest لقواعد النطاق، API integration على PostgreSQL اختبار معزول، Playwright لمسارات حرجة بمتصفح حقيقي. اختبارات SQL/migrations على قاعدة اختبار لا production. Fixtures اصطناعية فقط، لا بيانات شخصية حقيقية.
 
 | مستوى | تحقق حرج |
@@ -24,7 +26,18 @@ Connected E2E: Visit مكتملة → تقرير FINAL → FollowUp OPEN من ص
 
 Migration clean+upgrade مع Inspector rows قائمة: الحقلان NULL دون backfill، pair CHECK، وعدم كسر IDs والجلسات/ACTIVE/INACTIVE/العضويات/login. GET/PUT ذاتيان فقط، CSRF/no-store، Unicode عربي/غير عربي، NFC/trim/فراغات وحد 100 code points، رفض control/blank/null/unknown keys، AuditLog واحد لأسماء الحقول المتغيرة فقط داخل transaction، no-op بلا audit. UI RTL/keyboard/loading/error/success وconnected browser لإكمال الاسم واللقب؛ لا تحرير Inspector آخر أو كشف البريد كاسم عرض. شغّل regressions auth/API/DB وtypecheck/lint/tests/build/diff-check.
 
+## TASK-053A — Visit type evolution
+
+DB: migration واحدة clean+upgrade؛ تبقى أنواع Visit القديمة NULL دون backfill، interval مخطط/فعلي حصريان، منع overlap على الفترة المناسبة وFKs/Report القديم ثابتة. API: خمس قيم مطلوبة للجديد، retrospective EXCEPTIONAL فقط بفترة فعلية لا موعد مخطط، صلاحية المالك والنطاق، تحذير WeeklySchedule استشاري للمجدول دون استدلال تاريخي على الاستثنائي الماضي، تصحيح النوع بمراجعة revision فقط دون Report، no-op و409 وقفل النوع عند DRAFT/FINAL، audit ذري بلا PII. UI/connected: اختيار النوع وتصحيح مباح فقط، عنوان الفترة الصحيح، legacy NULL ظاهر بلا إسناد نوع، الاستثنائية الماضية لا تُعرض كموعد مخطط، regression للزيارات والتقارير والـFollowUp القائمة. `typecheck/lint/tests/build/git diff --check`.
+
+## TASK-054 — Inspector Visit Report V1
+
+مرجع التحقق التفصيلي [عقد TASK-054](architecture/TASK_054_INSPECTOR_VISIT_REPORT_V1.md#واجهة-rtl-والاختبارات-والبوابات). DB: migration واحدة clean+upgrade من HEAD، Preserve old DRAFT/FINAL وFollowUps بلا rewrite، زوجا provenance فقط، V1-only columns/child FK و23 مفتاحًا/fixed version وunique، حدود Unicode وstudentCount، FINAL المشترك واللقطات الجديدة دون إلزام قيم nullable، لا backfill. API: نوع صريح وتقرير واحد/Visit، old GET/PUT/finalize regression، V1 strict full replacement وإزالة/إضافة معيار، معيار مجهول/نسخة خاطئة/مكرر، no-op وupdatedAt/revision، scope/CSRF/no-store/404، سباق إنشاء نوعين/تحديثين/إتمامين وفائز واحد، AuditLog ذري `{}` وrollback بلا PII، FINAL immutable، FollowUp من V1. UI: نوع Visit المشتق دون اختيار Report، 11 قسمًا/23 معيارًا، derived مقابل editable، حفظ صريح/dirty-state/409، RTL/focus/keyboard/200% zoom/responsive، القديم يعمل وFINAL read-only. Connected Playwright على Vite/API/PostgreSQL معزولة: Visit→V1 DRAFT→قيم معايير→FINAL→إعادة تحميل ثابتة→FollowUp OPEN→COMPLETED، مع فحص ثبات تقرير V1/لقطاته/حدث إتمامه. Regresions TASK-052/053/G5، `typecheck/lint/tests/build/git diff --check`. لا اختبارات طباعة في TASK-054؛ تُنفذ في مهمة الطباعة المستقبلية.
+
+تصحيح ADR-035 للبوابة: لا شاشة اختيار Report type لVisit typed؛ تحقق V1 من لب التقرير المشترك ونصوص نقاط القوة/التحسين، ومن إجمالي/حاضر/غائب الاختيارية وعدم تجاوز الإجمالي/مساواة المجموع عند توفر الثلاثة. تحقق `tenureConclusionText` اختياريًا للتثبيت فقط، و`pedagogicalMark` اختياريًا للترقية فقط: 0 و20 و14 و14.0 و14.00 و14.25 مقبولة ومتساوية عدديا عند اللزوم؛ -0.01 و20.01 و14.257 ونص غير رقمي مرفوضة، مع عدم مرور float إلى التخزين. DB تتحقق من `NUMERIC(4,2)` ومجال 0..20، وAPI تحمي دقة الإدخال قبل التحويل؛ legacy `markText` والبيانات القديمة بلا تحويل. لا علامة مفروضة في FINAL أو محسوبة/مقارنة، وحقول النتيجة غير المنطبقة ترفض. اختبر زيارة قديمة NULL/Report قديم وFINAL ثابتين، وقفل `visitType` بمجرد وجود Report. يبدأ TASK-054 فقط بعد إتمام وقبول TASK-053A.
+
 ## TASK-052 — Pedagogical accompaniment report
+
 
 DB: migration واحدة forward-only بعد TASK-052A، clean chain وترقية من HEAD بلا backfill؛ `visitId` unique، FK Restrict، status/revision/provenance/حدود النصوص وCHECK النهائي/المسودة واللقطات. API: scope ACTIVE Inspector + عضوية District الحالية + ملكية Visit، 200 `report:null` بعد Visit مصرح بلا تقرير، GET DRAFT/FINAL، create/update PUT strict، PLANNED/COMPLETED مسودة مسموحة، CANCELLED إنشاء/حفظ/إتمام ممنوعة مع بقاء مسودة قديمة مقروءة؛ FINAL immutable. تحقق الحد الأدنى النهائي، نقص هوية المفتش، `expectedRevision`، first-create race، تحديثان متزامنان، إتمامان متزامنان، وعدم تسرب أسماء قيود DB. إثبات AuditLog `INSPECTION_REPORT_FINALIZED` مرة واحدة وmetadata `{}` وrollback عند فشل append؛ لا audit لحفظ المسودة. إثبات بقاء لقطة Inspector/Teacher بعد تغيير الاسم، واسم المؤسسة التاريخي بعد إعادة التسمية/الأرشفة/تغيير مؤسسة Teacher؛ Visit مصدر السنة والأوقات؛ لا email/PII أو report prose في logs/audit/error/list/URL. تحقق CSRF/no-store/404 عام والغلاف الموحد.
 

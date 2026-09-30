@@ -199,14 +199,20 @@ export type WeeklySchedule = { id: string; teacherId: string; academicYear: stri
 export type WeeklyScheduleSlotInput = Omit<WeeklyScheduleSlot, 'id'>;
 
 export type PedagogicalVisitStatus = 'PLANNED' | 'COMPLETED' | 'CANCELLED';
+export type PedagogicalVisitType = 'GUIDANCE' | 'TENURE_CONFIRMATION' | 'PROMOTION_EVALUATION' | 'MONITORING_FOLLOW_UP' | 'EXCEPTIONAL';
 export type PedagogicalVisit = {
   id: string;
   districtId: string;
   teacher: { id: string; name: string; surname: string };
   institution: { id: string; name: string };
   academicYear: string;
-  scheduledStartAt: string;
-  scheduledEndAt: string;
+  visitType: PedagogicalVisitType | null;
+  scheduledStartAt: string | null;
+  scheduledEndAt: string | null;
+  actualStartAt: string | null;
+  actualEndAt: string | null;
+  intervalKind: 'SCHEDULED' | 'ACTUAL_RETROSPECTIVE';
+  visitTypeEditable: boolean;
   occurredAt: string | null;
   status: PedagogicalVisitStatus;
   revision: number;
@@ -235,14 +241,14 @@ export type FollowUp = {
 export type FollowUpPage = { limit: number; nextCursor: string | null; total: number };
 export type VisitFilters = {
   districtId?: string; teacherId?: string; institutionId?: string;
-  status?: PedagogicalVisitStatus; from?: string; to?: string; limit?: number; cursor?: string;
+  status?: PedagogicalVisitStatus; visitType?: PedagogicalVisitType; from?: string; to?: string; limit?: number; cursor?: string;
 };
 export type VisitPage = { limit: number; nextCursor: string | null; total: number };
 export type ScheduleWarningCode = 'VISIT_WEEKLY_SCHEDULE_MISSING' | 'VISIT_OUTSIDE_WEEKLY_SCHEDULE';
 
 export async function listPedagogicalVisits(options: VisitFilters = {}) {
   const query = new URLSearchParams();
-  for (const key of ['districtId', 'teacherId', 'institutionId', 'status', 'from', 'to', 'cursor'] as const) {
+  for (const key of ['districtId', 'teacherId', 'institutionId', 'status', 'visitType', 'from', 'to', 'cursor'] as const) {
     const value = options[key];
     if (value) query.set(key, value);
   }
@@ -267,17 +273,17 @@ async function visitMutation<T>(path: string, method: 'POST' | 'PATCH' | 'PUT', 
   return response.json() as Promise<T>;
 }
 
-export function createPedagogicalVisit(input: {
-  teacherId: string; academicYear: string; scheduledStartAt: string; scheduledEndAt: string;
-  scheduleWarningAcknowledgement?: ScheduleWarningCode;
-}) {
+export type ScheduledVisitInput = { teacherId: string; academicYear: string; visitType: PedagogicalVisitType; scheduledStartAt: string; scheduledEndAt: string; scheduleWarningAcknowledgement?: ScheduleWarningCode };
+export type RetrospectiveExceptionalVisitInput = { teacherId: string; academicYear: string; visitType: 'EXCEPTIONAL'; actualStartAt: string; actualEndAt: string; institutionContextConfirmed: true };
+export function createPedagogicalVisit(input: ScheduledVisitInput | RetrospectiveExceptionalVisitInput) {
   return visitMutation<{ data: { visit: PedagogicalVisit } }>('/api/v1/visits', 'POST', input);
 }
 
 export type PedagogicalVisitPatch =
   | { operation: 'RESCHEDULE'; expectedRevision: number; academicYear: string; scheduledStartAt: string; scheduledEndAt: string; scheduleWarningAcknowledgement?: ScheduleWarningCode }
   | { operation: 'COMPLETE'; expectedRevision: number; occurredAt: string }
-  | { operation: 'CANCEL'; expectedRevision: number };
+  | { operation: 'CANCEL'; expectedRevision: number }
+  | { operation: 'SET_VISIT_TYPE'; expectedRevision: number; visitType: PedagogicalVisitType };
 
 export function patchPedagogicalVisit(id: string, input: PedagogicalVisitPatch) {
   return visitMutation<{ data: { visit: PedagogicalVisit } }>(`/api/v1/visits/${encodeURIComponent(id)}`, 'PATCH', input);

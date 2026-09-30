@@ -90,7 +90,7 @@ async function scopedVisit(database: ReportDb, visitId: string, inspectorId: str
   const visit = await database.pedagogicalVisit.findFirst({
     where: { id: visitId, inspectorId },
     select: { id: true, districtId: true, inspectorId: true, teacherId: true, status: true, academicYear: true,
-      scheduledStartAt: true, scheduledEndAt: true, occurredAt: true, institutionId: true, institutionNameSnapshot: true },
+      visitType: true, scheduledStartAt: true, scheduledEndAt: true, occurredAt: true, institutionId: true, institutionNameSnapshot: true },
   });
   if (!visit) throw notFound();
   await requireInspectorDistrictMembership(database, inspectorId, visit.districtId);
@@ -101,7 +101,7 @@ async function fullRead(database: ReportDb, reportId: string, inspectorId: strin
   const row = await database.inspectionReport.findUnique({
     where: { id: reportId },
     include: { visit: { select: { id: true, districtId: true, inspectorId: true, teacherId: true, status: true,
-      academicYear: true, scheduledStartAt: true, scheduledEndAt: true, occurredAt: true,
+      academicYear: true, visitType: true, scheduledStartAt: true, scheduledEndAt: true, occurredAt: true,
       institutionId: true, institutionNameSnapshot: true } } },
   });
   if (!row || row.visit.inspectorId !== inspectorId) throw notFound();
@@ -127,7 +127,7 @@ async function fullRead(database: ReportDb, reportId: string, inspectorId: strin
       ? { inspector: { name: row.finalizedInspectorNameSnapshot!, surname: row.finalizedInspectorSurnameSnapshot! }, teacher: { name: row.finalizedTeacherNameSnapshot!, surname: row.finalizedTeacherSurnameSnapshot! } }
       : { inspector: currentInspector?.name && currentInspector.surname ? { name: currentInspector.name, surname: currentInspector.surname } : null, teacher: { name: teacher.name, surname: teacher.surname } },
     visit: { id: row.visit.id, status: row.visit.status, academicYear: row.visit.academicYear,
-      scheduledStartAt: row.visit.scheduledStartAt.toISOString(), scheduledEndAt: row.visit.scheduledEndAt.toISOString(),
+      scheduledStartAt: row.visit.scheduledStartAt!.toISOString(), scheduledEndAt: row.visit.scheduledEndAt!.toISOString(),
       occurredAt: row.visit.occurredAt?.toISOString() ?? null,
       institution: { id: row.visit.institutionId, name: row.visit.institutionNameSnapshot }, teacher: { id: teacher.id } },
   };
@@ -167,6 +167,7 @@ export function registerInspectionReportRoutes(app: Express, database: PrismaCli
       await database.$transaction(async (tx) => {
         await tx.$queryRaw`SELECT "id" FROM "PedagogicalVisit" WHERE "id" = ${visitId}::uuid FOR UPDATE`;
         const visit = await scopedVisit(tx, visitId, inspectorId);
+        if (visit.visitType !== null) throw new ApiError(409, 'REPORT_TYPE_CONFLICT', 'هذا النوع من الزيارات يحتاج مسار تقريره المعتمد.');
         if (visit.status === 'CANCELLED') throw stateConflict();
         const existing = await tx.inspectionReport.findUnique({ where: { visitId: visit.id } });
         if (existing?.status === 'FINAL') throw stateConflict();

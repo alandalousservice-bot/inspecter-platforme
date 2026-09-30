@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { ApiRequestError, createPedagogicalVisit, getCurrentDistricts, type DistrictOption, type ScheduleWarningCode, type TeacherDirectoryItem } from '../auth/client';
+import { ApiRequestError, createPedagogicalVisit, getCurrentDistricts, type DistrictOption, type PedagogicalVisitType, type ScheduleWarningCode, type TeacherDirectoryItem } from '../auth/client';
 import { Button, Card, CardContent, CardHeader, Dialog, ErrorState, Input, LoadingState } from '../ui';
 import { TeacherPicker } from './VisitPickers';
 import { localDateTimeToOffset } from './time';
 import './visits.css';
 
-type CreatePayload = { teacherId: string; academicYear: string; scheduledStartAt: string; scheduledEndAt: string };
+type CreatePayload = { teacherId: string; academicYear: string; visitType: PedagogicalVisitType; scheduledStartAt: string; scheduledEndAt: string };
 type WarningState = { code: ScheduleWarningCode; payload: CreatePayload } | { stale: true; payload: CreatePayload };
+const visitTypeLabels: Record<PedagogicalVisitType, string> = {
+  GUIDANCE: 'زيارة توجيهية / تكوينية', TENURE_CONFIRMATION: 'زيارة التثبيت / الترسيم',
+  PROMOTION_EVALUATION: 'زيارة الترقية / التقييم', MONITORING_FOLLOW_UP: 'زيارة المراقبة والمتابعة', EXCEPTIONAL: 'زيارة استثنائية',
+};
 const warningText: Record<ScheduleWarningCode, string> = {
   VISIT_WEEKLY_SCHEDULE_MISSING: 'لا يوجد توزيع أسبوعي مسجل لهذا الأستاذ والسنة الدراسية.',
   VISIT_OUTSIDE_WEEKLY_SCHEDULE: 'الموعد لا يقع بالكامل ضمن التوزيع الأسبوعي المسجل.',
@@ -39,6 +43,9 @@ export function VisitCreatePage() {
   const [academicYear, setAcademicYear] = useState('');
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
+  const [selectedVisitType, setSelectedVisitType] = useState<PedagogicalVisitType | ''>('');
+  const [exceptionalMode, setExceptionalMode] = useState<'SCHEDULED' | 'RETROSPECTIVE'>('SCHEDULED');
+  const [institutionContextConfirmed, setInstitutionContextConfirmed] = useState(false);
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
   const [warning, setWarning] = useState<WarningState | null>(null);
@@ -75,10 +82,21 @@ export function VisitCreatePage() {
     if (!districtId || !teacher) { setFormError('اختر المقاطعة والأستاذ أولًا.'); return; }
     if (!teacher.currentInstitution) { setFormError('اعتمد مؤسسة حالية للأستاذ من ملفه قبل التخطيط.'); return; }
     if (!validAcademicYear(academicYear)) { setFormError('أدخل سنة دراسية صحيحة مثل 2026-2027.'); return; }
+    if (!selectedVisitType) { setFormError('اختر نوع الزيارة.'); return; }
+    if (selectedVisitType === 'EXCEPTIONAL' && exceptionalMode === 'RETROSPECTIVE') {
+      const actualStart = localDateTimeToOffset(start); const actualEnd = localDateTimeToOffset(end);
+      if (!actualStart || !actualEnd || Date.parse(actualStart) >= Date.parse(actualEnd) || Date.parse(actualEnd) > Date.now()) { setFormError('أدخل فترة فعلية صحيحة انتهت بالفعل.'); return; }
+      if (!institutionContextConfirmed) { setFormError('أكد أن المؤسسة المعروضة هي مؤسسة الزيارة وقت وقوعها.'); return; }
+      void createPedagogicalVisit({ teacherId: teacher.id, academicYear, visitType: 'EXCEPTIONAL', actualStartAt: actualStart, actualEndAt: actualEnd, institutionContextConfirmed: true })
+        .then((result) => navigate(`/app/visits/${encodeURIComponent(result.data.visit.id)}${location.search}`, { state: { success: 'تم تسجيل الزيارة الاستثنائية السابقة.' } }))
+        .catch((error: unknown) => setFormError(readableError(error)))
+        .finally(() => setSaving(false));
+      setSaving(true); return;
+    }
     const startAt = localDateTimeToOffset(start); const endAt = localDateTimeToOffset(end);
     if (!startAt || !endAt) { setFormError('أدخل تاريخًا ووقتًا صالحين بتوقيت الجزائر.'); return; }
     if (Date.parse(startAt) >= Date.parse(endAt)) { setFormError('يجب أن يسبق موعد البداية موعد النهاية.'); return; }
-    void send({ teacherId: teacher.id, academicYear, scheduledStartAt: startAt, scheduledEndAt: endAt });
+    void send({ teacherId: teacher.id, academicYear, visitType: selectedVisitType, scheduledStartAt: startAt, scheduledEndAt: endAt });
   }
 
   const canCreate = districts.length > 0 && !districtLoading && !districtError;
@@ -96,11 +114,14 @@ export function VisitCreatePage() {
         {teacher?.currentInstitution ? <p className="visit-inline-note">المؤسسة الحالية المعتمدة: {teacher.currentInstitution.name}{teacher.currentInstitution.municipality ? ` — ${teacher.currentInstitution.municipality}` : ''}</p> : null}
         {teacher ? <p><Link to={`/app/teachers/${encodeURIComponent(teacher.id)}/schedules`}>عرض التوزيع الأسبوعي للأستاذ</Link></p> : null}
         <Input id="visit-academic-year" label="السنة الدراسية" required value={academicYear} onChange={(event) => { setAcademicYear(event.currentTarget.value); setWarning(null); }} hint="أدخلها صراحةً بصيغة YYYY-YYYY، مثل 2026-2027." aria-describedby={formError ? 'visit-create-error' : undefined} />
-        <Input id="visit-start" label="بداية الزيارة — توقيت الجزائر" type="datetime-local" required value={start} onChange={(event) => { setStart(event.currentTarget.value); setWarning(null); }} aria-describedby={formError ? 'visit-create-error' : undefined} />
-        <Input id="visit-end" label="نهاية الزيارة — توقيت الجزائر" type="datetime-local" required value={end} onChange={(event) => { setEnd(event.currentTarget.value); setWarning(null); }} aria-describedby={formError ? 'visit-create-error' : undefined} />
+        <div className="visit-field"><label className="ui-field__label" htmlFor="visit-create-type">نوع الزيارة <span aria-hidden="true">*</span></label><select id="visit-create-type" className="ui-input" required value={selectedVisitType} disabled={saving} aria-describedby={formError ? 'visit-create-error' : undefined} onChange={(event) => { setSelectedVisitType(event.currentTarget.value as PedagogicalVisitType | ''); setExceptionalMode('SCHEDULED'); setInstitutionContextConfirmed(false); setWarning(null); setFormError(''); }}><option value="">اختر نوع الزيارة</option>{Object.entries(visitTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
+        {selectedVisitType === 'EXCEPTIONAL' ? <div className="visit-field"><label className="ui-field__label" htmlFor="visit-exceptional-mode">طريقة تسجيل الزيارة الاستثنائية</label><select id="visit-exceptional-mode" className="ui-input" value={exceptionalMode} disabled={saving} onChange={(event) => { setExceptionalMode(event.currentTarget.value as 'SCHEDULED' | 'RETROSPECTIVE'); setWarning(null); setInstitutionContextConfirmed(false); }}><option value="SCHEDULED">زيارة مجدولة</option><option value="RETROSPECTIVE">تسجيل زيارة وقعت سابقًا</option></select></div> : null}
+        <Input id="visit-start" label={selectedVisitType === 'EXCEPTIONAL' && exceptionalMode === 'RETROSPECTIVE' ? 'بداية الفترة الفعلية — توقيت الجزائر' : 'بداية الزيارة — توقيت الجزائر'} type="datetime-local" required value={start} onChange={(event) => { setStart(event.currentTarget.value); setWarning(null); }} aria-describedby={formError ? 'visit-create-error' : undefined} />
+        <Input id="visit-end" label={selectedVisitType === 'EXCEPTIONAL' && exceptionalMode === 'RETROSPECTIVE' ? 'نهاية الفترة الفعلية — توقيت الجزائر' : 'نهاية الزيارة — توقيت الجزائر'} type="datetime-local" required value={end} onChange={(event) => { setEnd(event.currentTarget.value); setWarning(null); }} aria-describedby={formError ? 'visit-create-error' : undefined} />
+        {selectedVisitType === 'EXCEPTIONAL' && exceptionalMode === 'RETROSPECTIVE' ? <label className="visit-inline-note"><input type="checkbox" checked={institutionContextConfirmed} disabled={saving} onChange={(event) => setInstitutionContextConfirmed(event.currentTarget.checked)} /> أؤكد أن المؤسسة الحالية المعتمدة المعروضة هي المؤسسة التي وقعت فيها الزيارة</label> : null}
         {start && end && start.slice(0, 10) !== end.slice(0, 10) ? <p role="status">يمتد الموعد إلى تاريخ آخر؛ سيظهر تاريخ البداية والنهاية كاملين.</p> : null}
         {formError ? <p id="visit-create-error" className="visit-error" role="alert">{formError}</p> : null}
-        <Button type="submit" disabled={saving || !districtId || !teacher || !teacher.currentInstitution}>{saving ? 'جارٍ إنشاء الزيارة…' : 'إنشاء الزيارة'}</Button>
+        <Button type="submit" disabled={saving || !districtId || !teacher || !teacher.currentInstitution || !selectedVisitType}>{saving ? 'جارٍ إنشاء الزيارة…' : 'إنشاء الزيارة'}</Button>
       </form>
     </CardContent></Card> : null}
     <Dialog open={Boolean(warningDialog)} title={warningDialog && 'stale' in warningDialog ? 'تغيّر التوزيع الأسبوعي' : 'تنبيه الجدول الأسبوعي'}

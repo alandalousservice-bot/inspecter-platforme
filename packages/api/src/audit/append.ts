@@ -73,18 +73,22 @@ const eventContracts = {
   },
   [AuditAction.PEDAGOGICAL_VISIT_CREATED]: {
     entityType: 'PedagogicalVisit',
-    metadata: z.object({ scheduleWarningCode: z.enum(['VISIT_WEEKLY_SCHEDULE_MISSING', 'VISIT_OUTSIDE_WEEKLY_SCHEDULE']).optional() }).strict(),
+    metadata: z.object({
+      visitType: z.enum(['GUIDANCE', 'TENURE_CONFIRMATION', 'PROMOTION_EVALUATION', 'MONITORING_FOLLOW_UP', 'EXCEPTIONAL']),
+      intervalKind: z.literal('ACTUAL_RETROSPECTIVE').optional(),
+      scheduleWarningCode: z.enum(['VISIT_WEEKLY_SCHEDULE_MISSING', 'VISIT_OUTSIDE_WEEKLY_SCHEDULE']).optional(),
+    }).strict(),
   },
   [AuditAction.PEDAGOGICAL_VISIT_UPDATED]: {
     entityType: 'PedagogicalVisit',
     metadata: z.object({
-      changedFields: z.array(z.enum(['scheduledStartAt', 'scheduledEndAt', 'academicYear'])).min(1),
+      changedFields: z.array(z.enum(['scheduledStartAt', 'scheduledEndAt', 'academicYear', 'visitType'])).min(1),
       scheduleWarningCode: z.enum(['VISIT_WEEKLY_SCHEDULE_MISSING', 'VISIT_OUTSIDE_WEEKLY_SCHEDULE']).optional(),
     }).strict(),
   },
   [AuditAction.PEDAGOGICAL_VISIT_COMPLETED]: {
     entityType: 'PedagogicalVisit',
-    metadata: z.object({ fromStatus: z.literal('PLANNED'), toStatus: z.literal('COMPLETED') }).strict(),
+    metadata: z.object({ fromStatus: z.literal('PLANNED').nullable(), toStatus: z.literal('COMPLETED') }).strict(),
   },
   [AuditAction.PEDAGOGICAL_VISIT_CANCELLED]: {
     entityType: 'PedagogicalVisit',

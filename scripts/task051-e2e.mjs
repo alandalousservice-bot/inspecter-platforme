@@ -73,9 +73,10 @@ try {
   process.env.G3_E2E_INSPECTOR_EMAIL = email;
   process.env.G3_E2E_INSPECTOR_PASSWORD = password;
   process.env.TASK051_E2E = '1';
+  process.env.TASK053A_E2E = '1';
   exitCode = runNode([resolve(root, 'node_modules/@playwright/test/cli.js'), 'test', '--config=playwright.config.ts']);
 } finally {
-  for (const key of ['G3_E2E_DATABASE_URL', 'G3_E2E_DISTRICT_ID', 'G3_E2E_INSPECTOR_EMAIL', 'G3_E2E_INSPECTOR_PASSWORD', 'TASK051_E2E', 'TASK051_TEACHER_INSIDE_ID', 'TASK051_TEACHER_OUTSIDE_ID', 'TASK051_INSTITUTION_ID']) delete process.env[key];
+  for (const key of ['G3_E2E_DATABASE_URL', 'G3_E2E_DISTRICT_ID', 'G3_E2E_INSPECTOR_EMAIL', 'G3_E2E_INSPECTOR_PASSWORD', 'TASK051_E2E', 'TASK053A_E2E', 'TASK051_TEACHER_INSIDE_ID', 'TASK051_TEACHER_OUTSIDE_ID', 'TASK051_INSTITUTION_ID']) delete process.env[key];
   if (admin && schemaCreated) {
     await admin.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
     const remaining = await admin.$queryRaw`SELECT to_regnamespace(${schema})::text AS name`;

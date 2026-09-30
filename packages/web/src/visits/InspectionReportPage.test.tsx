@@ -9,7 +9,8 @@ vi.mock('../auth/client', async (importOriginal) => ({ ...(await importOriginal<
 
 const visit = { id: '55555555-5555-4555-8555-555555555555', districtId: '11111111-1111-4111-8111-111111111111',
   teacher: { id: '44444444-4444-4444-8444-444444444444', name: 'ليلى', surname: 'علي' }, institution: { id: '33333333-3333-4333-8333-333333333333', name: 'ابتدائية النور' },
-  academicYear: '2026-2027', scheduledStartAt: '2026-10-15T08:30:00.000Z', scheduledEndAt: '2026-10-15T09:30:00.000Z', occurredAt: null, status: 'PLANNED' as const, revision: 1, createdAt: '', updatedAt: '' };
+  academicYear: '2026-2027', visitType: null, scheduledStartAt: '2026-10-15T08:30:00.000Z', scheduledEndAt: '2026-10-15T09:30:00.000Z',
+  actualStartAt: null, actualEndAt: null, intervalKind: 'SCHEDULED' as const, visitTypeEditable: true, occurredAt: null, status: 'PLANNED' as const, revision: 1, createdAt: '', updatedAt: '' };
 const report = { id: '66666666-6666-4666-8666-666666666666', visitId: visit.id, reportType: 'PEDAGOGICAL_ACCOMPANIMENT' as const,
   templateSource: 'INSPECTOR_AUTHORED' as const, templateVersion: 1 as const, status: 'DRAFT' as const, revision: 1,
   levelClass: null, lessonTopic: null, pedagogicalObservations: null, strengths: null, improvementAreas: null, guidanceRecommendations: null,

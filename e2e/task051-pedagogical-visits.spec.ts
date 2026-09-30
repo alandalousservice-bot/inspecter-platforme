@@ -28,6 +28,7 @@ async function planVisit(page: Page, teacherName: string, start: string, end: st
   await page.getByRole('button', { name: new RegExp(teacherName, 'u') }).click();
   await expect(page.getByText(new RegExp(`الأستاذ المختار:.*${teacherName}`, 'u'))).toBeVisible();
   await page.getByLabel(/السنة الدراسية/u).fill('2026-2027');
+  await page.getByLabel('نوع الزيارة').selectOption('GUIDANCE');
   await page.getByLabel(/بداية الزيارة/u).fill(start);
   await page.getByLabel(/نهاية الزيارة/u).fill(end);
   await page.getByRole('button', { name: 'إنشاء الزيارة' }).click();
