@@ -89,6 +89,49 @@ export type TeacherProfilePatch = Partial<Pick<TeacherProfile,
   'name' | 'surname' | 'birthDate' | 'placeOfBirth' | 'phone' | 'email'
   | 'professionalStatus' | 'employedAt' | 'confirmedAt' | 'qualifications'>>;
 
+export type TeacherDirectoryItem = {
+  id: string;
+  districtId: string;
+  name: string;
+  surname: string;
+  professionalStatus: 'PERMANENT' | 'TRAINEE' | 'CONTRACT' | 'TEMPORARY_CONTRACT' | null;
+  recordStatus: 'ACTIVE' | 'INACTIVE';
+  currentInstitution: { id: string; name: string; municipality: string | null } | null;
+};
+export type TeacherDirectoryFilters = {
+  districtId?: string;
+  q?: string;
+  institutionId?: string;
+  hasCurrentInstitution?: boolean;
+  professionalStatus?: NonNullable<TeacherDirectoryItem['professionalStatus']>;
+  recordStatus?: TeacherDirectoryItem['recordStatus'];
+  academicYear?: string;
+  dayOfWeek?: number;
+  minuteOfDay?: number;
+  worksToday?: true;
+  worksNow?: true;
+  limit?: number;
+  cursor?: string;
+};
+export type TeacherDirectoryPage = { limit: number; nextCursor: string | null; total: number };
+
+export async function listTeachers(options: TeacherDirectoryFilters = {}) {
+  const query = new URLSearchParams();
+  for (const key of ['districtId', 'q', 'institutionId', 'professionalStatus', 'recordStatus', 'academicYear', 'cursor'] as const) {
+    const value = options[key];
+    if (value !== undefined && value !== '') query.set(key, String(value));
+  }
+  if (options.hasCurrentInstitution !== undefined) query.set('hasCurrentInstitution', String(options.hasCurrentInstitution));
+  if (options.dayOfWeek !== undefined) query.set('dayOfWeek', String(options.dayOfWeek));
+  if (options.minuteOfDay !== undefined) query.set('minuteOfDay', String(options.minuteOfDay));
+  if (options.worksToday) query.set('worksToday', 'true');
+  if (options.worksNow) query.set('worksNow', 'true');
+  query.set('limit', String(options.limit ?? 25));
+  const response = await fetch(`/api/v1/teachers?${query}`, { credentials: 'same-origin' });
+  if (!response.ok) return readFailure(response);
+  return response.json() as Promise<{ data: TeacherDirectoryItem[]; page: TeacherDirectoryPage }>;
+}
+
 type ApiFailure = { error?: { code?: string; message?: string; fields?: Record<string, string[]> } };
 
 export class ApiRequestError extends Error {

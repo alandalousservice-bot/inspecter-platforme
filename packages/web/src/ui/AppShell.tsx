@@ -18,6 +18,7 @@ export function AppShell({ children, headerAction }: AppShellProps) {
           <nav aria-label="التنقل الرئيسي">
             <NavLink to="/app/submissions">طلبات الأساتذة</NavLink>
             <NavLink to="/app/institutions">المؤسسات</NavLink>
+            <NavLink to="/app/teachers">دليل الأساتذة</NavLink>
           </nav>
         </aside>
         <main id="main-content" className="app-main" tabIndex={-1}>

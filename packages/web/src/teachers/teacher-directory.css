@@ -1,0 +1,42 @@
+.teacher-directory {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.teacher-directory__heading h1,
+.teacher-directory__heading p { margin-block: 0; }
+.teacher-directory__heading h1 { font-size: var(--font-size-page); }
+.teacher-directory__heading > div > p:last-child,
+.teacher-directory__eyebrow,
+.teacher-directory__hint,
+.teacher-directory__filter-actions span { color: var(--color-text-muted); }
+.teacher-directory__eyebrow { margin-block-end: var(--space-2) !important; font-size: var(--font-size-small); }
+.teacher-directory__filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: var(--space-3); align-items: end; }
+.teacher-directory__filters-card .ui-card__content { display: grid; gap: var(--space-4); }
+.teacher-directory__institution-filter { display: grid; gap: var(--space-2); min-width: 0; }
+.teacher-directory__institution-filter select { width: 100%; }
+.teacher-directory__hint { display: block; font-size: var(--font-size-small); }
+.teacher-directory__schedule-filters { margin: 0; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-card); }
+.teacher-directory__schedule-filters legend { padding-inline: var(--space-2); font-weight: 600; }
+.teacher-directory__schedule-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); align-items: end; gap: var(--space-3); }
+.teacher-directory__check { display: flex; align-items: center; gap: var(--space-2); min-height: 2.75rem; }
+.teacher-directory__check input { accent-color: var(--color-brand); }
+.teacher-directory__filter-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.teacher-directory__total { margin-block: 0 var(--space-4); color: var(--color-text-muted); }
+.teacher-directory__municipality { display: block; margin-block-start: var(--space-1); color: var(--color-text-muted); font-size: var(--font-size-small); }
+.teacher-directory__status { display: inline-block; padding: var(--space-1) var(--space-2); border: 1px solid var(--color-border); border-radius: 999px; }
+.teacher-directory__schedule-link { white-space: nowrap; }
+.teacher-directory__pagination { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-block-start: var(--space-4); }
+.teacher-directory__pagination span { color: var(--color-text-muted); text-align: center; }
+.teacher-directory__empty { display: grid; justify-items: start; gap: var(--space-2); padding-block: var(--space-4); }
+.teacher-directory__empty h2,
+.teacher-directory__empty p { margin: 0; }
+.teacher-directory__empty p { color: var(--color-text-muted); }
+.teacher-directory__notice { padding: var(--space-3); border-inline-start: 3px solid var(--color-info); background: color-mix(in srgb, var(--color-info) 8%, transparent); }
+
+@media (max-width: 40rem) {
+  .teacher-directory__pagination { flex-wrap: wrap; }
+  .teacher-directory__pagination span { order: -1; width: 100%; }
+  .teacher-directory__pagination button { flex: 1; }
+}

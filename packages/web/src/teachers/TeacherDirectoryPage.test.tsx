@@ -1,0 +1,201 @@
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter, Route, Routes } from 'react-router';
+import type { TeacherDirectoryItem } from '../auth/client';
+import { ApiRequestError } from '../auth/client';
+import { TeacherDirectoryPage, parseTimeToMinute } from './TeacherDirectoryPage';
+
+const mocks = vi.hoisted(() => ({ listInstitutions: vi.fn(), listTeachers: vi.fn(), getCurrentDistricts: vi.fn() }));
+vi.mock('../auth/client', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../auth/client')>();
+  return { ...original, ...mocks };
+});
+
+const districtA = { id: '11111111-1111-4111-8111-111111111111', name: 'مقاطعة الشمال' };
+const districtB = { id: '22222222-2222-4222-8222-222222222222', name: 'مقاطعة الجنوب' };
+const institution = { id: '33333333-3333-4333-8333-333333333333', districtId: districtA.id, name: 'مدرسة النور', municipality: 'الجزائر' };
+const teacher: TeacherDirectoryItem = {
+  id: '44444444-4444-4444-8444-444444444444', districtId: districtA.id, name: 'محمد', surname: 'علي',
+  professionalStatus: 'PERMANENT', recordStatus: 'ACTIVE', currentInstitution: institution,
+};
+const response = (data: TeacherDirectoryItem[] = [teacher], total = data.length, nextCursor: string | null = null) => ({ data, page: { limit: 25, total, nextCursor } });
+
+beforeEach(() => {
+  mocks.getCurrentDistricts.mockResolvedValue([districtA]);
+  mocks.listInstitutions.mockResolvedValue({ data: [institution], page: { limit: 25, nextCursor: null, total: 1 } });
+  mocks.listTeachers.mockResolvedValue(response());
+});
+afterEach(() => { cleanup(); vi.clearAllMocks(); vi.useRealTimers(); });
+
+function renderPage(path = '/app/teachers') {
+  return render(<MemoryRouter initialEntries={[path]}><Routes><Route path="/app/teachers" element={<TeacherDirectoryPage />} /></Routes></MemoryRouter>);
+}
+
+describe('TASK-045 Teacher directory', () => {
+  it('loads the ACTIVE-default server page, total, approved institution and supported navigation only', async () => {
+    renderPage();
+    expect(screen.getByText('جارٍ تحميل دليل الأساتذة…')).toBeTruthy();
+    expect(await screen.findByRole('cell', { name: 'محمد علي' })).toBeTruthy();
+    expect(screen.getByText('إجمالي النتائج: 1')).toBeTruthy();
+    expect(screen.getByText('مدرسة النور')).toBeTruthy();
+    expect(screen.getByText('الجزائر')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'محمد علي' }).getAttribute('href')).toBe(`/app/teachers/${teacher.id}`);
+    expect(screen.getByRole('link', { name: 'التوزيع الأسبوعي' }).getAttribute('href')).toBe(`/app/teachers/${teacher.id}/schedules`);
+    expect(mocks.listTeachers).toHaveBeenCalledWith({ limit: 25 });
+    expect(screen.queryByRole('button', { name: /حذف|أرشفة|تعديل/ })).toBeNull();
+  });
+
+  it('shows an unassigned current-institution state and never displays phone or email columns', async () => {
+    mocks.listTeachers.mockResolvedValueOnce(response([{ ...teacher, currentInstitution: null }]));
+    renderPage();
+    expect(await screen.findByText('لم تُعتمد مؤسسة حالية')).toBeTruthy();
+    expect(screen.queryByRole('columnheader', { name: /الهاتف|البريد/ })).toBeNull();
+  });
+
+  it('debounces q and sends search to the API without client-side filtering', async () => {
+    vi.useFakeTimers();
+    renderPage();
+    fireEvent.change(screen.getByRole('textbox', { name: 'البحث عن أستاذ' }), { target: { value: 'محمد علي' } });
+    act(() => { vi.advanceTimersByTime(349); });
+    expect(mocks.listTeachers).toHaveBeenCalledTimes(1);
+    await act(async () => { vi.advanceTimersByTime(1); await Promise.resolve(); await Promise.resolve(); });
+    expect(mocks.listTeachers).toHaveBeenLastCalledWith({ q: 'محمد علي', limit: 25 });
+    vi.useRealTimers();
+  });
+
+  it('ignores a stale response after a newer server search has started', async () => {
+    let resolveOld!: (value: ReturnType<typeof response>) => void;
+    mocks.listTeachers.mockReturnValueOnce(new Promise((resolve) => { resolveOld = resolve; })).mockResolvedValue(response([{ ...teacher, id: '55555555-5555-4555-8555-555555555555', name: 'أحدث' }]));
+    renderPage('/app/teachers?q=قديم');
+    fireEvent.change(screen.getByRole('textbox', { name: 'البحث عن أستاذ' }), { target: { value: 'جديد' } });
+    await new Promise((resolve) => window.setTimeout(resolve, 400));
+    expect(await screen.findByRole('cell', { name: 'أحدث علي' })).toBeTruthy();
+    await act(async () => { resolveOld(response([{ ...teacher, name: 'قديم' }])); });
+    expect(screen.queryByRole('cell', { name: 'قديم علي' })).toBeNull();
+  });
+
+  it('offers a District filter only for multiple current Districts and sends selected scope', async () => {
+    mocks.getCurrentDistricts.mockResolvedValueOnce([districtA, districtB]);
+    renderPage();
+    expect(await screen.findByRole('cell', { name: 'مقاطعة الشمال' })).toBeTruthy();
+    const filter = await screen.findByRole('combobox', { name: 'المقاطعة' });
+    fireEvent.change(filter, { target: { value: districtB.id } });
+    await waitFor(() => expect(mocks.listTeachers).toHaveBeenLastCalledWith({ districtId: districtB.id, limit: 25 }));
+    mocks.getCurrentDistricts.mockResolvedValueOnce([districtA]);
+    cleanup(); renderPage();
+    await screen.findByRole('cell', { name: 'محمد علي' });
+    expect(screen.queryByRole('combobox', { name: 'المقاطعة' })).toBeNull();
+  });
+
+  it('keeps server scope authoritative if current District labels fail to load', async () => {
+    mocks.getCurrentDistricts.mockRejectedValueOnce(new Error('private district error'));
+    renderPage();
+    expect(await screen.findByText('تعذر تحميل أسماء المقاطعات؛ تبقى صلاحية النطاق لدى الخادم.')).toBeTruthy();
+    expect(await screen.findByRole('cell', { name: 'محمد علي' })).toBeTruthy();
+    expect(mocks.listTeachers).toHaveBeenCalledWith({ limit: 25 });
+    expect(screen.queryByText(/private district error/)).toBeNull();
+  });
+
+  it('uses bounded server search for Institutions and the selected institutionId filter', async () => {
+    renderPage();
+    const search = screen.getByRole('textbox', { name: 'البحث عن مؤسسة حالية معتمدة' });
+    fireEvent.change(search, { target: { value: 'مدرسة النور' } });
+    expect(await screen.findByRole('combobox', { name: 'نتائج المؤسسات' })).toBeTruthy();
+    fireEvent.change(screen.getByRole('combobox', { name: 'نتائج المؤسسات' }), { target: { value: institution.id } });
+    await waitFor(() => expect(mocks.listInstitutions).toHaveBeenCalledWith({ q: 'مدرسة النور', districtId: undefined, limit: 25 }));
+    await waitFor(() => expect(mocks.listTeachers).toHaveBeenLastCalledWith({ institutionId: institution.id, hasCurrentInstitution: true, limit: 25 }));
+  });
+
+  it('composes unassigned, professional and record status filters using canonical values', async () => {
+    renderPage();
+    fireEvent.change(screen.getByRole('combobox', { name: 'المؤسسة الحالية المعتمدة' }), { target: { value: 'false' } });
+    await waitFor(() => expect(mocks.listTeachers).toHaveBeenLastCalledWith({ hasCurrentInstitution: false, limit: 25 }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'الصفة المهنية' }), { target: { value: 'TRAINEE' } });
+    await waitFor(() => expect(mocks.listTeachers).toHaveBeenLastCalledWith({ hasCurrentInstitution: false, professionalStatus: 'TRAINEE', limit: 25 }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'حالة السجل' }), { target: { value: 'INACTIVE' } });
+    await waitFor(() => expect(mocks.listTeachers).toHaveBeenLastCalledWith({ hasCurrentInstitution: false, professionalStatus: 'TRAINEE', recordStatus: 'INACTIVE', limit: 25 }));
+    expect(screen.getByRole('option', { name: 'متربص' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'مرسم' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'متعاقد' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'متعاقد مؤقت' })).toBeTruthy();
+  });
+
+  it('requires an explicit valid academic year before schedule filters and converts HH:mm', async () => {
+    renderPage();
+    const year = screen.getByRole('textbox', { name: 'السنة الدراسية' });
+    const day = screen.getByRole('combobox', { name: 'يوم العمل' }) as HTMLSelectElement;
+    expect(day.disabled).toBe(true);
+    fireEvent.change(year, { target: { value: '2026-2027' } });
+    await waitFor(() => expect(mocks.listTeachers).toHaveBeenLastCalledWith({ limit: 25 }));
+    expect(day.disabled).toBe(false);
+    fireEvent.change(day, { target: { value: '2' } });
+    await waitFor(() => expect(mocks.listTeachers).toHaveBeenLastCalledWith({ academicYear: '2026-2027', dayOfWeek: 2, limit: 25 }));
+    fireEvent.change(screen.getByLabelText('وقت الحصة'), { target: { value: '08:30' } });
+    await waitFor(() => expect(mocks.listTeachers).toHaveBeenLastCalledWith({ academicYear: '2026-2027', dayOfWeek: 2, minuteOfDay: 510, limit: 25 }));
+    expect(parseTimeToMinute('23:59')).toBe(1439);
+    expect(parseTimeToMinute('24:00')).toBeUndefined();
+  });
+
+  it('sends worksToday/worksNow only as true and resets cursor on filter changes', async () => {
+    renderPage('/app/teachers?academicYear=2026-2027&dayOfWeek=2&cursor=irrelevant');
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'يعمل اليوم' }));
+    await waitFor(() => expect(mocks.listTeachers).toHaveBeenLastCalledWith({ academicYear: '2026-2027', dayOfWeek: 2, worksToday: true, limit: 25 }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'يعمل الآن' }));
+    await waitFor(() => expect(mocks.listTeachers).toHaveBeenLastCalledWith({ academicYear: '2026-2027', dayOfWeek: 2, worksToday: true, worksNow: true, limit: 25 }));
+    expect((screen.getByRole('textbox', { name: 'السنة الدراسية' }) as HTMLInputElement).value).toBe('2026-2027');
+  });
+
+  it('uses cursor history for next/previous, displays server total and clears cursor on reset', async () => {
+    const nextId = '66666666-6666-4666-8666-666666666666';
+    mocks.listTeachers.mockResolvedValueOnce(response([teacher], 30, nextId)).mockResolvedValueOnce(response([{ ...teacher, id: nextId, name: 'التالي' }], 30));
+    renderPage();
+    await screen.findByRole('cell', { name: 'محمد علي' });
+    expect(screen.getByText('النتائج 1–1 من 30')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'النتائج التالية' }));
+    expect(await screen.findByRole('cell', { name: 'التالي علي' })).toBeTruthy();
+    await waitFor(() => expect(mocks.listTeachers).toHaveBeenLastCalledWith({ limit: 25, cursor: nextId }));
+    fireEvent.click(screen.getByRole('button', { name: 'السابق' }));
+    expect(await screen.findByRole('cell', { name: 'محمد علي' })).toBeTruthy();
+  });
+
+  it('resets a stale cursor safely and reloads from the first page', async () => {
+    mocks.listTeachers.mockResolvedValueOnce(response([teacher], 30, '66666666-6666-4666-8666-666666666666'))
+      .mockRejectedValueOnce(new ApiRequestError('not found', undefined, 404, 'NOT_FOUND'))
+      .mockResolvedValue(response([teacher], 30));
+    renderPage();
+    await screen.findByRole('cell', { name: 'محمد علي' });
+    fireEvent.click(screen.getByRole('button', { name: 'النتائج التالية' }));
+    expect(await screen.findByText('تغيّرت النتائج أو انتهت صلاحية مؤشر الصفحة؛ عُدنا إلى بداية القائمة.')).toBeTruthy();
+    await waitFor(() => expect(mocks.listTeachers).toHaveBeenLastCalledWith({ limit: 25 }));
+    expect(screen.getByRole('cell', { name: 'محمد علي' })).toBeTruthy();
+  });
+
+  it('distinguishes default and filtered empty results and resets filters', async () => {
+    mocks.listTeachers.mockResolvedValueOnce(response([], 0));
+    renderPage();
+    expect(await screen.findByRole('heading', { name: 'لا توجد سجلات أساتذة ظاهرة' })).toBeTruthy();
+    cleanup(); mocks.listTeachers.mockResolvedValue(response([], 0)); renderPage('/app/teachers?q=none');
+    expect(await screen.findByRole('heading', { name: 'لا توجد نتائج مطابقة' })).toBeTruthy();
+    fireEvent.click(screen.getAllByRole('button', { name: 'مسح المرشحات' })[0]);
+    await waitFor(() => expect(mocks.listTeachers).toHaveBeenLastCalledWith({ limit: 25 }));
+  });
+
+  it('keeps transport details out of the error state and retries', async () => {
+    mocks.listTeachers.mockRejectedValueOnce(new Error('raw server internals')).mockResolvedValue(response());
+    renderPage();
+    expect(await screen.findByRole('heading', { name: 'تعذر تحميل دليل الأساتذة' })).toBeTruthy();
+    expect(screen.queryByText(/raw server internals/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'إعادة المحاولة' }));
+    expect(await screen.findByRole('cell', { name: 'محمد علي' })).toBeTruthy();
+  });
+
+  it('is RTL with associated labels and keyboard-focusable actions', async () => {
+    renderPage();
+    expect(await screen.findByRole('cell', { name: 'محمد علي' })).toBeTruthy();
+    expect(document.querySelector('.teacher-directory')?.getAttribute('dir')).toBe('rtl');
+    const search = screen.getByRole('textbox', { name: 'البحث عن أستاذ' });
+    search.focus(); expect(document.activeElement).toBe(search);
+    expect(screen.getByRole('table', { name: 'دليل الأساتذة' })).toBeTruthy();
+    expect(screen.queryByRole('columnheader', { name: /البلدية/ })).toBeNull();
+  });
+});
