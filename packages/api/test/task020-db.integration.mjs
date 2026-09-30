@@ -202,8 +202,8 @@ after(async () => {
                COUNT(*) FILTER (WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL)::int AS applied
         FROM "${schemaName}"."_prisma_migrations"
       `);
-      assert.deepEqual(history[0], { total: 8, applied: 8 });
-      log('TASK-020 second deploy/status: PASS; migration history: 8/8 applied');
+      assert.deepEqual(history[0], { total: 9, applied: 9 });
+      log('TASK-020 second deploy/status: PASS; migration history: 9/9 applied');
       void secondDeploy;
     }
   } catch (error) {
@@ -228,6 +228,7 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
     'Inspector',
     'InspectorDistrictMembership',
     'Institution',
+    'PedagogicalVisit',
     'Session',
     'Teacher',
     'TeacherSubmission',
@@ -278,7 +279,7 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
   `;
   const primaryKeys = constraints.filter((constraint) => constraint.contype === 'p');
   assert.deepEqual(primaryKeys.map(({ source_table }) => source_table).sort(), [
-    'AuditLog', 'District', 'Inspector', 'InspectorDistrictMembership', 'Institution', 'Session', 'Teacher', 'TeacherSubmission', 'WeeklySchedule', 'WeeklyScheduleSlot',
+    'AuditLog', 'District', 'Inspector', 'InspectorDistrictMembership', 'Institution', 'PedagogicalVisit', 'Session', 'Teacher', 'TeacherSubmission', 'WeeklySchedule', 'WeeklyScheduleSlot',
   ]);
   const foreignKeys = constraints.filter((constraint) => constraint.contype === 'f');
   assert.deepEqual(foreignKeys.map(({ source_table, target_table, confdeltype, confupdtype }) => ({
@@ -289,6 +290,10 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
     { source_table: 'InspectorDistrictMembership', target_table: 'District', confdeltype: 'r', confupdtype: 'c' },
     { source_table: 'InspectorDistrictMembership', target_table: 'Inspector', confdeltype: 'r', confupdtype: 'c' },
     { source_table: 'Institution', target_table: 'District', confdeltype: 'r', confupdtype: 'c' },
+    { source_table: 'PedagogicalVisit', target_table: 'District', confdeltype: 'r', confupdtype: 'r' },
+    { source_table: 'PedagogicalVisit', target_table: 'Inspector', confdeltype: 'r', confupdtype: 'r' },
+    { source_table: 'PedagogicalVisit', target_table: 'Institution', confdeltype: 'r', confupdtype: 'r' },
+    { source_table: 'PedagogicalVisit', target_table: 'Teacher', confdeltype: 'r', confupdtype: 'r' },
     { source_table: 'Session', target_table: 'Inspector', confdeltype: 'r', confupdtype: 'c' },
     { source_table: 'Teacher', target_table: 'District', confdeltype: 'r', confupdtype: 'c' },
     { source_table: 'Teacher', target_table: 'Institution', confdeltype: 'r', confupdtype: 'c' },
@@ -307,6 +312,10 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
   `;
   const expectedIndexes = [
     'Institution_districtId_name_idx',
+    'PedagogicalVisit_districtId_scheduledStartAt_id_idx',
+    'PedagogicalVisit_teacherId_scheduledStartAt_idx',
+    'PedagogicalVisit_inspectorId_scheduledStartAt_idx',
+    'PedagogicalVisit_institutionId_scheduledStartAt_idx',
     'InspectorDistrictMembership_districtId_idx',
     'InspectorDistrictMembership_inspectorId_idx',
     'Session_inspectorId_idx',
@@ -330,7 +339,7 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
            COUNT(*) FILTER (WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL)::int AS applied
     FROM "${schemaName}"."_prisma_migrations"
   `);
-  assert.deepEqual(migrationHistory[0], { total: 8, applied: 8 });
+  assert.deepEqual(migrationHistory[0], { total: 9, applied: 9 });
 
   await t.test('creates the four models with UUIDs, nullability, and resolvable relations', async () => {
     const runId = randomBytes(6).toString('hex');

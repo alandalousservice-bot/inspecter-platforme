@@ -15,7 +15,7 @@
 | Core | ProfessionalHistory | أساس مؤجل لأحداث مهنية أخرى عند وجود عقد؛ لا يُستخدم لنقل مؤسسة أو تاريخ علاقة Teacher بها، ولا يحل محل AuditLog |
 | Schedule | WeeklySchedule | teacherId، academicYear، revision؛ جدول حالي واحد لكل Teacher وسنة، بلا status أو validFrom/validTo أو تاريخ نسخ |
 | Schedule | WeeklyScheduleSlot | scheduleId، dayOfWeek، startMinute/endMinute، levelLabel/groupLabel/notes اختيارية؛ سياق المكان من مؤسسة Teacher الحالية المعتمدة، بلا institutionId أو assignmentId |
-| Visit | PedagogicalVisit | inspectorId/teacherId/institutionId، scheduledAt، occurredAt، status، سياق حصة وصفي محدود؛ لا شبكة تقييم |
+| Visit | PedagogicalVisit | عقد [ADR-031](DECISIONS.md#adr-031--pedagogicalvisit-scheduling-and-historical-context-task-050): districtId/inspectorId/teacherId/institutionId وسnapshot اسم المؤسسة، فترة مخططة وسنة جدول صريحة، occurredAt، status/revision؛ بلا نوع أو notes أو حقول تقرير |
 | Visit | InspectionReport | visitId unique، templateVersion nullable، status، narrative/recommendations structure مبدئي، finalizedAt، immutable final snapshot؛ يتطور عند وصول النموذج |
 | Visit | FollowUp | reportId/teacherId، ownerInspectorId، dueAt، status، note، completedAt؛ توصية قابلة للمتابعة |
 | Training | TrainingEvent | districtId، type/title/date، status؛ foundation فقط |
@@ -79,6 +79,31 @@ TASK-035 يقرأ ويعدّل حقول Teacher الحالية فقط وفق [ع
 
 يمنع قيد PostgreSQL GiST exclusion تداخل `(scheduleId,dayOfWeek,int4range(startMinute,endMinute,'[)'))` لنفس الجدول واليوم؛ `[)` يسمح بتجاور نهاية slot وبداية التالي. `btree_gist` مثبتة في سلسلة migrations منذ TASK-022؛ هجرة TASK-047 forward-only مستقلة، مع تحقق clean+upgrade. الفهارس: unique `(teacherId,academicYear)`، وslot `(scheduleId,dayOfWeek,startMinute,endMinute)` لقراءة اليوم بترتيب الوقت، و`(dayOfWeek,startMinute)` لدعم بحث TASK-044 المستقبلي؛ لا فهرس إضافي على `teacherId` إذ يغطيه مفتاح uniqueness كبادئة. لا مؤسسة لازمة لكل slot في DB؛ TASK-048 تمنع mutation عندما `Teacher.institutionId=NULL`.
 
+## PedagogicalVisit persistence contract (ADR-031 / TASK-050)
+
+Migration مستقلة forward-only تنشئ `PedagogicalVisit` فقط؛ لا تعدل الجداول التاريخية أو تنشئ InspectionReport. أسماء الحقول وأنواعها:
+
+| Field | Type / nullability | Rule |
+|---|---|---|
+| `id` | UUID PK، NOT NULL | generated |
+| `districtId` | UUID NOT NULL | District الزيارة وقت الإنشاء، لا يُشتق لاحقًا من Teacher |
+| `inspectorId` | UUID NOT NULL | المفتش المسؤول؛ Inspector المصادق عليه وقت الإنشاء |
+| `teacherId` | UUID NOT NULL | Teacher واحد للزيارة |
+| `institutionId` | UUID NOT NULL | مؤسسة Teacher الحالية المعتمدة عند الإنشاء؛ مرجع تاريخي ثابت |
+| `institutionNameSnapshot` | String NOT NULL | الاسم غير الفارغ من Institution وقت الإنشاء؛ لا يُعاد ملؤه بعد إعادة التسمية |
+| `academicYear` | String NOT NULL | `YYYY-YYYY` بسنتين متتاليتين؛ سياق فحص الجدول، لا FK إلى WeeklySchedule |
+| `scheduledStartAt`, `scheduledEndAt` | DateTime NOT NULL | UTC normalized وفق أعمدة DateTime الحالية؛ start < end، بلا مدة افتراضية |
+| `occurredAt` | DateTime NULL | NULL إلا عند COMPLETED؛ عندها وقت الإنجاز الفعلي المطلوب من المفتش |
+| `status` | String NOT NULL، DEFAULT `PLANNED` | `PLANNED/COMPLETED/CANCELLED` فقط |
+| `revision` | Int NOT NULL، DEFAULT 1 | موجب؛ يزيد مرة لكل mutation فعلية |
+| `createdAt`, `updatedAt` | DateTime NOT NULL | default now / Prisma `@updatedAt` |
+
+FKs `districtId → District.id`, `inspectorId → Inspector.id`, `teacherId → Teacher.id` جميعها `onDelete: Restrict`, `onUpdate: Restrict`. FK مركب `(institutionId,districtId) → Institution(id,districtId)` يستخدم المفتاح الفريد الموجود مع `onDelete: Restrict`, `onUpdate: Restrict`؛ يمنع حذف المؤسسة أو تغيير مقاطعتها مع وجود زيارة تاريخية، ولا يمنع تعديل اسمها أو أرشفتها. لا FK مركب بين `(teacherId,districtId)` وTeacher لأن `districtId` لقطة تاريخية ولا ينبغي أن تعيد حركة Teacher مستقبلًا كتابة الزيارة أو تمنعها تلقائيًا؛ تتحقق الخدمة ذريًا من تطابق District عند الإنشاء، بينما يظل ADR-017 قرار نقل مستقلًا. تقرأ الخدمة Teacher ثم Institution وتقفل صفّيهما بترتيب ثابت داخل معاملة الإنشاء قبل التحقق والنسخ والتدقيق؛ لا يجوز أن يتغير رابط المؤسسة أو اسمها في منتصف التقاط سياق الزيارة. تقرأ قائمة/تفاصيل الزيارة اسم المؤسسة من `institutionNameSnapshot`، لا من اسم المؤسسة الحي ولا من `Teacher.institutionId` الحالي.
+
+تفرض migration قيود CHECK على `scheduledStartAt < scheduledEndAt`, و`revision >= 1`, وقائمة `status`، و`occurredAt IS NOT NULL` إذا وفقط إذا `status='COMPLETED'`، وعدم فراغ `institutionNameSnapshot`، وشكل `academicYear` وسنتيه المتتابعتين وفق ADR-030. لا تفرض DB انتقالات الحالة التاريخية بلا trigger؛ تعالجها خدمة mutation مع شرط revision/current status. لا عمود `type`, `notes`, `scheduleId`, `reportId` أو بيانات تقييم/تقرير، ولا حذف صلب في TASK-050.
+
+تستخدم migration امتداد `btree_gist` الموجود وتضيف قيدي GiST exclusion جزئيين على `tsrange(scheduledStartAt,scheduledEndAt,'[)')`، أحدهما مع مساواة `inspectorId` والآخر مع مساواة `teacherId`، بشرط `status <> 'CANCELLED'`. التاريخان مخزنان كقيم UTC وفق DateTime الحالي؛ يجب ألا يؤثر timezone جلسة PostgreSQL في تكوين المدى. يمنع القيدان السباق حتى لو تجاوز متطلبان فحص الخدمة، ويسمحان بالتجاور وبإعادة استعمال موعد زيارة أُلغيت؛ الزيارة `COMPLETED` تبقى مانعة للتداخل. الفهارس العادية لخدمة النطاق/القائمة: `(districtId,scheduledStartAt DESC,id DESC)`, `(teacherId,scheduledStartAt)`, `(inspectorId,scheduledStartAt)`, `(institutionId,scheduledStartAt)`؛ لا فهرس تاريخي آخر بلا قياس. سجلات قائمة مسبقة أو هجرة ترقية لا تتطلب backfill؛ الاختبار يجب أن يثبت بقاء G4 كما هو.
+
 ## قيود وفهارس
 
 - قرارات TeacherSubmission تتبع مصفوفة [ADR-026](DECISIONS.md#adr-026--teacher-submission-decision-workflow): `PENDING → ACCEPTED/REJECTED/INTERNAL_REVIEW` و`INTERNAL_REVIEW → ACCEPTED/REJECTED` فقط؛ الحالات النهائية لا يعاد فتحها. `decidedAt/decidedByInspectorId` يسجلان آخر إجراء انتقال، بما فيه INTERNAL_REVIEW، ولا يقتصران على القرار النهائي؛ `acceptedTeacherId` يضبط للقبول فقط وفريد حيث غير NULL. القبول ينشئ Teacher واحدًا ويحدّث الطلب ويضيف AuditLog في transaction واحدة؛ الرفض/الإحالة لا ينشئان Teacher، ولكل قرار AuditLog في المعاملة. تستخدم optimistic concurrency أو conditional update؛ لا merge آلي ولا إنشاء Institution/Assignment من التصريحات.
@@ -89,7 +114,7 @@ TASK-035 يقرأ ويعدّل حقول Teacher الحالية فقط وفق [ع
 - `InspectorDistrictMembership` تاريخي؛ `validFrom` إلزامي و`validTo = NULL` فترة مفتوحة. إن وُجد `validTo` فيجوز أن يساوي `validFrom` ولا يجوز أن يسبقه. الفترات نصف مفتوحة `[validFrom, validTo)`، ويمنع PostgreSQL تداخل فترتين للـ`inspectorId + districtId` نفسيهما بقيد exclusion زمني. يسمح بتعدد السجلات التاريخية ولا يوجد unique للزوج؛ إغلاق التكليف بتعيين `validTo`، ولا يمنع membership لمقاطعات مختلفة بالتوازي. التفاصيل المعتمدة في [ADR-023](DECISIONS.md#adr-023--inspector--district-membership-policy).
 - لا حقل نصاب أسبوعي في علاقة Teacher بالمؤسسة. إذا لزم حساب النصاب لاحقًا فيُشتق من `WeeklyScheduleSlot` وفق ADR-030 بعد تحديد قواعده؛ لا حد نصاب رسمي مفترض في TASK-040.
 - `WeeklyScheduleSlot` يتبع قيود [ADR-030](DECISIONS.md#adr-030--weekly-schedule-mvp-contract): اليوم 1..7، والدقائق `0 <= startMinute < endMinute <= 1440`، وعدم التداخل داخل الجدول واليوم مع السماح بالتجاور. لا ينشأ Slot في TASK-040.
-- فهارس: Submission(districtId,status,submittedAt)، Teacher(districtId,surname,name,recordStatus) و(institutionId) عند إضافة الرابط، Institution(districtId,name) و(id,districtId) لدعم FK المركب، Schedule UNIQUE(teacherId,academicYear)، Slot(scheduleId,dayOfWeek,startMinute,endMinute)، Visit(teacherId,occurredAt)/(inspectorId,scheduledAt)، FollowUp(ownerInspectorId,status,dueAt)، Proposal(inspectorId,kind,status)، AuditLog(districtId,occurredAt). البحث النصي المتقدم يبدأ بـPostgres normalized columns/trigram بعد قياس؛ لا Elasticsearch مبكرًا.
+- فهارس: Submission(districtId,status,submittedAt)، Teacher(districtId,surname,name,recordStatus) و(institutionId)، Institution(districtId,name) و(id,districtId)، Schedule UNIQUE(teacherId,academicYear)، Slot(scheduleId,dayOfWeek,startMinute,endMinute)؛ فهارس Visit وقيدا التداخل في [عقدها أعلاه](#pedagogicalvisit-persistence-contract-adr-031--task-050)؛ FollowUp(ownerInspectorId,status,dueAt)، Proposal(inspectorId,kind,status)، AuditLog(districtId,occurredAt). البحث النصي المتقدم يبدأ بـPostgres normalized columns/trigram بعد قياس؛ لا Elasticsearch مبكرًا.
 - AuditLog: FK اختيارية إلى Inspector/District بـ`onDelete: Restrict` و`onUpdate: Cascade`. `entityType/entityId` مرجع منطقي بلا FK إلى المورد. يُستمد district من المورد بعد authorization؛ الأحداث المقاطعية تتطلبه. metadata ذات allowlist لكل حدث بلا نسخ بيانات شخصية أو أسرار أو request bodies. لا update/delete في خدمة append؛ لا ضمان immutability على مستوى DB. التفاصيل في [ADR-025](DECISIONS.md#adr-025--auditlog-event-payload-and-append-contract).
 
 ## سياسة التاريخ والهجرات

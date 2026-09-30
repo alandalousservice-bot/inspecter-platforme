@@ -76,8 +76,8 @@ G4: CLOSED / PASS — اكتملت مراجعة ربط مؤسسة حالية و�
 
 | ID | Objective; Scope | Dependencies; Expected areas | Acceptance Criteria; Tests | Out of Scope; Gate |
 |---|---|---|---|---|
-| TASK-050 | PedagogicalVisit skeleton migration/API | G4؛ prisma/visits | scoped schedule/status, teacher/institution consistency; integration | evaluation grid؛ G5 |
-| TASK-051 | Visit list/detail UI | 050,012؛ client/visits | loading/empty/error and workflow; UI | lesson memo as visit form؛ G5 |
+| TASK-050 COMPLETED | PedagogicalVisit migration + scoped list/create/detail/reschedule/complete/cancel API وفق [ADR-031](DECISIONS.md#adr-031--pedagogicalvisit-scheduling-and-historical-context-task-050) | G4,025,ADR-031؛ prisma/visits + service/routes/audit؛ اقرأ [DB](DATABASE.md#pedagogicalvisit-persistence-contract-adr-031--task-050) و[API](API_CONTRACTS.md#pedagogical-visit-contract-adr-031--task-050) فقط للزيارة | clean+upgrade migration، لقطة Institution ودائرة تاريخيتان، teacher/institution scope، `PLANNED→COMPLETED/CANCELLED`، وقت بداية/نهاية، advisory schedule بإقرار صريح، منع التداخل في DB تحت السباق، revision وAuditLog ذري، list/cursor/validation/خصوصية؛ integration حسب TEST_STRATEGY وبوابات typecheck/lint/tests/build/diff-check: PASS | لا Visit UI أو نوع أو notes أو تقرير/شبكة تقييم/طباعة أو نقل Teacher؛ G5 |
+| TASK-051 | Visit list/detail UI | 050,012؛ client/visits | loading/empty/error and workflow using TASK-050 API; UI | لا تقرير أو lesson memo كاستمارة زيارة؛ G5 |
 | TASK-052 | InspectionReport draft/final snapshot | 050,025؛ prisma/reports | one report/visit, immutable final, audit; integration | official template fields (ADR-012)؛ G5 |
 | TASK-053 | FollowUp entity/API + views | 052؛ prisma/followup, client | due/status/owner, alertable; integration/E2E | full training module؛ G5 |
 

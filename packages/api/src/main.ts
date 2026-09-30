@@ -10,6 +10,7 @@ import { registerSubmissionDecisionRoute } from './intake/decision-routes.js';
 import { registerTeacherProfileRoutes } from './teachers/routes.js';
 import { registerTeacherDirectoryRoutes } from './teachers/directory-routes.js';
 import { registerWeeklyScheduleRoutes } from './schedules/routes.js';
+import { registerPedagogicalVisitRoutes } from './visits/routes.js';
 
 const port = Number(process.env.PORT ?? 3001);
 const prisma = new PrismaClient();
@@ -25,4 +26,5 @@ createApp((app) => {
   registerTeacherDirectoryRoutes(app, prisma, requireInspector);
   registerTeacherProfileRoutes(app, prisma, requireInspector);
   registerWeeklyScheduleRoutes(app, prisma, requireInspector);
+  registerPedagogicalVisitRoutes(app, prisma, requireInspector);
 }).listen(port);

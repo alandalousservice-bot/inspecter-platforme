@@ -18,6 +18,7 @@ model District {
   auditEvents  AuditLog[]
   submissions  TeacherSubmission[]
   teachers     Teacher[]
+  visits       PedagogicalVisit[]
 }
 
 model Inspector {
@@ -31,6 +32,7 @@ model Inspector {
   sessions           Session[]
   auditEvents        AuditLog[]
   decidedSubmissions TeacherSubmission[]           @relation("TeacherSubmissionDecider")
+  visits             PedagogicalVisit[]
 }
 
 model InspectorDistrictMembership {
@@ -63,18 +65,19 @@ model Session {
 }
 
 model Institution {
-  id            String    @id @default(uuid()) @db.Uuid
-  districtId    String    @db.Uuid
+  id            String             @id @default(uuid()) @db.Uuid
+  districtId    String             @db.Uuid
   name          String
   externalCode  String?
   municipality  String?
   address       String?
   directorPhone String?
   archivedAt    DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  district      District  @relation(fields: [districtId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  district      District           @relation(fields: [districtId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   teachers      Teacher[]
+  visits        PedagogicalVisit[]
 
   @@unique([id, districtId])
   @@index([districtId, name])
@@ -118,6 +121,7 @@ model Teacher {
   institution        Institution?       @relation(fields: [institutionId, districtId], references: [id, districtId], onDelete: Restrict, onUpdate: Cascade)
   acceptedSubmission TeacherSubmission? @relation("AcceptedSubmission")
   weeklySchedules    WeeklySchedule[]
+  visits             PedagogicalVisit[]
 
   @@index([institutionId])
   @@index([districtId, surname, name, recordStatus])
@@ -134,6 +138,32 @@ model WeeklySchedule {
   slots        WeeklyScheduleSlot[]
 
   @@unique([teacherId, academicYear])
+}
+
+model PedagogicalVisit {
+  id                      String      @id @default(uuid()) @db.Uuid
+  districtId              String      @db.Uuid
+  inspectorId             String      @db.Uuid
+  teacherId               String      @db.Uuid
+  institutionId           String      @db.Uuid
+  institutionNameSnapshot String
+  academicYear            String
+  scheduledStartAt        DateTime    @db.Timestamp(3)
+  scheduledEndAt          DateTime    @db.Timestamp(3)
+  occurredAt              DateTime?   @db.Timestamp(3)
+  status                  String      @default("PLANNED")
+  revision                Int         @default(1)
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+  district                District    @relation(fields: [districtId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  inspector               Inspector   @relation(fields: [inspectorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  teacher                 Teacher     @relation(fields: [teacherId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  institution             Institution @relation(fields: [institutionId, districtId], references: [id, districtId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([districtId, scheduledStartAt(sort: Desc), id(sort: Desc)])
+  @@index([teacherId, scheduledStartAt])
+  @@index([inspectorId, scheduledStartAt])
+  @@index([institutionId, scheduledStartAt])
 }
 
 model WeeklyScheduleSlot {

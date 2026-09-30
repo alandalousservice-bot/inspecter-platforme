@@ -18,6 +18,10 @@ export const AuditAction = {
   TEACHER_INSTITUTION_CHANGED: 'TEACHER_INSTITUTION_CHANGED',
   WEEKLY_SCHEDULE_CREATED: 'WEEKLY_SCHEDULE_CREATED',
   WEEKLY_SCHEDULE_UPDATED: 'WEEKLY_SCHEDULE_UPDATED',
+  PEDAGOGICAL_VISIT_CREATED: 'PEDAGOGICAL_VISIT_CREATED',
+  PEDAGOGICAL_VISIT_UPDATED: 'PEDAGOGICAL_VISIT_UPDATED',
+  PEDAGOGICAL_VISIT_COMPLETED: 'PEDAGOGICAL_VISIT_COMPLETED',
+  PEDAGOGICAL_VISIT_CANCELLED: 'PEDAGOGICAL_VISIT_CANCELLED',
 } as const;
 
 const eventContracts = {
@@ -61,6 +65,25 @@ const eventContracts = {
       affectedSlotIds: z.tuple([z.string().uuid()]),
       slotCount: z.number().int().nonnegative(),
     }).strict(),
+  },
+  [AuditAction.PEDAGOGICAL_VISIT_CREATED]: {
+    entityType: 'PedagogicalVisit',
+    metadata: z.object({ scheduleWarningCode: z.enum(['VISIT_WEEKLY_SCHEDULE_MISSING', 'VISIT_OUTSIDE_WEEKLY_SCHEDULE']).optional() }).strict(),
+  },
+  [AuditAction.PEDAGOGICAL_VISIT_UPDATED]: {
+    entityType: 'PedagogicalVisit',
+    metadata: z.object({
+      changedFields: z.array(z.enum(['scheduledStartAt', 'scheduledEndAt', 'academicYear'])).min(1),
+      scheduleWarningCode: z.enum(['VISIT_WEEKLY_SCHEDULE_MISSING', 'VISIT_OUTSIDE_WEEKLY_SCHEDULE']).optional(),
+    }).strict(),
+  },
+  [AuditAction.PEDAGOGICAL_VISIT_COMPLETED]: {
+    entityType: 'PedagogicalVisit',
+    metadata: z.object({ fromStatus: z.literal('PLANNED'), toStatus: z.literal('COMPLETED') }).strict(),
+  },
+  [AuditAction.PEDAGOGICAL_VISIT_CANCELLED]: {
+    entityType: 'PedagogicalVisit',
+    metadata: z.object({ fromStatus: z.literal('PLANNED'), toStatus: z.literal('CANCELLED') }).strict(),
   },
 } as const;
 

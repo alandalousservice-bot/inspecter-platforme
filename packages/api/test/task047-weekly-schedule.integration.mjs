@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { after, before, test } from 'node:test';
 import { createRequire } from 'node:module';
@@ -52,6 +52,19 @@ function runPrisma(args, url, selectedSchema = schemaPath) {
   if (result.error || result.status !== 0) throw new Error(`Isolated Prisma command failed (${args[0]}).`);
 }
 
+function migrationBundle(name, excluded) {
+  const bundle = join(tempRoot, name);
+  const bundleMigrations = join(bundle, 'migrations');
+  mkdirSync(bundleMigrations, { recursive: true });
+  cpSync(join(migrationsDir, 'migration_lock.toml'), join(bundle, 'migration_lock.toml'));
+  for (const entry of readdirSync(migrationsDir, { withFileTypes: true })) {
+    if (entry.isDirectory() && !excluded.includes(entry.name)) cpSync(join(migrationsDir, entry.name), join(bundleMigrations, entry.name), { recursive: true });
+  }
+  const bundledSchema = join(bundle, 'schema.prisma');
+  cpSync(schemaPath, bundledSchema);
+  return { schema: bundledSchema, migrations: bundleMigrations };
+}
+
 async function appliedMigrations(db) {
   return db.$queryRaw`SELECT migration_name, finished_at FROM "_prisma_migrations" ORDER BY started_at`;
 }
@@ -74,9 +87,12 @@ before(async () => {
   await admin.$executeRawUnsafe(`CREATE SCHEMA "${cleanSchema}"`);
   await admin.$executeRawUnsafe(`CREATE SCHEMA "${upgradeSchema}"`);
 
+  tempRoot = mkdtempSync(join(tmpdir(), 'task047-prisma-upgrade-'));
+  const cleanBundle = migrationBundle('clean', ['20260929070000_task_050_pedagogical_visit']);
+  const upgradeBundle = migrationBundle('upgrade', [migrationName, '20260929070000_task_050_pedagogical_visit']);
   const cleanUrl = schemaUrl(baseUrl, cleanSchema);
-  runPrisma(['migrate', 'deploy'], cleanUrl);
-  runPrisma(['migrate', 'status'], cleanUrl);
+  runPrisma(['migrate', 'deploy'], cleanUrl, cleanBundle.schema);
+  runPrisma(['migrate', 'status'], cleanUrl, cleanBundle.schema);
   cleanDb = new PrismaClient({ datasources: { db: { url: cleanUrl } } });
   await cleanDb.$connect();
   const cleanHistory = await appliedMigrations(cleanDb);
@@ -84,19 +100,8 @@ before(async () => {
   assert.equal(cleanHistory.length, 8);
   assert.ok(cleanHistory.every((row) => row.finished_at));
 
-  tempRoot = mkdtempSync(join(tmpdir(), 'task047-prisma-upgrade-'));
-  const tempMigrations = join(tempRoot, 'migrations');
-  const tempSchema = join(tempRoot, 'schema.prisma');
-  cpSync(join(migrationsDir, 'migration_lock.toml'), join(tempRoot, 'migration_lock.toml'));
-  for (const entry of readdirSync(migrationsDir, { withFileTypes: true })) {
-    if (entry.isDirectory() && entry.name !== migrationName) {
-      cpSync(join(migrationsDir, entry.name), join(tempMigrations, entry.name), { recursive: true });
-    }
-  }
-  cpSync(schemaPath, tempSchema);
-
   const upgradeUrl = schemaUrl(baseUrl, upgradeSchema);
-  runPrisma(['migrate', 'deploy'], upgradeUrl, tempSchema);
+  runPrisma(['migrate', 'deploy'], upgradeUrl, upgradeBundle.schema);
   const districtId = randomUUID();
   const teacherId = randomUUID();
   const institutionId = randomUUID();
@@ -112,8 +117,8 @@ before(async () => {
   const task040Migration = readdirSync(migrationsDir, { withFileTypes: true })
     .find((entry) => entry.isDirectory() && entry.name.startsWith('20260929050000'))?.name;
   assert.equal(task040Migration, '20260929050000_task_040_current_institution');
-  cpSync(join(migrationsDir, migrationName), join(tempMigrations, migrationName), { recursive: true });
-  runPrisma(['migrate', 'deploy'], upgradeUrl, tempSchema);
+  cpSync(join(migrationsDir, migrationName), join(upgradeBundle.migrations, migrationName), { recursive: true });
+  runPrisma(['migrate', 'deploy'], upgradeUrl, upgradeBundle.schema);
 
   const legacy = new PrismaClient({ datasources: { db: { url: upgradeUrl } } });
   try {
