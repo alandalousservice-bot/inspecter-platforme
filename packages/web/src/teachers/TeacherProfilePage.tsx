@@ -322,7 +322,7 @@ export function TeacherProfilePage() {
     {!loading && profile ? <>
       {successMessage ? <SuccessState title={successMessage} /> : null}
       {!editing ? <>
-        <div className="teacher-profile__actions"><Button onClick={beginEdit}>تعديل الملف</Button></div>
+        <div className="teacher-profile__actions"><Button onClick={beginEdit}>تعديل الملف</Button><Link to={`/app/teachers/${encodeURIComponent(profile.id)}/schedules`}>التوزيع الأسبوعي</Link></div>
         <Card><CardHeader title="الهوية" /><CardContent><dl className="teacher-profile__facts">
           <Field label="الاسم" value={profile.name} /><Field label="اللقب" value={profile.surname} />
           <Field label="تاريخ الميلاد" value={profile.birthDate} /><Field label="مكان الميلاد" value={profile.placeOfBirth} />

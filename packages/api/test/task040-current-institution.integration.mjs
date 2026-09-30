@@ -84,7 +84,7 @@ before(async () => {
   await cleanDb.$connect();
 
   const cleanHistory = await migrationState(cleanDb);
-  assert.equal(cleanHistory.at(-1)?.migration_name, migrationName);
+  assert.ok(cleanHistory.some((row) => row.migration_name === migrationName));
   assert.ok(cleanHistory.every((row) => row.finished_at));
 
   tempRoot = mkdtempSync(join(tmpdir(), 'task040-prisma-upgrade-'));
@@ -93,7 +93,7 @@ before(async () => {
   const tempMigrationLock = join(migrationsDir, 'migration_lock.toml');
   cpSync(tempMigrationLock, join(tempRoot, 'migration_lock.toml'));
   for (const directory of readdirSync(migrationsDir, { withFileTypes: true })) {
-    if (directory.isDirectory() && directory.name !== migrationName) {
+    if (directory.isDirectory() && directory.name < migrationName) {
       cpSync(join(migrationsDir, directory.name), join(tempMigrations, directory.name), { recursive: true });
     }
   }

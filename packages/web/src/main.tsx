@@ -8,6 +8,7 @@ import { PublicTeacherIntakePage } from './public-intake/PublicTeacherIntakePage
 import { SubmissionsPage } from './submissions/SubmissionsPage';
 import { SubmissionDetailPage } from './submissions/SubmissionDetailPage';
 import { TeacherProfilePage } from './teachers/TeacherProfilePage';
+import { WeeklySchedulePage } from './teachers/WeeklySchedulePage';
 import './ui/tokens.css';
 import './ui/shell.css';
 import './ui/primitives.css';
@@ -27,6 +28,7 @@ createRoot(root).render(
           <Route path="submissions" element={<SubmissionsPage />} />
           <Route path="submissions/:id" element={<SubmissionDetailPage />} />
           <Route path="teachers/:id" element={<TeacherProfilePage />} />
+          <Route path="teachers/:id/schedules" element={<WeeklySchedulePage />} />
         </Route>
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="*" element={<Navigate to="/login" replace />} />

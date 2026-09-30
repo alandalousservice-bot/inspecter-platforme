@@ -202,8 +202,8 @@ after(async () => {
                COUNT(*) FILTER (WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL)::int AS applied
         FROM "${schemaName}"."_prisma_migrations"
       `);
-      assert.deepEqual(history[0], { total: 7, applied: 7 });
-      log('TASK-020 second deploy/status: PASS; migration history: 7/7 applied');
+      assert.deepEqual(history[0], { total: 8, applied: 8 });
+      log('TASK-020 second deploy/status: PASS; migration history: 8/8 applied');
       void secondDeploy;
     }
   } catch (error) {
@@ -231,6 +231,8 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
     'Session',
     'Teacher',
     'TeacherSubmission',
+    'WeeklySchedule',
+    'WeeklyScheduleSlot',
     '_prisma_migrations',
   ]);
 
@@ -276,7 +278,7 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
   `;
   const primaryKeys = constraints.filter((constraint) => constraint.contype === 'p');
   assert.deepEqual(primaryKeys.map(({ source_table }) => source_table).sort(), [
-    'AuditLog', 'District', 'Inspector', 'InspectorDistrictMembership', 'Institution', 'Session', 'Teacher', 'TeacherSubmission',
+    'AuditLog', 'District', 'Inspector', 'InspectorDistrictMembership', 'Institution', 'Session', 'Teacher', 'TeacherSubmission', 'WeeklySchedule', 'WeeklyScheduleSlot',
   ]);
   const foreignKeys = constraints.filter((constraint) => constraint.contype === 'f');
   assert.deepEqual(foreignKeys.map(({ source_table, target_table, confdeltype, confupdtype }) => ({
@@ -293,6 +295,8 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
     { source_table: 'TeacherSubmission', target_table: 'District', confdeltype: 'r', confupdtype: 'c' },
     { source_table: 'TeacherSubmission', target_table: 'Inspector', confdeltype: 'r', confupdtype: 'c' },
     { source_table: 'TeacherSubmission', target_table: 'Teacher', confdeltype: 'r', confupdtype: 'c' },
+    { source_table: 'WeeklySchedule', target_table: 'Teacher', confdeltype: 'r', confupdtype: 'c' },
+    { source_table: 'WeeklyScheduleSlot', target_table: 'WeeklySchedule', confdeltype: 'r', confupdtype: 'c' },
   ]);
 
   const indexes = await prismaClient.$queryRaw`
@@ -308,6 +312,9 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
     'Session_inspectorId_idx',
     'Teacher_districtId_surname_name_recordStatus_idx',
     'TeacherSubmission_districtId_status_submittedAt_idx',
+    'WeeklySchedule_teacherId_academicYear_key',
+    'WeeklyScheduleSlot_scheduleId_dayOfWeek_startMinute_endMinute_i',
+    'WeeklyScheduleSlot_dayOfWeek_startMinute_idx',
   ];
   for (const name of expectedIndexes) assert.ok(indexes.some((index) => index.indexname === name), `Missing index ${name}`);
   const emailUniqueIndex = indexes.find((index) => index.tablename === 'Inspector' && index.indexname === 'Inspector_email_key');
@@ -315,7 +322,7 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
   assert.match(emailUniqueIndex.indexdef, /\bemail\b/i);
   const uniqueIndexes = indexes.filter((index) => index.indexdef.includes('UNIQUE') && !index.indexname.endsWith('_pkey'));
   assert.deepEqual(uniqueIndexes.map(({ indexname }) => indexname), [
-    'Inspector_email_key', 'Institution_id_districtId_key', 'Session_tokenHash_key', 'TeacherSubmission_acceptedTeacherId_key',
+    'Inspector_email_key', 'Institution_id_districtId_key', 'Session_tokenHash_key', 'TeacherSubmission_acceptedTeacherId_key', 'WeeklySchedule_teacherId_academicYear_key',
   ]);
 
   const migrationHistory = await prismaClient.$queryRawUnsafe(`
@@ -323,7 +330,7 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
            COUNT(*) FILTER (WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL)::int AS applied
     FROM "${schemaName}"."_prisma_migrations"
   `);
-  assert.deepEqual(migrationHistory[0], { total: 7, applied: 7 });
+  assert.deepEqual(migrationHistory[0], { total: 8, applied: 8 });
 
   await t.test('creates the four models with UUIDs, nullability, and resolvable relations', async () => {
     const runId = randomBytes(6).toString('hex');

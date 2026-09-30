@@ -89,10 +89,10 @@ export type TeacherProfilePatch = Partial<Pick<TeacherProfile,
   'name' | 'surname' | 'birthDate' | 'placeOfBirth' | 'phone' | 'email'
   | 'professionalStatus' | 'employedAt' | 'confirmedAt' | 'qualifications'>>;
 
-type ApiFailure = { error?: { message?: string; fields?: Record<string, string[]> } };
+type ApiFailure = { error?: { code?: string; message?: string; fields?: Record<string, string[]> } };
 
 export class ApiRequestError extends Error {
-  constructor(message: string, readonly fields?: Record<string, string[]>, readonly status?: number) {
+  constructor(message: string, readonly fields?: Record<string, string[]>, readonly status?: number, readonly code?: string) {
     super(message);
     this.name = 'ApiRequestError';
   }
@@ -124,7 +124,43 @@ async function readFailure(response: Response): Promise<never> {
   } catch {
     // Keep transport/parser details out of the UI.
   }
-  throw new ApiRequestError(body?.error?.message ?? 'تعذر إكمال الطلب.', body?.error?.fields, response.status);
+  throw new ApiRequestError(body?.error?.message ?? 'تعذر إكمال الطلب.', body?.error?.fields, response.status, body?.error?.code);
+}
+
+export type WeeklyScheduleSlot = {
+  id: string; dayOfWeek: number; startMinute: number; endMinute: number;
+  levelLabel: string | null; groupLabel: string | null; notes: string | null;
+};
+export type WeeklySchedule = { id: string; teacherId: string; academicYear: string; revision: number; slots: WeeklyScheduleSlot[] };
+export type WeeklyScheduleSlotInput = Omit<WeeklyScheduleSlot, 'id'>;
+
+export async function getWeeklySchedule(teacherId: string, academicYear: string): Promise<{ data: { schedule: WeeklySchedule | null } }> {
+  const query = new URLSearchParams({ academicYear });
+  const response = await fetch(`/api/v1/teachers/${encodeURIComponent(teacherId)}/schedules?${query}`, { credentials: 'same-origin' });
+  if (!response.ok) return readFailure(response);
+  return response.json() as Promise<{ data: { schedule: WeeklySchedule | null } }>;
+}
+
+async function scheduleMutation<T>(path: string, method: 'POST' | 'PATCH' | 'DELETE', body: unknown): Promise<T> {
+  const csrfToken = csrfCookie();
+  if (!csrfToken) throw new ApiRequestError('تعذر التحقق من الطلب. أعد تحميل الصفحة ثم حاول مجددًا.');
+  const response = await fetch(path, { method, credentials: 'same-origin',
+    headers: { 'content-type': 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify(body) });
+  if (!response.ok) return readFailure(response);
+  return response.json() as Promise<T>;
+}
+
+export function createWeeklySchedule(teacherId: string, academicYear: string) {
+  return scheduleMutation<{ data: { schedule: WeeklySchedule } }>(`/api/v1/teachers/${encodeURIComponent(teacherId)}/schedules`, 'POST', { academicYear, slots: [] });
+}
+export function addWeeklyScheduleSlot(scheduleId: string, expectedRevision: number, slot: WeeklyScheduleSlotInput) {
+  return scheduleMutation<{ data: { schedule: WeeklySchedule } }>(`/api/v1/schedules/${encodeURIComponent(scheduleId)}/slots`, 'POST', { expectedRevision, slot });
+}
+export function patchWeeklyScheduleSlot(slotId: string, expectedRevision: number, changes: Partial<WeeklyScheduleSlotInput>) {
+  return scheduleMutation<{ data: { schedule: WeeklySchedule } }>(`/api/v1/slots/${encodeURIComponent(slotId)}`, 'PATCH', { expectedRevision, changes });
+}
+export function deleteWeeklyScheduleSlot(slotId: string, expectedRevision: number) {
+  return scheduleMutation<{ data: { schedule: WeeklySchedule } }>(`/api/v1/slots/${encodeURIComponent(slotId)}`, 'DELETE', { expectedRevision });
 }
 
 export async function login(email: string, password: string): Promise<InspectorIdentity> {

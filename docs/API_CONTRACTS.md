@@ -25,9 +25,9 @@ HTTP JSON `/api/v1`. هذه عقود الموارد والسلوك؛ schemas ا�
 | `/teachers` | GET — TASK-044 لاحقًا | q, district, currentInstitution, professionalStatus, recordStatus, day/time بعد TASK-048؛ indexed/server-side؛ visited/from/to بعد Visit domain |
 | `/teachers/:id` | GET/PATCH | ملف مهني حالي وفق عقد TASK-035 أدناه؛ لا حساب مستخدم أو تحرير إسنادات/زيارات |
 | `/teachers/:id/current-institution` | PUT — TASK-043 مكتملة | اختيار مؤسسة حالية واحدة أو إنشاؤها صراحةً وربطها ذريًا؛ `expectedInstitutionId` يمنع قرارًا مبنيًا على رابط تغيّر |
-| `/teachers/:id/schedules` | GET/POST — TASK-048 لاحقًا | سنة دراسية canonical وجدول حالي واحد لها؛ GET structured slots/revision |
-| `/schedules/:id/slots` | POST — TASK-048 لاحقًا | dayOfWeek/startMinute/endMinute وlabels/notes اختيارية؛ بلا institutionId/assignmentId |
-| `/slots/:id` | PATCH/DELETE — TASK-048 لاحقًا | تحرير slot في الجدول الحالي مع expected revision؛ لا تاريخ نسخ أو draft/published |
+| `/teachers/:id/schedules` | GET/POST — TASK-048 مكتملة | سنة دراسية canonical وجدول حالي واحد لها؛ GET structured slots/revision |
+| `/schedules/:id/slots` | POST — TASK-048 مكتملة | dayOfWeek/startMinute/endMinute وlabels/notes اختيارية؛ بلا institutionId/assignmentId |
+| `/slots/:id` | PATCH/DELETE — TASK-048 مكتملة | تحرير slot في الجدول الحالي مع expected revision؛ لا تاريخ نسخ أو draft/published |
 | `/visits` | GET/POST | teacherId, institutionId, scheduledAt، status، filter by date |
 | `/visits/:id` | GET/PATCH | وصف هيكلي؛ لا حقول تقييم رسمية |
 | `/visits/:id/report` | GET/PUT | draft فقط؛ finalization endpoint مستقل يحفظ snapshot |
@@ -52,11 +52,47 @@ HTTP JSON `/api/v1`. هذه عقود الموارد والسلوك؛ schemas ا�
 - `POST /institutions` accepts only `{districtId,name,externalCode?}`. District membership is required; an out-of-scope District returns generic 404. No update, delete, archive, or unarchive operation is introduced by TASK-023.
 - Archive semantics are defined by [ADR-024](DECISIONS.md#adr-024--institution-archive-list-policy).
 
-### Weekly schedule forward contract (ADR-030 / TASK-048)
+### Weekly schedule contract (ADR-030 / TASK-048)
 
-هذه المسارات مستقبلية حتى TASK-048؛ لا API في TASK-047. Inspector `ACTIVE` بعضوية حالية في District Teacher، مع إخفاء مورد خارج النطاق بـ`404` وCSRF للـmutations. `GET /teachers/:id/schedules` يعرض الجدول الحالي لكل سنة دراسية مطلوبة مع `revision` وslots مرتبة حسب `(dayOfWeek,startMinute,id)`؛ لا تعرض حالة draft/published أو تواريخ صلاحية أو مؤسسة مخزنة على slot. `POST /teachers/:id/schedules` ينشئ جدولًا واحدًا لكل `(teacherId,academicYear)`، والسنة إلزامية `YYYY-YYYY` متتابعة؛ تكرار السنة `409`. لا حذف كامل للجدول في MVP.
+كل المسارات أدناه تحت `/api/v1`. تتطلب القراءة Inspector `ACTIVE` مصادقًا عليه، وعضوية District حالية للمعلّم؛ المورد المفقود أو خارج النطاق يعيد `404` عامًا وفق الغلاف المشترك، بلا كشف cross-district. جميع mutations تتطلب CSRF. تستخدم هذه المسارات سياسة cache الحالية للـAPI المصادق عليه، ولا تنشئ آلية cache جديدة. لا قراءة تسجل AuditLog.
 
-`POST /schedules/:id/slots` و`PATCH/DELETE /slots/:id` تتطلب `expectedRevision` من الجدول الحالي؛ التغيير الناجح يزيد `revision` مرة واحدة ويعيد revision الجديدة، والتعارض `409` بلا تغيير جزئي أو AuditLog. لا Mutation إذا `Teacher.institutionId=NULL` حتى اعتماد مؤسسة حالية؛ يسمح بعرض Teacher غير المربوط. يتحقق Zod strict من `dayOfWeek` 1 الاثنين .. 7 الأحد، و`startMinute/endMinute` كأعداد صحيحة مع `0 <= startMinute < endMinute <= 1440`. `levelLabel/groupLabel/notes` اختيارية nullable، وبعد NFC/trim واختزال فراغات العرض ورفض محارف التحكم يبلغ الحد Unicode code points 100/100/500؛ النص الفارغ مرفوض. لا curriculum IDs أو institutionId/assignmentId أو timezone/تاريخ slot. أكثر من slot في اليوم مسموح؛ يمنع التداخل لنفس الجدول واليوم (`A.startMinute < B.endMinute && B.startMinute < A.endMinute`) ويسمح بالتجاور؛ خطأ الخدمة ودّي وآمن، وقيد DB يحمي السباقات. كل mutation وحدثها التدقيقي في معاملة واحدة: `WEEKLY_SCHEDULE_CREATED` للإنشاء بmetadata `{}`، و`WEEKLY_SCHEDULE_UPDATED` لتغيير/حذف slots بmetadata `{changedFields:["slots"],affectedSlotIds:[...],slotCount:<integer>}`، بلا نصوص slot أو PII. جميع التواريخ التشغيلية «اليوم/الآن» تستخدم `Africa/Algiers`، لكن slot يحتفظ بدقائق يوم محلية فقط؛ لا استثناءات عطلة في MVP. [ADR-030](DECISIONS.md#adr-030--weekly-schedule-mvp-contract).
+التمثيل القانوني للجدول هو `{id,teacherId,academicYear,revision,slots}`. كل slot يعيد فقط `{id,dayOfWeek,startMinute,endMinute,levelLabel,groupLabel,notes}`. النصوص الاختيارية تظهر `null` عند خلوها. لا `institutionId` أو `assignmentId` أو تواريخ صلاحية أو revisions تاريخية. ترتيب slots حتمي تصاعديًا حسب `dayOfWeek`, ثم `startMinute`, ثم `endMinute`, ثم `id`.
+
+#### Read
+
+`GET /api/v1/teachers/:teacherId/schedules?academicYear=YYYY-YYYY` يتطلب query `academicYear` بصيغة canonical وسنتين متتابعتين. إذا كان Teacher ضمن النطاق والجدول موجودًا، فالرد `200 {"data":{"schedule":<canonical schedule>}}`. إذا كان Teacher ضمن النطاق ولا يوجد جدول لتلك السنة، فهذا وضع طبيعي ويرد `200 {"data":{"schedule":null}}`. Teacher مفقود أو خارج النطاق يعيد `404` عامًا؛ query مفقود/غير صالح يعيد غلاف خطأ التحقق الحالي.
+
+#### Create schedule
+
+`POST /api/v1/teachers/:teacherId/schedules` يقبل جسمًا strict بالشكل `{academicYear,slots}`. `academicYear` مطلوب بصيغة `YYYY-YYYY` متتابعة. `slots` مصفوفة مطلوبة؛ يجوز أن تكون فارغة. كل عنصر يضم `dayOfWeek`, `startMinute`, `endMinute`، ويجوز أن يضم `levelLabel`, `groupLabel`, `notes` كـstring غير فارغ أو `null` وفق حدود التطبيع أدناه؛ غياب حقل نصي اختياري يعادل `null`. تُرفض المفاتيح غير المعروفة، ولا يقبل العميل IDs أو `teacherId` أو `revision` أو `scheduleId` أو حقول المؤسسة. ينشأ الجدول revision=1 وتُنشأ slots الأولية في معاملة واحدة. النجاح `201 {"data":{"schedule":<canonical schedule>}}`. تكرار `(teacherId,academicYear)`، بما فيه خاسر سباق الإنشاء، يعيد `409` بالرمز `WEEKLY_SCHEDULE_ALREADY_EXISTS`؛ لا صفوف slots يتيمة ولا AuditLog نجاح ثانٍ. إنشاء الجدول يسجل `WEEKLY_SCHEDULE_CREATED` مع `entityType=WeeklySchedule`, و`entityId=scheduleId`, و`districtId=Teacher.districtId`, وactor/requestId من سياق الخادم، وmetadata `{}` بالضبط.
+
+#### Slot create
+
+`POST /api/v1/schedules/:scheduleId/slots` يقبل جسمًا strict `{expectedRevision,slot}`. `expectedRevision` عدد صحيح موجب مطلوب. `slot` كائن strict؛ `dayOfWeek`, `startMinute`, `endMinute` مطلوبة، وحقول النص الاختيارية تقبل string غير فارغ أو `null`؛ الحقل النصي المحذوف عند الإنشاء يحفظ `null`. النجاح `201 {"data":{"schedule":<full updated canonical schedule>}}`، وتزيد revision مرة واحدة بالضبط. يسجل `WEEKLY_SCHEDULE_UPDATED`، ومفتاح المورد هو الجدول، مع metadata `{changedFields:["slots"],affectedSlotIds:[createdSlotId],slotCount:resultingSlotCount}`.
+
+#### Slot patch
+
+`PATCH /api/v1/slots/:slotId` يقبل جسمًا strict `{expectedRevision,changes}`. `expectedRevision` عدد صحيح موجب مطلوب؛ `changes` مطلوب ويضم خاصية mutable واحدة على الأقل من `dayOfWeek`, `startMinute`, `endMinute`, `levelLabel`, `groupLabel`, `notes`. لا تقبل خصائص الهوية أو الجدول أو السنة أو revision أو المؤسسة. للحقول النصية: الغياب يبقي القيمة، و`null` يمحوها، أما string الفارغ أو المكوّن من فراغات فقط فيُرفض؛ لا يتحول الفارغ إلى null. القيم النصية غير الفارغة تخضع للتطبيع والتحقق الحاليين. إذا لم ينتج بعد التطبيع أي تغيير محفوظ، فالرد `200` بالجدول الحالي؛ لا زيادة revision ولا AuditLog. عند تغيير فعلي، الرد `200 {"data":{"schedule":<full updated canonical schedule>}}` وتزيد revision مرة واحدة. يسجل `WEEKLY_SCHEDULE_UPDATED` مع metadata `{changedFields:["slots"],affectedSlotIds:[updatedSlotId],slotCount:resultingSlotCount}`.
+
+#### Slot delete
+
+`DELETE /api/v1/slots/:slotId` يقبل JSON body strict `{expectedRevision}`؛ هذا المسار يجيز صراحةً JSON body مع DELETE. `expectedRevision` عدد صحيح موجب مطلوب. النجاح `200 {"data":{"schedule":<full updated canonical schedule>}}` وتزيد revision مرة واحدة. يجوز حذف آخر slot ويبقى الجدول موجودًا بمصفوفة `slots:[]`؛ لا endpoint لحذف الجدول كله. يسجل `WEEKLY_SCHEDULE_UPDATED` مع metadata `{changedFields:["slots"],affectedSlotIds:[deletedSlotId],slotCount:resultingSlotCount}`.
+
+#### Scope, prerequisite, concurrency and validation
+
+أي mutation على Teacher لا يملك `institutionId` حاليًا يرد `409` بالرمز `TEACHER_CURRENT_INSTITUTION_REQUIRED`؛ ينطبق ذلك على إنشاء الجدول وإنشاء/تعديل/حذف slot، بينما تبقى القراءة متاحة. لا ينشئ النظام أو يربط مؤسسة تلقائيًا.
+
+في كل slot mutation يجب أن يساوي `expectedRevision` revision الحالية. الاختلاف يرد `409` بالرمز `WEEKLY_SCHEDULE_REVISION_CONFLICT`، دون retry أو أي تغيير أو AuditLog. الطلبات المتزامنة التي تحمل revision نفسها: ينجح واحد على الأكثر. التحقق العام يستخدم غلاف validation الحالي (`400`, `VALIDATION_ERROR`) للسنة أو UUID أو weekday أو الوقت أو النصوص أو المفاتيح غير الصالحة. Zod strict يفرض `dayOfWeek` عددًا صحيحًا من 1 (الاثنين) إلى 7 (الأحد)، و`startMinute/endMinute` عددين صحيحين مع `0 <= startMinute < endMinute <= 1440`.
+
+`levelLabel/groupLabel/notes` اختيارية وnullable وحدودها بعد Unicode NFC وtrim واختزال فراغات العرض ورفض محارف التحكم هي 100/100/500 Unicode code points؛ النص الفارغ أو whitespace-only مرفوض، و`null` يمحو الحقل في PATCH. slots متعددة في اليوم مسموحة. يمنع تداخل slotين في الجدول واليوم نفسيهما (`A.startMinute < B.endMinute && B.startMinute < A.endMinute`) ويسمح بالتجاور. يعيد تداخل التطبيق أو fallback لقيد PostgreSQL `400` بالرمز `WEEKLY_SCHEDULE_SLOT_OVERLAP`، دون كشف تفاصيل قاعدة البيانات.
+
+#### Atomicity and AuditLog
+
+إنشاء الجدول: التفويض والنطاق، شرط المؤسسة الحالية، إنشاء الجدول والـslots الأولية، وحدث AuditLog تتم ذريًا. كل slot mutation: التفويض والنطاق، شرط المؤسسة الحالية، فحص revision والتحقق، mutation، زيادة revision مرة عند التغيير الفعلي، وAuditLog تتم ذريًا؛ فشل التدقيق يرجع كل التغييرات. `WEEKLY_SCHEDULE_UPDATED` يستخدم دائمًا `entityType=WeeklySchedule`, `entityId=scheduleId`, و`districtId=Teacher.districtId`، مع actor/requestId من سياق الخادم.
+
+وفق ADR-030، metadata إنشاء الجدول `{}` بالضبط. ولكل إنشاء أو تعديل فعلي أو حذف slot، metadata التحديث بالضبط `{changedFields:["slots"],affectedSlotIds:[...],slotCount:<integer>}`؛ `changedFields` يساوي `['slots']` فقط، و`affectedSlotIds` يحوي فقط ID الـslot المنشأ/المعدّل/المحذوف، و`slotCount` العدد الكلي الناتج بعد العملية. لا تضف operation أو scheduleId أو قيم slot أو PII أو بيانات المؤسسة. لا AuditLog لقراءة أو PATCH بلا تغيير محفوظ. فشل append يلغي العملية كلها.
+
+يستخدم محرر TASK-048 أيام الأسبوع العربية ومؤسسة Teacher الحالية كسياق عرض فقط. لا تُحفظ المؤسسة في الجدول/slot. التفسير التشغيلي لليوم/الوقت يستخدم `Africa/Algiers`، والـslot نفسه دقائق محلية فقط. لا عطلات أو استثناءات أو طباعة أو تاريخ نسخ ضمن العقد. [ADR-030](DECISIONS.md#adr-030--weekly-schedule-mvp-contract).
 
 ### Post-G3 workplace contract (ADR-029)
 

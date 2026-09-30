@@ -91,7 +91,7 @@ model TeacherSubmission {
   acceptedTeacherId    String?    @unique @db.Uuid
   district             District   @relation(fields: [districtId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   decidedByInspector   Inspector? @relation("TeacherSubmissionDecider", fields: [decidedByInspectorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  acceptedTeacher      Teacher?    @relation("AcceptedSubmission", fields: [acceptedTeacherId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  acceptedTeacher      Teacher?   @relation("AcceptedSubmission", fields: [acceptedTeacherId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([districtId, status, submittedAt])
 }
@@ -117,20 +117,51 @@ model Teacher {
   district           District           @relation(fields: [districtId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   institution        Institution?       @relation(fields: [institutionId, districtId], references: [id, districtId], onDelete: Restrict, onUpdate: Cascade)
   acceptedSubmission TeacherSubmission? @relation("AcceptedSubmission")
+  weeklySchedules    WeeklySchedule[]
 
   @@index([institutionId])
   @@index([districtId, surname, name, recordStatus])
 }
 
+model WeeklySchedule {
+  id           String               @id @default(uuid()) @db.Uuid
+  teacherId    String               @db.Uuid
+  academicYear String
+  revision     Int                  @default(1)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  teacher      Teacher              @relation(fields: [teacherId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  slots        WeeklyScheduleSlot[]
+
+  @@unique([teacherId, academicYear])
+}
+
+model WeeklyScheduleSlot {
+  id          String         @id @default(uuid()) @db.Uuid
+  scheduleId  String         @db.Uuid
+  dayOfWeek   Int
+  startMinute Int
+  endMinute   Int
+  levelLabel  String?
+  groupLabel  String?
+  notes       String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  schedule    WeeklySchedule @relation(fields: [scheduleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([scheduleId, dayOfWeek, startMinute, endMinute])
+  @@index([dayOfWeek, startMinute])
+}
+
 model AuditLog {
-  id               String    @id @default(uuid()) @db.Uuid
-  actorInspectorId String?   @db.Uuid
-  districtId       String?   @db.Uuid
+  id               String     @id @default(uuid()) @db.Uuid
+  actorInspectorId String?    @db.Uuid
+  districtId       String?    @db.Uuid
   action           String
   entityType       String
-  entityId         String    @db.Uuid
-  occurredAt       DateTime  @default(now())
-  requestId        String?   @db.Uuid
+  entityId         String     @db.Uuid
+  occurredAt       DateTime   @default(now())
+  requestId        String?    @db.Uuid
   metadata         Json?
   actorInspector   Inspector? @relation(fields: [actorInspectorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   district         District?  @relation(fields: [districtId], references: [id], onDelete: Restrict, onUpdate: Cascade)

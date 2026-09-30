@@ -5,6 +5,10 @@ export type ApiErrorCode =
   | 'NOT_FOUND'
   | 'CONFLICT'
   | 'RATE_LIMITED'
+  | 'WEEKLY_SCHEDULE_ALREADY_EXISTS'
+  | 'TEACHER_CURRENT_INSTITUTION_REQUIRED'
+  | 'WEEKLY_SCHEDULE_REVISION_CONFLICT'
+  | 'WEEKLY_SCHEDULE_SLOT_OVERLAP'
   | 'INTERNAL_ERROR';
 
 export type ApiFieldErrors = Record<string, string[]>;

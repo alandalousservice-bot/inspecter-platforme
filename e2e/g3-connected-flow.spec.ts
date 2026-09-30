@@ -216,6 +216,59 @@ test('G3 connected browser workflow: public intake, decisions, profile edit and 
   await expect(page.getByRole('heading', { name: 'جهة العمل المصرح بها — غير معتمدة' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'المؤسسة الحالية المعتمدة' })).toBeVisible();
 
+  // TASK-048: connected weekly schedule workflow for a currently assigned Teacher.
+  await page.getByRole('link', { name: 'التوزيع الأسبوعي' }).click();
+  await expect(page).toHaveURL(new RegExp(`/app/teachers/${teacher.id}/schedules$`));
+  await page.getByLabel('السنة الدراسية').fill('2026-2027');
+  await page.getByRole('button', { name: 'عرض التوزيع' }).click();
+  await expect(page.getByRole('heading', { name: 'لا يوجد توزيع لهذه السنة' })).toBeVisible();
+  await page.getByRole('button', { name: 'إنشاء توزيع فارغ' }).click();
+  await expect(page.getByRole('heading', { name: 'إضافة حصة' })).toBeVisible();
+  async function addScheduleSlot(start: string, end: string) {
+    await page.getByLabel('اليوم').selectOption('1');
+    await page.getByLabel('وقت البداية').fill(start);
+    await page.getByLabel('وقت النهاية').fill(end);
+    const mutation = page.waitForResponse((response) => new URL(response.url()).pathname.endsWith('/slots')
+      && new URL(response.url()).pathname.startsWith('/api/v1/schedules/') && response.request().method() === 'POST');
+    const addButton = page.locator('.weekly-schedule__form button[type="submit"]');
+    await expect(addButton).toBeVisible();
+    await expect(addButton).toBeEnabled();
+    await addButton.click();
+    expect((await mutation).status()).toBe(201);
+    await expect(page.getByText(/تمت إضافة الحصة/)).toBeVisible();
+  }
+  const weeklyScheduleId = (await db.weeklySchedule.findUniqueOrThrow({ where: { teacherId_academicYear: { teacherId: teacher.id, academicYear: '2026-2027' } } })).id;
+  await addScheduleSlot('08:00', '09:00');
+  await addScheduleSlot('09:00', '10:00');
+  let weeklySchedule = await db.weeklySchedule.findUniqueOrThrow({ where: { teacherId_academicYear: { teacherId: teacher.id, academicYear: '2026-2027' } }, include: { slots: true } });
+  expect(weeklySchedule.revision).toBe(3);
+  expect(weeklySchedule.slots).toHaveLength(2);
+  await page.reload();
+  await page.getByLabel('السنة الدراسية').fill('2026-2027');
+  await page.getByRole('button', { name: 'عرض التوزيع' }).click();
+  await expect(page.getByText('08:00 – 09:00')).toBeVisible();
+  await expect(page.getByText('09:00 – 10:00')).toBeVisible();
+  await page.getByRole('button', { name: 'تعديل' }).first().click();
+  await page.getByLabel('وقت البداية').fill('08:15');
+  await page.getByLabel('وقت النهاية').fill('08:45');
+  await page.getByRole('button', { name: 'حفظ الحصة' }).click();
+  await expect(page.getByText(/تم تحديث الحصة/)).toBeVisible();
+  weeklySchedule = await db.weeklySchedule.findUniqueOrThrow({ where: { id: weeklySchedule.id }, include: { slots: true } });
+  expect(weeklySchedule.revision).toBe(4);
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'حذف' }).last().click();
+  await expect(page.getByText(/تم حذف الحصة/)).toBeVisible();
+  await page.reload();
+  await page.getByLabel('السنة الدراسية').fill('2026-2027');
+  await page.getByRole('button', { name: 'عرض التوزيع' }).click();
+  await expect(page.getByText('08:15 – 08:45')).toBeVisible();
+  await expect(page.getByText('09:00 – 10:00')).toHaveCount(0);
+  weeklySchedule = await db.weeklySchedule.findUniqueOrThrow({ where: { id: weeklySchedule.id }, include: { slots: true } });
+  expect(weeklySchedule.revision).toBe(5);
+  expect(weeklySchedule.slots).toHaveLength(1);
+  await page.getByRole('link', { name: 'ملف الأستاذ', exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/app/teachers/${teacher.id}$`));
+
   // Create B in the isolated test fixture; Scenario C changes the current link without mutating either Institution.
   const institutionB = await db.institution.create({ data: { districtId, name: `ابتدائية ثانية ${runTag}`, municipality: `بلدية ثانية ${runTag}` } });
   await page.getByRole('button', { name: 'تغيير المؤسسة الحالية' }).click();
@@ -270,6 +323,13 @@ test('G3 connected browser workflow: public intake, decisions, profile edit and 
   // Scenario B: select an existing authoritative Institution for an unassigned Teacher.
   await page.getByRole('link', { name: 'فتح ملف الأستاذ' }).click();
   await expect(page.getByText('لم تُعتمد مؤسسة حالية')).toBeVisible();
+  await page.getByRole('link', { name: 'التوزيع الأسبوعي' }).click();
+  await page.getByLabel('السنة الدراسية').fill('2026-2027');
+  await page.getByRole('button', { name: 'عرض التوزيع' }).click();
+  await expect(page.getByRole('heading', { name: 'لا يوجد توزيع لهذه السنة' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'إنشاء توزيع فارغ' })).toBeDisabled();
+  await page.getByRole('link', { name: 'ملف الأستاذ', exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/app/teachers/${reviewed.acceptedTeacherId}$`));
   await page.getByRole('button', { name: 'اعتماد المؤسسة' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'اختيار مؤسسة موجودة' }).click();
   await page.getByLabel('البحث عن مؤسسة').fill(`ابتدائية ثانية ${runTag}`);

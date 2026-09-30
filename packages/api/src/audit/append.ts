@@ -16,6 +16,8 @@ export const AuditAction = {
   INSTITUTION_UPDATED: 'INSTITUTION_UPDATED',
   TEACHER_INSTITUTION_LINKED: 'TEACHER_INSTITUTION_LINKED',
   TEACHER_INSTITUTION_CHANGED: 'TEACHER_INSTITUTION_CHANGED',
+  WEEKLY_SCHEDULE_CREATED: 'WEEKLY_SCHEDULE_CREATED',
+  WEEKLY_SCHEDULE_UPDATED: 'WEEKLY_SCHEDULE_UPDATED',
 } as const;
 
 const eventContracts = {
@@ -50,6 +52,15 @@ const eventContracts = {
   [AuditAction.TEACHER_INSTITUTION_CHANGED]: {
     entityType: 'Teacher',
     metadata: z.object({ previousInstitutionId: z.string().uuid(), institutionId: z.string().uuid() }).strict(),
+  },
+  [AuditAction.WEEKLY_SCHEDULE_CREATED]: { entityType: 'WeeklySchedule', metadata: z.object({}).strict() },
+  [AuditAction.WEEKLY_SCHEDULE_UPDATED]: {
+    entityType: 'WeeklySchedule',
+    metadata: z.object({
+      changedFields: z.tuple([z.literal('slots')]),
+      affectedSlotIds: z.tuple([z.string().uuid()]),
+      slotCount: z.number().int().nonnegative(),
+    }).strict(),
   },
 } as const;
 
