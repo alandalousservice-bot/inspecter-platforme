@@ -15,6 +15,7 @@ import { VisitCreatePage } from './visits/VisitCreatePage';
 import { VisitDetailPage } from './visits/VisitDetailPage';
 import { VisitListPage } from './visits/VisitListPage';
 import { InspectionReportPage } from './visits/InspectionReportPage';
+import { FollowUpsPage } from './followups/FollowUpsPage';
 import './ui/tokens.css';
 import './ui/shell.css';
 import './ui/primitives.css';
@@ -40,6 +41,7 @@ createRoot(root).render(
           <Route path="visits/new" element={<VisitCreatePage />} />
           <Route path="visits/:id" element={<VisitDetailPage />} />
           <Route path="visits/:id/report" element={<InspectionReportPage />} />
+          <Route path="follow-ups" element={<FollowUpsPage />} />
           <Route path="me/professional-identity" element={<ProfessionalIdentityPage />} />
         </Route>
         <Route path="/" element={<Navigate to="/login" replace />} />

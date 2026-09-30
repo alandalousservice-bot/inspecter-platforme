@@ -18,6 +18,10 @@
 .report-conflict { display: grid; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-card); }
 .report-conflict p { margin: 0; }
 .report-cancelled { padding: var(--space-3); border-inline-start: 3px solid currentColor; }
+.report-followup-list { display: grid; gap: var(--space-3); padding: 0; list-style: none; }
+.report-followup-list li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-3); padding-block: var(--space-3); border-block-end: 1px solid var(--color-border); }
+.report-followup-form { display: grid; gap: var(--space-3); }
+.report-followup-form textarea { min-height: 7rem; resize: vertical; }
 @media (max-width: 42rem) {
   .report-page__header { flex-direction: column; }
   .report-context > div { grid-template-columns: 1fr; gap: var(--space-1); }

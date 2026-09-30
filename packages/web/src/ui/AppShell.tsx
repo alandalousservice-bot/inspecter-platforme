@@ -20,6 +20,7 @@ export function AppShell({ children, headerAction }: AppShellProps) {
             <NavLink to="/app/institutions">المؤسسات</NavLink>
             <NavLink to="/app/teachers">دليل الأساتذة</NavLink>
             <NavLink to="/app/visits">الزيارات التربوية</NavLink>
+            <NavLink to="/app/follow-ups">إجراءات المتابعة</NavLink>
             <NavLink to="/app/me/professional-identity">هويتي المهنية</NavLink>
           </nav>
         </aside>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router';
-import { ApiRequestError, finalizeInspectionReport, getInspectionReport, getPedagogicalVisit, saveInspectionReport, type InspectionReport, type InspectionReportContent, type PedagogicalVisit } from '../auth/client';
+import { ApiRequestError, createFollowUp, finalizeInspectionReport, getInspectionReport, getPedagogicalVisit, listReportFollowUps, saveInspectionReport, type FollowUp, type InspectionReport, type InspectionReportContent, type PedagogicalVisit } from '../auth/client';
 import { Button, Card, CardContent, CardHeader, Dialog, EmptyState, ErrorState, LoadingState, SuccessState } from '../ui';
 import { formatAlgiers } from './time';
 import './inspection-report.css';
@@ -22,6 +22,11 @@ export function InspectionReportPage() {
   const { id = '' } = useParams();
   const [visit, setVisit] = useState<PedagogicalVisit | null>(null);
   const [report, setReport] = useState<InspectionReport | null>(null);
+  const [followUps, setFollowUps] = useState<FollowUp[]>([]);
+  const [showFollowUpForm, setShowFollowUpForm] = useState(false);
+  const [followUpNote, setFollowUpNote] = useState('');
+  const [followUpDueDate, setFollowUpDueDate] = useState('');
+  const [followUpError, setFollowUpError] = useState('');
   const [content, setContent] = useState<InspectionReportContent>(blank);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -39,6 +44,8 @@ export function InspectionReportPage() {
     try {
       const [visitResult, reportResult] = await Promise.all([getPedagogicalVisit(id), getInspectionReport(id)]);
       setVisit(visitResult.data.visit); setReport(reportResult.data.report);
+      if (reportResult.data.report?.status === 'FINAL') setFollowUps((await listReportFollowUps(reportResult.data.report.id)).data);
+      else setFollowUps([]);
       if (!preserveContent) setContent(reportResult.data.report ? Object.fromEntries(fields.map(({ key }) => [key, reportResult.data.report?.[key] ?? ''])) as InspectionReportContent : blank);
       if (!preserveContent) setDirty(false);
     } catch { setLoadError(true); }
@@ -97,6 +104,18 @@ export function InspectionReportPage() {
     } finally { setBusy(false); }
   }
 
+  async function submitFollowUp(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); if (!report || busy) return;
+    if (codePoints(followUpNote.normalize('NFC').trim()) > 1000) { setFollowUpError('الحد الأقصى 1000 محرف.'); return; }
+    setBusy(true); setFollowUpError('');
+    try {
+      const created = await createFollowUp(report.id, { note: followUpNote, dueDate: followUpDueDate });
+      setFollowUps((items) => [...items, created.data.followUp].sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.id.localeCompare(b.id)));
+      setFollowUpNote(''); setFollowUpDueDate(''); setShowFollowUpForm(false);
+    } catch { setFollowUpError('تعذر إنشاء إجراء المتابعة. تحقق من الحالة والبيانات ثم أعد المحاولة.'); }
+    finally { setBusy(false); }
+  }
+
   return <main className="report-page" dir="rtl">
     <header className="report-page__header"><div><h1>تقرير مرافقة بيداغوجية</h1><p>تقرير من إعداد المفتش — غير رسمي</p></div><Link to={`/app/visits/${encodeURIComponent(id)}`}>العودة إلى الزيارة</Link></header>
     {loading ? <LoadingState label="جارٍ تحميل التقرير…" /> : null}
@@ -112,6 +131,8 @@ export function InspectionReportPage() {
       {report?.status === 'FINAL' ? <Card><CardHeader title="اعتماد التقرير" description="التقرير نهائي وثابت في النسخة الحالية." />
         <CardContent><p>تاريخ الاعتماد: <time dateTime={report.finalizedAt ?? undefined}>{report.finalizedAt ? new Date(report.finalizedAt).toLocaleString('ar-DZ', { timeZone: 'Africa/Algiers' }) : '—'}</time></p>
           <dl className="report-context"><div><dt>المفتش عند الاعتماد</dt><dd>{report.finalizedInspectorNameSnapshot} {report.finalizedInspectorSurnameSnapshot}</dd></div><div><dt>الأستاذ عند الاعتماد</dt><dd>{report.finalizedTeacherNameSnapshot} {report.finalizedTeacherSurnameSnapshot}</dd></div></dl></CardContent></Card> : null}
+      {report?.status === 'FINAL' ? <Card><CardHeader title="إجراءات المتابعة" description="إجراءات مستقلة مرتبطة بهذا التقرير النهائي." action={<Button onClick={() => { setFollowUpError(''); setShowFollowUpForm(true); }}>إضافة إجراء متابعة</Button>} />
+        <CardContent>{followUps.length ? <ul className="report-followup-list">{followUps.map((item) => <li key={item.id}><strong>{item.note}</strong><span>الاستحقاق: {item.dueDate}</span><span>{item.status === 'OPEN' ? item.alertState === 'OVERDUE' ? 'متأخرة' : item.alertState === 'DUE_TODAY' ? 'مستحقة اليوم' : 'مفتوحة' : 'مكتملة'}</span></li>)}</ul> : <p>لا توجد إجراءات متابعة لهذا التقرير.</p>}<Link to="/app/follow-ups">عرض جميع إجراءات المتابعة</Link></CardContent></Card> : null}
       {visit.status === 'CANCELLED' && !report ? <EmptyState title="الزيارة ملغاة ولا توجد مسودة محفوظة" description="لا يمكن إنشاء تقرير لهذه الزيارة." /> : <Card><CardHeader title={report?.status === 'FINAL' ? 'محتوى التقرير النهائي' : readOnly ? 'المسودة المحفوظة' : 'محتوى التقرير'} description={readOnly ? 'الحقول للقراءة فقط.' : 'احفظ المسودة صراحة؛ لا يتم الحفظ تلقائيًا.'} />
         <CardContent><form className="report-form" onSubmit={(event) => void save(event)} aria-busy={busy}>
           {fields.map((field) => <div className="report-field" key={field.key}><label htmlFor={`report-${field.key}`}>{field.label}{field.required ? <span> (مطلوب للإتمام النهائي)</span> : null}</label>
@@ -133,6 +154,14 @@ export function InspectionReportPage() {
     <Dialog open={confirmRefresh} title="مراجعة النسخة الأحدث" description="تحميل النسخة الأحدث سيستبدل النص الظاهر حاليًا بما حفظه الطلب الآخر. لن يتم ذلك دون تأكيدك." onClose={() => setConfirmRefresh(false)}
       actions={<><Button variant="secondary" onClick={() => setConfirmRefresh(false)}>الاحتفاظ بكتابتي</Button><Button onClick={() => { setConfirmRefresh(false); setRevisionConflict(false); void load(); }}>تحميل النسخة الأحدث</Button></>}>
       <p>يمكنك نسخ كتابتك يدويًا قبل تحميل النسخة الأحدث.</p>
+    </Dialog>
+    <Dialog open={showFollowUpForm} title="إضافة إجراء متابعة" description="الإجراء مستقل عن نص التقرير النهائي." onClose={() => { if (!busy) setShowFollowUpForm(false); }}
+      actions={<><Button variant="secondary" disabled={busy} onClick={() => setShowFollowUpForm(false)}>إلغاء</Button><Button type="submit" form="report-followup-form" disabled={busy}>{busy ? 'جارٍ الحفظ…' : 'حفظ الإجراء'}</Button></>}>
+      <form id="report-followup-form" className="report-followup-form" onSubmit={(event) => void submitFollowUp(event)}>
+        <label htmlFor="report-followup-note">الإجراء المطلوب</label><textarea id="report-followup-note" className="ui-input" required value={followUpNote} onChange={(event) => setFollowUpNote(event.currentTarget.value)} />
+        <label htmlFor="report-followup-due">تاريخ الاستحقاق</label><input id="report-followup-due" className="ui-input" type="date" required value={followUpDueDate} onChange={(event) => setFollowUpDueDate(event.currentTarget.value)} />
+        {followUpError ? <p role="alert">{followUpError}</p> : null}
+      </form>
     </Dialog>
   </main>;
 }

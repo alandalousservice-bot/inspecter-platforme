@@ -17,7 +17,7 @@
 | Schedule | WeeklyScheduleSlot | scheduleId، dayOfWeek، startMinute/endMinute، levelLabel/groupLabel/notes اختيارية؛ سياق المكان من مؤسسة Teacher الحالية المعتمدة، بلا institutionId أو assignmentId |
 | Visit | PedagogicalVisit | عقد [ADR-031](DECISIONS.md#adr-031--pedagogicalvisit-scheduling-and-historical-context-task-050): districtId/inspectorId/teacherId/institutionId وسnapshot اسم المؤسسة، فترة مخططة وسنة جدول صريحة، occurredAt، status/revision؛ بلا نوع أو notes أو حقول تقرير |
 | Visit | InspectionReport | عقد [ADR-012](DECISIONS.md#adr-012--inspector-authored-pedagogical-accompaniment-report-task-052): visitId unique، نوع/مصدر/إصدار ثابت، نصوص مرافقة محددة، DRAFT/FINAL، revision، finalizedAt/by، لقطة هوية نهائية؛ ليس قالبًا وزاريًا |
-| Visit | FollowUp | reportId/teacherId، ownerInspectorId، dueAt، status، note، completedAt؛ توصية قابلة للمتابعة |
+| Visit | FollowUp | `reportId` فقط إلى InspectionReport، `ownerInspectorId`، `dueDate`، `status`، `note`، `completionNote`، `completedAt`، `revision`؛ إجراء متابعة مستقل وفق ADR-033 |
 | Training | TrainingEvent | districtId، type/title/date، status؛ foundation فقط |
 | Training | TrainingParticipation | eventId/teacherId، participationStatus nullable؛ تفاصيل الحضور مؤجلة |
 | Reference | CurriculumSource | title، sourceUri، authorityLabel، verifiedAt/by، versionLabel؛ لا مادة official بلا provenance |
@@ -109,6 +109,27 @@ Migration واحدة جديدة forward-only بعد TASK-052A تنشئ `Inspecti
 
 FK `visitId → PedagogicalVisit.id` و`finalizedByInspectorId → Inspector.id` بـ`onDelete: Restrict,onUpdate: Restrict`. `visitId` unique يخدم البحث من زيارة؛ فهرس `finalizedByInspectorId` فقط للـFK، ولا دليل تقارير عام في TASK-052. قراءة/إتمام Report تتطلب المفتش المسؤول وعضويته الحالية في `Visit.districtId` وفق ADR-031؛ لا يُستمد النطاق من Report body. لا حذف صلب أو أرشفة في MVP؛ ADR-014 OPEN.
 
+## FollowUp persistence contract (ADR-033 / TASK-053)
+
+Migration واحدة forward-only بعد TASK-052 تنشئ `FollowUp` فقط؛ لا تعديل Visit/Report أو migrations سابقة، ولا backfill. النموذج:
+
+| Field | Prisma / DB | Invariant |
+|---|---|---|
+| `id` | `String @id @default(uuid()) @db.Uuid` | هوية مستقلة |
+| `reportId` | `String @db.Uuid` NOT NULL | FK إلى `InspectionReport.id`؛ غير unique، `0..N` لكل تقرير |
+| `ownerInspectorId` | `String @db.Uuid` NOT NULL | FK إلى `Inspector.id`؛ ثابت بعد الإنشاء |
+| `status` | `String` NOT NULL DEFAULT `OPEN` | CHECK `OPEN/COMPLETED` |
+| `note` | `String` NOT NULL | وصف إجراء؛ 1..1000 Unicode code points بعد التطبيع |
+| `dueDate` | `DateTime @db.Date` NOT NULL | تاريخ تقويمي خالص؛ API `YYYY-MM-DD`، بلا وقت أو timezone في التخزين |
+| `completionNote` | `String?` | نتيجة موجزة؛ NULL أو 1..1000 Unicode code points |
+| `completedAt` | `DateTime? @db.Timestamp(3)` | UTC من الخادم؛ NULL إذا OPEN، غير NULL إذا COMPLETED |
+| `revision` | `Int` NOT NULL DEFAULT 1 | CHECK `>=1`؛ compare-and-swap في الخدمة |
+| `createdAt`, `updatedAt` | `DateTime` default now / `@updatedAt` | اصطلاح السجلات القابلة للتعديل |
+
+CHECK يربط `status=OPEN` بـ`completedAt IS NULL AND completionNote IS NULL`، و`status=COMPLETED` بـ`completedAt IS NOT NULL`؛ `completionNote` تظل اختيارية. CHECK يمنع `note` الفارغة/الفراغية ويقيد طولها `char_length <=1000`، ويمنع `completionNote` غير NULL الفارغة/الفراغية ويقيدها كذلك. API تطبّق NFC وtrim واختزال whitespace المتكرر إلى فراغ واحد، وترفض محارف التحكم و`""`/الفراغ فقط؛ الاختيارية الغائبة أو `null` تحفظ NULL. `dueDate` تاريخ Gregorian حقيقي canonical؛ يقبل الماضي ولا تُخزّن حالة تنبيه مشتقة. لا JSON أو `teacherId/visitId/districtId` أو لقطة PII على FollowUp.
+
+FKs إلى `InspectionReport` و`Inspector`: `onDelete: Restrict,onUpdate: Restrict`. فهرس `(reportId,dueDate,id)` للقائمة المرتبطة بالتقرير، وفهرس `(status,dueDate,id)` للقائمة التشغيلية مع نطاق المقاطعة المشتق عبر Report→Visit؛ فهرس `ownerInspectorId` لدعم FK/تحقق المالك. لا unique على `reportId`، ولا trigger لمنع تغيّر تقرير/Visit: شرط FINAL، Visit غير CANCELLED، الملكية والنطاق والتحرير/الإكمال والـrevision تُفرض في معاملات الخدمة المشروطة. القراءة تستعمل Report→Visit التاريخية؛ لا تغيير لتقرير FINAL أو نسخه بسبب FollowUp.
+
 ## PedagogicalVisit persistence contract (ADR-031 / TASK-050)
 
 Migration مستقلة forward-only تنشئ `PedagogicalVisit` فقط؛ لا تعدل الجداول التاريخية أو تنشئ InspectionReport. أسماء الحقول وأنواعها:
@@ -144,7 +165,7 @@ FKs `districtId → District.id`, `inspectorId → Inspector.id`, `teacherId →
 - `InspectorDistrictMembership` تاريخي؛ `validFrom` إلزامي و`validTo = NULL` فترة مفتوحة. إن وُجد `validTo` فيجوز أن يساوي `validFrom` ولا يجوز أن يسبقه. الفترات نصف مفتوحة `[validFrom, validTo)`، ويمنع PostgreSQL تداخل فترتين للـ`inspectorId + districtId` نفسيهما بقيد exclusion زمني. يسمح بتعدد السجلات التاريخية ولا يوجد unique للزوج؛ إغلاق التكليف بتعيين `validTo`، ولا يمنع membership لمقاطعات مختلفة بالتوازي. التفاصيل المعتمدة في [ADR-023](DECISIONS.md#adr-023--inspector--district-membership-policy).
 - لا حقل نصاب أسبوعي في علاقة Teacher بالمؤسسة. إذا لزم حساب النصاب لاحقًا فيُشتق من `WeeklyScheduleSlot` وفق ADR-030 بعد تحديد قواعده؛ لا حد نصاب رسمي مفترض في TASK-040.
 - `WeeklyScheduleSlot` يتبع قيود [ADR-030](DECISIONS.md#adr-030--weekly-schedule-mvp-contract): اليوم 1..7، والدقائق `0 <= startMinute < endMinute <= 1440`، وعدم التداخل داخل الجدول واليوم مع السماح بالتجاور. لا ينشأ Slot في TASK-040.
-- فهارس: Submission(districtId,status,submittedAt)، Teacher(districtId,surname,name,recordStatus) و(institutionId)، Institution(districtId,name) و(id,districtId)، Schedule UNIQUE(teacherId,academicYear)، Slot(scheduleId,dayOfWeek,startMinute,endMinute)؛ فهارس Visit وقيدا التداخل في [عقدها أعلاه](#pedagogicalvisit-persistence-contract-adr-031--task-050)؛ FollowUp(ownerInspectorId,status,dueAt)، Proposal(inspectorId,kind,status)، AuditLog(districtId,occurredAt). البحث النصي المتقدم يبدأ بـPostgres normalized columns/trigram بعد قياس؛ لا Elasticsearch مبكرًا.
+- فهارس: Submission(districtId,status,submittedAt)، Teacher(districtId,surname,name,recordStatus) و(institutionId)، Institution(districtId,name) و(id,districtId)، Schedule UNIQUE(teacherId,academicYear)، Slot(scheduleId,dayOfWeek,startMinute,endMinute)؛ فهارس Visit وقيدا التداخل في [عقدها أعلاه](#pedagogicalvisit-persistence-contract-adr-031--task-050)؛ فهارس FollowUp في [عقد ADR-033](#followup-persistence-contract-adr-033--task-053)، Proposal(inspectorId,kind,status)، AuditLog(districtId,occurredAt). البحث النصي المتقدم يبدأ بـPostgres normalized columns/trigram بعد قياس؛ لا Elasticsearch مبكرًا.
 - AuditLog: FK اختيارية إلى Inspector/District بـ`onDelete: Restrict` و`onUpdate: Cascade`. `entityType/entityId` مرجع منطقي بلا FK إلى المورد. يُستمد district من المورد بعد authorization؛ الأحداث المقاطعية تتطلبه. metadata ذات allowlist لكل حدث بلا نسخ بيانات شخصية أو أسرار أو request bodies. لا update/delete في خدمة append؛ لا ضمان immutability على مستوى DB. التفاصيل في [ADR-025](DECISIONS.md#adr-025--auditlog-event-payload-and-append-contract).
 
 ## سياسة التاريخ والهجرات

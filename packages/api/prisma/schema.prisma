@@ -36,6 +36,7 @@ model Inspector {
   decidedSubmissions TeacherSubmission[]           @relation("TeacherSubmissionDecider")
   visits             PedagogicalVisit[]
   finalizedReports   InspectionReport[]
+  ownedFollowUps     FollowUp[]
 }
 
 model InspectorDistrictMembership {
@@ -195,8 +196,29 @@ model InspectionReport {
   updatedAt                         DateTime         @updatedAt
   visit                             PedagogicalVisit @relation(fields: [visitId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   finalizedByInspector              Inspector?       @relation(fields: [finalizedByInspectorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  followUps                         FollowUp[]
 
   @@index([finalizedByInspectorId])
+}
+
+model FollowUp {
+  id               String           @id @default(uuid()) @db.Uuid
+  reportId         String           @db.Uuid
+  ownerInspectorId String           @db.Uuid
+  status           String           @default("OPEN")
+  note             String
+  dueDate          DateTime         @db.Date
+  completionNote   String?
+  completedAt      DateTime?        @db.Timestamp(3)
+  revision         Int              @default(1)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  report           InspectionReport @relation(fields: [reportId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  ownerInspector   Inspector        @relation(fields: [ownerInspectorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([reportId, dueDate, id])
+  @@index([status, dueDate, id])
+  @@index([ownerInspectorId])
 }
 
 model WeeklyScheduleSlot {

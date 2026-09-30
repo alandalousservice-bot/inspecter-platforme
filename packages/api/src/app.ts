@@ -20,6 +20,10 @@ export function createApp(
       || /^\/api\/v1\/reports\/[^/]+\/finalize(?:\?|$)/u.test(requestUrl)) {
       (request as typeof request & { rawBody?: string }).rawBody = buffer.toString('utf8');
     }
+    if (/^\/api\/v1\/reports\/[^/]+\/follow-ups(?:\?|$)/u.test(requestUrl)
+      || /^\/api\/v1\/follow-ups(?:\/[^/]+)?(?:\?|$)/u.test(requestUrl)) {
+      (request as typeof request & { rawBody?: string }).rawBody = buffer.toString('utf8');
+    }
   } }));
 
   app.get('/api/v1/health', (_request, response) => {

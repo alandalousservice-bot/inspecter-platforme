@@ -32,8 +32,9 @@ HTTP JSON `/api/v1`. هذه عقود الموارد والسلوك؛ schemas ا�
 | `/visits/:id` | GET/PATCH — TASK-050 contract | قراءة/إعادة جدولة/إكمال/إلغاء ضمن revision ونطاق المفتش؛ بلا حقول تقرير |
 | `/visits/:id/report` | GET/PUT — TASK-052 | تقرير المرافقة ضمن نطاق Visit؛ GET للمسودة/النهائي أو null؛ PUT حفظ مسودة فقط |
 | `/reports/:id/finalize` | POST — TASK-052 | إتمام مشروط بـrevision وVisit مكتملة؛ snapshot وAuditLog ذريان؛ لا تعديل لاحق |
-| `/reports/:id/follow-ups` | GET/POST | recommendation reference/note/dueAt؛ permission |
-| `/follow-ups/:id` | PATCH | state transition وaudit |
+| `/reports/:id/follow-ups` | GET/POST — TASK-053 | قائمة متابعات تقرير FINAL وإنشاء إجراء مستقل؛ عقد ADR-033 أدناه |
+| `/follow-ups` | GET — TASK-053 | قائمة تشغيلية scoped للمفتش مع حالة استحقاق مشتقة وترقيم خادمي |
+| `/follow-ups/:id` | PATCH — TASK-053 | تحرير OPEN للمالك أو إكمالها؛ revision وتدقيق الانتقال فقط |
 | `/reference/sources`, `/reference/items` | GET | verified provenance وtaxonomy، read-only في MVP |
 | `/proposals` | GET/POST | kind, status، inspector owner، title، content validated by kind |
 | `/proposals/:id` | GET/PATCH/POST clone/POST archive | owner/district guard؛ تعديل ينتج ProposalRevision جديدًا |
@@ -42,6 +43,20 @@ HTTP JSON `/api/v1`. هذه عقود الموارد والسلوك؛ schemas ا�
 | `/audit-events` | GET | inspector-authorized, filtered; redacted; no public route |
 | `/me/districts` | GET | authenticated Inspector's current District context only; no client-supplied scope |
 | `/me/professional-identity` | GET/PUT — TASK-052A | الاسم واللقب المهنيان للمفتش المصادق عليه فقط؛ لا تحرير مستخدم آخر |
+
+### Pedagogical FollowUp (ADR-033 / TASK-053)
+
+كل المسارات `/api/v1` مصادقة Inspector `ACTIVE`، `Cache-Control: no-store`، وPOST/PATCH يتحققان من CSRF القائم. النطاق من `FollowUp.reportId → InspectionReport.visitId → PedagogicalVisit.districtId` وعضوية Inspector السارية **الآن**؛ `districtId` في العميل لا يوسع النطاق. القراءة لأي مفتش حالي في المقاطعة؛ التحرير والإكمال للمالك الحالي `ownerInspectorId=actor.id` مع عضوية سارية فقط. المالك بعد انتهاء عضويته لا يقرأ/يعدل؛ أعضاء المقاطعة الحاليون يقرأون ولا يعدلون. المعرّف الغائب أو خارج النطاق/الملكية يرد `404` عامًا بلا كشف وجوده. لا صلاحية Teacher أو إعادة إسناد. تقرير FINAL قد يُقرأ هنا بواسطة أعضاء المقاطعة لأجل سياق المتابعة فقط؛ هذا لا يغير حدود `GET/PUT /visits/:id/report` المملوكة لمفتش الزيارة، ولا يكشف نص التقرير في رد المتابعة.
+
+إسقاط FollowUp المصرح: `{id,reportId,ownerInspectorId,status,note,dueDate,completionNote,completedAt,revision,createdAt,updatedAt,alertState,context:{visitId,districtId,teacher:{id,name,surname},institution:{id,name}}}`. الاسمان من **لقطة التقرير النهائي**، واسم المؤسسة من `Visit.institutionNameSnapshot` لا القيم الحية؛ لا بريد/هاتف أو نص التقرير. جميع الأوقات غير `dueDate` ISO UTC؛ `dueDate` `YYYY-MM-DD`. `alertState` مشتقة بتاريخ اليوم المحسوب مرة لكل طلب في `Africa/Algiers`: `OVERDUE` إذا OPEN و`dueDate < today`، `DUE_TODAY` إذا OPEN وتساوى، وإلا `NONE`؛ لا حقل DB ولا «قريبًا». لا notifier أو scheduler.
+
+`GET /reports/:id/follow-ups`: يتطلب تقريرًا ضمن District عضوية actor الحالية، دون إرجاع محتواه؛ إذا لم يكن FINAL فـ`409 FOLLOW_UP_REPORT_NOT_READY`. يرد `200 {data:[<projection>],page:{limit,nextCursor,total}}` بجميع حالات FollowUp. يقبل `limit?` عدد 1..100 افتراضي 25 و`cursor?` UUID فقط؛ الفرز `dueDate ASC,id ASC` والترقيم كما أدناه. التقرير الغائب/خارج النطاق `404` عام. `POST /reports/:id/follow-ups`: جسم strict `{note:string,dueDate:string}` فقط. التقرير يجب أن يكون `FINAL` والزيارة `COMPLETED` وغير `CANCELLED`؛ DRAFT أو زيارة غير مؤهلة `409 FOLLOW_UP_REPORT_NOT_READY` دون إنشاء. الإنشاء لأية عضوية حالية في District التقرير، والمالك هو actor؛ لا owner/district/teacher/visit/status/revision/completedAt من العميل. النجاح `201 {data:{followUp:<projection>}}`، `OPEN`, `revision=1`, `completionNote=null`, `completedAt=null`؛ لا AuditLog للإنشاء.
+
+`GET /follow-ups`: القائمة التشغيلية لكل Districts العضوية الحالية، لا تقتصر على ملكية actor. يقبل فقط `districtId?` UUID مصرحًا (وإلا 404 عام)، `status?=OPEN|COMPLETED` (الافتراضي OPEN)، `alert?=OVERDUE|DUE_TODAY` (اختياري، مع `status=COMPLETED` ينتج فارغًا)، `limit?` و`cursor?`. المرشحات AND وخادمية قبل `total`، مع استعمال تاريخ الجزائر نفسه للترشيح والإسقاط. الفرز الوحيد `dueDate ASC,id ASC`؛ `limit` 1..100 افتراضي 25، و`cursor` UUID لصف ما زال في مجموعة النتائج المصرح/المرشحة وإلا 404 عام. `200 {data:[<projection>],page:{limit,nextCursor,total}}`؛ `nextCursor` آخر id معروض إذا توجد صفحة تالية وإلا NULL. لا snapshot متعدد الطلبات؛ تغيّر اليوم/البيانات قد يستلزم البدء من الصفحة الأولى. لا بحث نصي أو unbounded fetch.
+
+`PATCH /follow-ups/:id` جسم strict لأحد شكلين فقط: `{"operation":"EDIT","expectedRevision":<positive integer>,"note":string,"dueDate":"YYYY-MM-DD"}` لاستبدال حقلي OPEN كاملين؛ أو `{"operation":"COMPLETE","expectedRevision":<positive integer>,"completionNote"?:string|null}`. EDIT فعلي يزيد revision مرة ويترك الحالة/الإكمال دون تغيير؛ بعد التطبيع إن لم يتغير الحقلان يرد `200` بالإسقاط الحالي بلا تحديث أو audit. COMPLETE من OPEN فقط، يضبط `completedAt` بوقت الخادم، `status=COMPLETED`، و`completionNote` أو NULL ويزيد revision مرة؛ لا تحرير بعدها أو إكمال ثانٍ. `COMPLETED` تعيد `409 FOLLOW_UP_STATE_CONFLICT`؛ revision غير المطابقة `409 FOLLOW_UP_REVISION_CONFLICT`، بلا retry/overwrite؛ نجاح واحد فقط في سباقين على revision نفسها. completion تُضيف `FOLLOW_UP_STATE_CHANGED`, `entityType=FollowUp`, `entityId=followUp.id`, `districtId=Visit.districtId`, `metadata={}`، مع actor/requestId من الخادم في المعاملة نفسها؛ فشل append يرجع التغيير. EDIT/إنشاء/no-op/قراءة بلا audit. النجاح `200 {data:{followUp:<projection>}}`.
+
+النصان يرفضان control characters في الإدخال الخام أولًا، ثم NFC وtrim واختزال whitespace المتكرر إلى فراغ واحد؛ ترفض القيم الفارغة بعد التطبيع؛ `note` 1..1000 Unicode code points، `completionNote` اختيارية `null` أو 1..1000. التاريخ canonical حقيقي `YYYY-MM-DD` بلا وقت/offset؛ يقبل الماضي والحاضر والمستقبل. رفض unknown/duplicate keys وinvalid UUID/date/body بـ`400 VALIDATION_ERROR` دون صدى القيم؛ الغلاف المشترك و`x-request-id` على النجاح/الخطأ، بلا request body في logs أو قيم PII/SQL في الأخطاء. لا `DELETE` أو route لتقرير/Visit غير FINAL ولا status lookup عام.
 
 ### Inspector professional identity (TASK-052A)
 

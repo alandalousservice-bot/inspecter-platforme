@@ -226,6 +226,13 @@ export type InspectionReport = InspectionReportContent & {
   visit: { id: string; status: PedagogicalVisitStatus; academicYear: string; scheduledStartAt: string; scheduledEndAt: string;
     occurredAt: string | null; institution: { id: string; name: string }; teacher: { id: string } };
 };
+export type FollowUp = {
+  id: string; reportId: string; ownerInspectorId: string; status: 'OPEN' | 'COMPLETED'; note: string; dueDate: string;
+  completionNote: string | null; completedAt: string | null; revision: number; createdAt: string; updatedAt: string;
+  alertState: 'OVERDUE' | 'DUE_TODAY' | 'NONE';
+  context: { visitId: string; districtId: string; teacher: { id: string; name: string; surname: string }; institution: { id: string; name: string } };
+};
+export type FollowUpPage = { limit: number; nextCursor: string | null; total: number };
 export type VisitFilters = {
   districtId?: string; teacherId?: string; institutionId?: string;
   status?: PedagogicalVisitStatus; from?: string; to?: string; limit?: number; cursor?: string;
@@ -288,6 +295,32 @@ export function saveInspectionReport(visitId: string, input: InspectionReportCon
 
 export function finalizeInspectionReport(reportId: string, expectedRevision: number) {
   return visitMutation<{ data: { report: InspectionReport } }>(`/api/v1/reports/${encodeURIComponent(reportId)}/finalize`, 'POST', { expectedRevision });
+}
+
+export async function listReportFollowUps(reportId: string, options: { limit?: number; cursor?: string } = {}) {
+  const query = new URLSearchParams({ limit: String(options.limit ?? 25) });
+  if (options.cursor) query.set('cursor', options.cursor);
+  const response = await fetch(`/api/v1/reports/${encodeURIComponent(reportId)}/follow-ups?${query}`, { credentials: 'same-origin' });
+  if (!response.ok) return readFailure(response);
+  return response.json() as Promise<{ data: FollowUp[]; page: FollowUpPage }>;
+}
+export async function listFollowUps(options: { districtId?: string; status?: 'OPEN' | 'COMPLETED'; alert?: 'OVERDUE' | 'DUE_TODAY'; limit?: number; cursor?: string } = {}) {
+  const query = new URLSearchParams({ status: options.status ?? 'OPEN', limit: String(options.limit ?? 25) });
+  if (options.districtId) query.set('districtId', options.districtId);
+  if (options.alert) query.set('alert', options.alert);
+  if (options.cursor) query.set('cursor', options.cursor);
+  const response = await fetch(`/api/v1/follow-ups?${query}`, { credentials: 'same-origin' });
+  if (!response.ok) return readFailure(response);
+  return response.json() as Promise<{ data: FollowUp[]; page: FollowUpPage }>;
+}
+export function createFollowUp(reportId: string, input: { note: string; dueDate: string }) {
+  return visitMutation<{ data: { followUp: FollowUp } }>(`/api/v1/reports/${encodeURIComponent(reportId)}/follow-ups`, 'POST', input);
+}
+export type FollowUpPatch =
+  | { operation: 'EDIT'; expectedRevision: number; note: string; dueDate: string }
+  | { operation: 'COMPLETE'; expectedRevision: number; completionNote?: string | null };
+export function patchFollowUp(id: string, input: FollowUpPatch) {
+  return visitMutation<{ data: { followUp: FollowUp } }>(`/api/v1/follow-ups/${encodeURIComponent(id)}`, 'PATCH', input);
 }
 
 export async function getWeeklySchedule(teacherId: string, academicYear: string): Promise<{ data: { schedule: WeeklySchedule | null } }> {

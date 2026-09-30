@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import { ApiRequestError } from '../auth/client';
 import { InspectionReportPage } from './InspectionReportPage';
 
-const mocks = vi.hoisted(() => ({ getInspectionReport: vi.fn(), getPedagogicalVisit: vi.fn(), saveInspectionReport: vi.fn(), finalizeInspectionReport: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getInspectionReport: vi.fn(), getPedagogicalVisit: vi.fn(), saveInspectionReport: vi.fn(), finalizeInspectionReport: vi.fn(), listReportFollowUps: vi.fn(), createFollowUp: vi.fn() }));
 vi.mock('../auth/client', async (importOriginal) => ({ ...(await importOriginal<typeof import('../auth/client')>()), ...mocks }));
 
 const visit = { id: '55555555-5555-4555-8555-555555555555', districtId: '11111111-1111-4111-8111-111111111111',
@@ -25,6 +25,8 @@ beforeEach(() => {
   mocks.getInspectionReport.mockResolvedValue({ data: { report: null } });
   mocks.saveInspectionReport.mockImplementation(async (_id, input) => ({ data: { report: { ...report, ...input, status: 'DRAFT', revision: input.expectedRevision === null ? 1 : input.expectedRevision + 1 } } }));
   mocks.finalizeInspectionReport.mockResolvedValue({ data: { report: { ...report, status: 'FINAL', revision: 2, levelClass: 'السنة الرابعة', lessonTopic: 'الألعاب', inspectorConclusion: 'خلاصة', finalizedAt: '2026-10-01T00:00:00.000Z', finalizedInspectorNameSnapshot: 'مفتش', finalizedInspectorSurnameSnapshot: 'تجريبي', finalizedTeacherNameSnapshot: 'ليلى', finalizedTeacherSurnameSnapshot: 'علي', displayIdentity: { inspector: { name: 'مفتش', surname: 'تجريبي' }, teacher: visit.teacher } } } });
+  mocks.listReportFollowUps.mockResolvedValue({ data: [], page: { limit: 25, nextCursor: null, total: 0 } });
+  mocks.createFollowUp.mockResolvedValue({ data: { followUp: { id: 'fu-1', note: 'تحقق من التطبيق', dueDate: '2026-10-10', status: 'OPEN', alertState: 'NONE' } } });
   Object.defineProperty(HTMLDialogElement.prototype, 'showModal', { configurable: true, value() { this.open = true; } });
   Object.defineProperty(HTMLDialogElement.prototype, 'close', { configurable: true, value() { this.open = false; this.dispatchEvent(new Event('close')); } });
 });
@@ -116,5 +118,18 @@ describe('TASK-052 report UI', () => {
     fireEvent.click(screen.getByRole('button', { name: 'اعتماد التقرير النهائي' }));
     fireEvent.click(screen.getByRole('button', { name: 'تأكيد الاعتماد النهائي' }));
     expect(await screen.findByRole('link', { name: 'إكمال الهوية المهنية' })).toHaveProperty('href', expect.stringContaining('/app/me/professional-identity'));
+  });
+
+  it('offers independent follow-up creation only after report is final', async () => {
+    mocks.getPedagogicalVisit.mockResolvedValue({ data: { visit: { ...visit, status: 'COMPLETED' } } });
+    mocks.getInspectionReport.mockResolvedValue({ data: { report: { ...report, status: 'FINAL', revision: 2, levelClass: 'السنة الرابعة', lessonTopic: 'الألعاب', inspectorConclusion: 'خلاصة', finalizedAt: '2026-10-01T00:00:00.000Z', finalizedByInspectorId: 'inspector', finalizedInspectorNameSnapshot: 'مفتش', finalizedInspectorSurnameSnapshot: 'تجريبي', finalizedTeacherNameSnapshot: 'ليلى', finalizedTeacherSurnameSnapshot: 'علي' } } });
+    renderRoute(); await screen.findByRole('heading', { name: 'إجراءات المتابعة' });
+    expect(mocks.listReportFollowUps).toHaveBeenCalledWith(report.id);
+    fireEvent.click(screen.getByRole('button', { name: 'إضافة إجراء متابعة' }));
+    fireEvent.change(screen.getByLabelText('الإجراء المطلوب'), { target: { value: 'تحقق من التطبيق' } });
+    fireEvent.change(screen.getByLabelText('تاريخ الاستحقاق'), { target: { value: '2026-10-10' } });
+    fireEvent.click(screen.getByRole('button', { name: 'حفظ الإجراء' }));
+    await waitFor(() => expect(mocks.createFollowUp).toHaveBeenCalledWith(report.id, { note: 'تحقق من التطبيق', dueDate: '2026-10-10' }));
+    expect(await screen.findByText('تحقق من التطبيق')).toBeTruthy();
   });
 });
