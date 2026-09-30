@@ -202,8 +202,8 @@ after(async () => {
                COUNT(*) FILTER (WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL)::int AS applied
         FROM "${schemaName}"."_prisma_migrations"
       `);
-      assert.deepEqual(history[0], { total: 9, applied: 9 });
-      log('TASK-020 second deploy/status: PASS; migration history: 9/9 applied');
+      assert.deepEqual(history[0], { total: 10, applied: 10 });
+      log('TASK-020 second deploy/status: PASS; migration history: 10/10 applied');
       void secondDeploy;
     }
   } catch (error) {
@@ -245,7 +245,7 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
   `;
   const columnNames = (tableName) => columns.filter((column) => column.table_name === tableName).map((column) => column.column_name);
   assert.deepEqual(columnNames('District'), ['id', 'name', 'externalCode', 'createdAt', 'updatedAt']);
-  assert.deepEqual(columnNames('Inspector'), ['id', 'email', 'passwordHash', 'status', 'createdAt', 'updatedAt']);
+  assert.deepEqual(columnNames('Inspector'), ['id', 'email', 'passwordHash', 'status', 'createdAt', 'updatedAt', 'name', 'surname']);
   assert.deepEqual(columnNames('InspectorDistrictMembership'), ['id', 'inspectorId', 'districtId', 'role', 'validFrom', 'validTo', 'createdAt', 'updatedAt']);
   assert.deepEqual(columnNames('Session'), ['id', 'inspectorId', 'tokenHash', 'expiresAt', 'revokedAt', 'createdAt', 'updatedAt']);
 
@@ -339,7 +339,7 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
            COUNT(*) FILTER (WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL)::int AS applied
     FROM "${schemaName}"."_prisma_migrations"
   `);
-  assert.deepEqual(migrationHistory[0], { total: 9, applied: 9 });
+  assert.deepEqual(migrationHistory[0], { total: 10, applied: 10 });
 
   await t.test('creates the four models with UUIDs, nullability, and resolvable relations', async () => {
     const runId = randomBytes(6).toString('hex');

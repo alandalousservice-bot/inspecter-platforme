@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 import { LoginPage } from './auth/LoginPage';
 import { SessionPage } from './auth/SessionPage';
+import { ProfessionalIdentityPage } from './auth/ProfessionalIdentityPage';
 import { InstitutionsPage } from './institutions/InstitutionsPage';
 import { PublicTeacherIntakePage } from './public-intake/PublicTeacherIntakePage';
 import { SubmissionsPage } from './submissions/SubmissionsPage';
@@ -37,6 +38,7 @@ createRoot(root).render(
           <Route path="visits" element={<VisitListPage />} />
           <Route path="visits/new" element={<VisitCreatePage />} />
           <Route path="visits/:id" element={<VisitDetailPage />} />
+          <Route path="me/professional-identity" element={<ProfessionalIdentityPage />} />
         </Route>
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="*" element={<Navigate to="/login" replace />} />

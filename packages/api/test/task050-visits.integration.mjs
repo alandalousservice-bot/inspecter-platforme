@@ -80,7 +80,8 @@ before(async () => {
   runPrisma(['migrate', 'deploy'], cleanUrl);
   runPrisma(['migrate', 'status'], cleanUrl);
   const history = await admin.$queryRawUnsafe(`SELECT migration_name,finished_at FROM "${cleanSchema}"."_prisma_migrations" ORDER BY started_at`);
-  assert.equal(history.length, 9); assert.equal(history.at(-1)?.migration_name, migrationName); assert.ok(history.every((row) => row.finished_at));
+  assert.equal(history.length, 10); assert.equal(history.at(-1)?.migration_name, '20260930010000_task_052a_inspector_professional_identity');
+  assert.ok(history.some((row) => row.migration_name === migrationName)); assert.ok(history.every((row) => row.finished_at));
 
   tempRoot = mkdtempSync(join(tmpdir(), 'task050-prisma-upgrade-'));
   const copiedMigrations = join(tempRoot, 'migrations');

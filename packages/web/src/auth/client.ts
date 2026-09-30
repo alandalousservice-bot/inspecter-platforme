@@ -1,6 +1,27 @@
 import { isDecisionAllowed } from '../submissions/decision-policy';
 
 export type InspectorIdentity = { id: string; email: string };
+export type ProfessionalIdentity = { name: string | null; surname: string | null };
+
+export async function getProfessionalIdentity(): Promise<ProfessionalIdentity> {
+  const response = await fetch('/api/v1/me/professional-identity', { credentials: 'same-origin' });
+  if (!response.ok) return readFailure(response);
+  const body = await response.json() as { data: ProfessionalIdentity };
+  return body.data;
+}
+
+export async function putProfessionalIdentity(input: { name: string; surname: string }): Promise<ProfessionalIdentity> {
+  const token = csrfCookie();
+  if (!token) throw new Error('تعذر التحقق من الطلب. أعد تحميل الصفحة ثم حاول مجددًا.');
+  const response = await fetch('/api/v1/me/professional-identity', {
+    method: 'PUT', credentials: 'same-origin',
+    headers: { 'content-type': 'application/json', 'x-csrf-token': token },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) return readFailure(response);
+  const body = await response.json() as { data: ProfessionalIdentity };
+  return body.data;
+}
 export type DistrictOption = { id: string; name: string };
 export type Institution = {
   id: string;

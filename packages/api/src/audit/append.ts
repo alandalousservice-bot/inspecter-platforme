@@ -6,6 +6,7 @@ export const AuditAction = {
   TEACHER_SUBMISSION_REJECTED: 'TEACHER_SUBMISSION_REJECTED',
   TEACHER_SUBMISSION_INTERNAL_REVIEW: 'TEACHER_SUBMISSION_INTERNAL_REVIEW',
   TEACHER_PROFILE_UPDATED: 'TEACHER_PROFILE_UPDATED',
+  INSPECTOR_PROFESSIONAL_IDENTITY_UPDATED: 'INSPECTOR_PROFESSIONAL_IDENTITY_UPDATED',
   INSPECTION_REPORT_FINALIZED: 'INSPECTION_REPORT_FINALIZED',
   FOLLOW_UP_STATE_CHANGED: 'FOLLOW_UP_STATE_CHANGED',
   INSPECTOR_PROPOSAL_CREATED: 'INSPECTOR_PROPOSAL_CREATED',
@@ -37,6 +38,10 @@ const eventContracts = {
       'name', 'surname', 'birthDate', 'placeOfBirth', 'phone', 'email',
       'professionalStatus', 'employedAt', 'confirmedAt', 'qualifications',
     ])).min(1) }).strict(),
+  },
+  [AuditAction.INSPECTOR_PROFESSIONAL_IDENTITY_UPDATED]: {
+    entityType: 'Inspector',
+    metadata: z.object({ changedFields: z.array(z.enum(['name', 'surname'])).min(1).max(2) }).strict(),
   },
   [AuditAction.INSPECTION_REPORT_FINALIZED]: { entityType: 'InspectionReport', metadata: z.object({}).strict() },
   [AuditAction.FOLLOW_UP_STATE_CHANGED]: { entityType: 'FollowUp', metadata: z.object({}).strict() },
@@ -90,7 +95,7 @@ const eventContracts = {
 const inputSchema = z.object({
   source: z.enum(['HTTP', 'SYSTEM']),
   actorInspectorId: z.string().uuid().nullable(),
-  districtId: z.string().uuid(),
+  districtId: z.string().uuid().nullable(),
   action: z.enum(AuditAction),
   entityType: z.string(),
   entityId: z.string().uuid(),
@@ -107,6 +112,9 @@ export async function appendAuditEvent(transaction: Prisma.TransactionClient, in
   }
   const contract = eventContracts[parsed.action];
   if (parsed.entityType !== contract.entityType) throw new Error('Audit event entity type does not match its action.');
+  if (parsed.districtId === null && parsed.action !== AuditAction.INSPECTOR_PROFESSIONAL_IDENTITY_UPDATED) {
+    throw new Error('A district-scoped audit event requires its resource district.');
+  }
   const metadata = parsed.metadata === undefined ? undefined : contract.metadata.parse(parsed.metadata);
   return transaction.auditLog.create({
     data: {

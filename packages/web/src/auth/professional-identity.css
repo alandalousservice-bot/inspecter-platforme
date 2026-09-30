@@ -1,0 +1,14 @@
+.professional-identity-page {
+  inline-size: min(100%, 44rem);
+  margin-inline: auto;
+  padding: var(--space-5);
+}
+
+.professional-identity-page form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+@media (max-width: 40rem) {
+  .professional-identity-page { padding: var(--space-3); }
+}

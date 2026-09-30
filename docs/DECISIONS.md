@@ -15,7 +15,7 @@
 | ADR-009 | ACCEPTED | Object storage adapter خاص عند الحاجة للملفات؛ لا provider lock-in، ولا رفع عام في MVP بلا متطلبات |
 | ADR-010 | PROPOSED | نطاق MVP يشمل محرر المقترحات الأربع وprint؛ يتطلب اعتماد ترتيب/سعة التنفيذ من Product Owner؛ يمكن فصل التوسع بعد foundation |
 | ADR-011 | ACCEPTED | مرشحو التشابه للمفتش فقط وفق تطابق الهاتف أو البريد المطبّع أو الاسم الكامل مع تاريخ الميلاد؛ أسباب محددة، دون إثبات هوية أو قرار آلي؛ التفاصيل أدناه |
-| ADR-012 | OPEN | نموذج تقرير الزيارة الرسمي: عند وصوله تُحدد الحقول والقالب والتوقيعات؛ الآن skeleton فقط |
+| ADR-012 | ACCEPTED | تقرير مرافقة بيداغوجية من إعداد المفتش، غير رسمي؛ عقد المسودة/الإتمام واللقطات أدناه. النموذج الوزاري الرسمي مؤجل حتى ورود مصدره |
 | ADR-013 | OPEN | المرجع البيداغوجي الرسمي وحقوق استعماله وإصداره: تحقق مصدر/سلطة كل وثيقة قبل وسمها OFFICIAL |
 | ADR-014 | OPEN | سياسة الخصوصية والاحتفاظ والأرشفة والحذف، ومن يرى المقترحات ومتى تُنشر للأساتذة: يقررها Product Owner/الجهة المعنية |
 | ADR-015 | ACCEPTED | عقد G3 التاريخي لـPublic Teacher Intake؛ يستبدل ADR-029 شكل مكان العمل للإرسالات الجديدة بعد TASK-041، مع بقاء snapshots القديمة كما أُرسلت |
@@ -75,7 +75,7 @@ AuditLog سجل أفعال العمل والأمن المُلزم بتدقيقه
 
 الثوابت المدعومة: `TEACHER_SUBMISSION_ACCEPTED/REJECTED/INTERNAL_REVIEW` (نوع المورد `TeacherSubmission`)، `INSPECTION_REPORT_FINALIZED` (`InspectionReport`)، `FOLLOW_UP_STATE_CHANGED` (`FollowUp`)، و`INSPECTOR_PROPOSAL_CREATED/UPDATED/CLONED/ARCHIVED` (`InspectorProposal`). يضيف [ADR-028](#adr-028--inspector-managed-teacher-profile-editing-task-035) في TASK-035 حدث `TEACHER_PROFILE_UPDATED` (`Teacher`) بتفاصيل مقيدة. وتضيف [ADR-029](#adr-029--one-current-teacher-workplace-after-g3) عند تنفيذ TASK-042 حدثي `INSTITUTION_CREATED/UPDATED` (`Institution`)؛ الإنشاء metadata `{}` والتعديل `{changedFields:[name|municipality|address|directorPhone]}` فقط. ويضيف [ADR-030](#adr-030--weekly-schedule-mvp-contract) عند TASK-048 حدثي `WEEKLY_SCHEDULE_CREATED/UPDATED` (`WeeklySchedule`) بالmetadata المحددة هناك. عمليات submission في TASK-034، وتعديل Teacher في TASK-035، ومؤسسة في TASK-042، والجدول في TASK-048، وreport في TASK-052، وFollowUp عند تنفيذ عقده، وproposal في TASK-063 وما يتبعه هي مستهلكون بحسب مهماتهم. لا يعني توثيق أي ثابت تنفيذ workflow قبل مهمته.
 
-[ADR-031](#adr-031--pedagogicalvisit-scheduling-and-historical-context-task-050) يضيف عند تنفيذ TASK-050 الأحداث `PEDAGOGICAL_VISIT_CREATED/UPDATED/COMPLETED/CANCELLED` بنوع المورد `PedagogicalVisit` وبمخططات metadata المقيدة هناك؛ لا تُستعمل قبل تنفيذ مسارات الزيارة.
+[ADR-031](#adr-031--pedagogicalvisit-scheduling-and-historical-context-task-050) يضيف عند تنفيذ TASK-050 الأحداث `PEDAGOGICAL_VISIT_CREATED/UPDATED/COMPLETED/CANCELLED` بنوع المورد `PedagogicalVisit` وبمخططات metadata المقيدة هناك؛ لا تُستعمل قبل تنفيذ مسارات الزيارة. TASK-052A يضيف `INSPECTOR_PROFESSIONAL_IDENTITY_UPDATED` للمورد `Inspector` بــmetadata `{changedFields:[name|surname]}` فقط، و`districtId=null`؛ تحديث الهوية والحدث ذريان. لا تُنقل قيم الأسماء إلى audit. يبقى `INSPECTION_REPORT_FINALIZED` الحدث الوحيد المطلوب للتقرير في TASK-052؛ metadata `{}`.
 
 `actorInspectorId` يشير إلى المفتش المنفذ؛ NULL محجوز لفعل آلي موثوق مستقبلًا، وليس هوية عامة مجهولة. لا `actorType` أو تنفيذ public/system workflow الآن. `districtId` سياق مقاطعة المورد وقت الحدث، ويأخذه المستدعي من المورد بعد authorization؛ لا يُختار من عضويات المفتش عند تعددها. يلزم للأحداث ذات المورد المقاطعي ويجوز NULL لحدث مستقبلي بلا مقاطعة. `entityType/entityId` مرجع منطقي متعدد الأنواع بلا FK إلى المورد، كي يبقى تاريخ الحدث عند أرشفته. actor/district علاقات FK بـ`Restrict` عند الحذف و`Cascade` عند تحديث المفتاح.
 
@@ -165,6 +165,20 @@ AuditLog سجل أفعال العمل والأمن المُلزم بتدقيقه
 
 TASK-047 = persistence فقط: النموذجان والعلاقات والقيود والفهارس وهجرة forward-only واختبارات DB/integration، بلا API/UI/AuditLog. TASK-048 = API ونموذج قراءة وإنشاء/تحرير، تحقق ونطاق وصلاحية المؤسسة وتزامن revision وأخطاء تداخل مفهومة وواجهة عربية RTL واختبار متصل. تدقق mutations داخل transaction بحدثي `WEEKLY_SCHEDULE_CREATED` عند الإنشاء و`WEEKLY_SCHEDULE_UPDATED` عند تغيير slots أو حذف slot؛ `entityType=WeeklySchedule`, `entityId=scheduleId`, `districtId=Teacher.districtId`، actor وrequestId من الطلب. metadata للإنشاء `{}`، وللتحديث `{changedFields:["slots"],affectedSlotIds:[UUID...],slotCount:<integer>}` فقط. لا قيم notes أو level/group أو بيانات Teacher الشخصية أو عنوان/هاتف Institution في audit أو السجلات. لا حذف كامل للجدول في MVP. TASK-044/045 لاحقتان لـ048؛ فلاتر اليوم/الوقت والترقيم على الخادم؛ بلدية دليل Teacher إن أضيف فلترها مستقبلًا تُستمد من `currentInstitution.municipality` ولا تُنسخ إلى Teacher.
 
+### ADR-012 — Inspector-authored pedagogical accompaniment report (TASK-052)
+
+**الحالة: ACCEPTED — قرارات Product Owner لبوابة G5.** النوع الأول «تقرير مرافقة بيداغوجية» من إعداد المفتش/المنتج، لا قالبًا وزاريًا رسميًا أو استمارة تفتيش نظامية. يحفظ `reportType=PEDAGOGICAL_ACCOMPANIMENT` و`templateSource=INSPECTOR_AUTHORED` و`templateVersion=1` كثوابت غير قابلة لتعديل المستخدم أو التغيير بعد الإنشاء. لا محرك قوالب عام، ولا درجات أو شبكة تقييم أو توقيع رقمي أو مرفقات. النموذج الرسمي المستقبلي يحتاج مصدرًا معتمدًا وعقدًا مستقلًا؛ لا يعيد تفسير التقارير القديمة.
+
+`InspectionReport` مستقل عن `PedagogicalVisit`، واحد كحد أقصى لكل زيارة. المسودة `DRAFT` تُنشأ/تُحرر والزيارة `PLANNED` أو `COMPLETED`؛ الإتمام إلى `FINAL` فقط والزيارة `COMPLETED`. مسودة زيارة `CANCELLED` تبقى مقروءة ولا تُحرر أو تُتم. النهائي ثابت بلا إعادة فتح أو استبدال أو تصحيح/نسخ أو حذف في MVP. `revision` يبدأ 1 ويزيد لكل حفظ فعلي أو إتمام؛ إنشاء/تحرير/إتمام متزامن يحسمه الخادم وDB دون overwrite أو retry آلي. لا تقرير يُنشأ تلقائيًا عند زيارة قائمة.
+
+حقول التقرير التي يكتبها المفتش فقط: المستوى/القسم، الميدان البيداغوجي أو موضوع الحصة، ملاحظات بيداغوجية، نقاط إيجابية، جوانب تحتاج تحسينًا، توجيهات/توصيات، وخلاصة المفتش. المسودة قد تكون ناقصة؛ النهائي يتطلب المستوى/القسم، الميدان/الموضوع، وخلاصة المفتش فقط. هذا حد منتج أدنى، وليس شرطًا رسميًا. لا curriculum FK أو JSON حر. الحدود والنصوص وقيود DB في [DATABASE](DATABASE.md#inspectionreport-persistence-contract-adr-012--task-052)، وHTTP في [API](API_CONTRACTS.md#pedagogical-accompaniment-report-adr-012--task-052).
+
+عند الإتمام يحفظ الخادم `finalizedAt` و`finalizedByInspectorId` وهوية العرض المهنية الثابتة للمفتش (`name`,`surname`) وهوية Teacher (`name`,`surname`). لا بريد/هاتف/ميلاد/مؤهل/بيانات مصادقة في اللقطات. المصدر التاريخي لاسم المؤسسة والسنة وأوقات الزيارة هو Visit المحفوظ؛ لا يعاد نسخها إلى Report ولا تُستبدل بالقيم الحية عند العرض النهائي. الإتمام يضيف `INSPECTION_REPORT_FINALIZED` بالـmetadata `{}` داخل المعاملة؛ حفظ المسودة بلا AuditLog. هوية الإتمام وصف إداري للعملية، وليست توقيعًا رقميًا.
+
+**شرط مسبق TASK-052A:** Inspector الحالي يملك `email` فقط ولا يملك اسم عرض مهنيًا. تُضاف `name/surname` nullable كزوج للحسابات القائمة دون backfill مفبرك. يملأ المفتش المصادق عليه اسمه ولقبه صراحة من واجهة ملفه، وتمنع خدمة الإتمام عندما يكونان ناقصين. لا يتغير login أو Session أو District membership. تُنفذ TASK-052A وتُقبل قبل بدء TASK-052؛ ليست جزءًا من تقريره أو migration الخاصة به.
+
+TASK-052 تشمل persistence/API ومحرر RTL بحفظ صريح وإتمام مؤكد واختبارات متصلة. طباعة A4/PDF ومواضع التوقيع المطبوعة مؤجلة إلى TASK-072؛ لا تخزين توقيعات. ADR-014 يبقى OPEN للمدة/الأرشفة/الحذف المستقبلية؛ عدم توفير حذف الآن لا يقرر احتفاظًا دائمًا. ADR-017 يبقى OPEN لنقل Teacher بين المقاطعات.
+
 ### ADR-031 — PedagogicalVisit scheduling and historical context (TASK-050)
 
 **الحالة: ACCEPTED — قرارات Product Owner قبل TASK-050.** `PedagogicalVisit` زيارة تربوية عامة لمفتش مسؤول واحد وأستاذ واحد، لا حقل نوع ولا حساب أستاذ. تبدأ `PLANNED`؛ الانتقالان الوحيدان `PLANNED → COMPLETED` و`PLANNED → CANCELLED`، والحالتان الأخيرتان نهائيتان. `occurredAt` وقت الإنجاز الفعلي الذي يقدمه المفتش عند الإكمال (ولا يجوز أن يكون في المستقبل)، لا وقت إنشاء التقرير؛ يكون NULL قبل الإكمال وعند الإلغاء. لا إعادة فتح أو حذف صلب أو notes أو محتوى تقرير في TASK-050. `revision` يبدأ 1 ويزيد مرة لكل تغيير فعلي؛ mutations تشترط `expectedRevision`، والخاسر في السباق يأخذ `409` دون كتابة أو تدقيق.
@@ -201,7 +215,7 @@ TASK-047 = persistence فقط: النموذجان والعلاقات والقي�
 |---|---|---|---|
 | ADR-010 | Product Owner | DEFERRED | قبل اعتماد سعة الجناح البيداغوجي في G6، والطباعة في G7؛ لا يعني التأجيل قبول نطاق MVP المقترح |
 | ADR-011 | Product Owner لسياسة عرض المرشحين؛ Architect لقواعد المقارنة | RESOLVED / ACCEPTED | اعتُمدت قواعد حتمية استشارية قبل TASK-032/G3؛ لا دمج أو قرار تلقائي |
-| ADR-012 | Product Owner والجهة صاحبة النموذج الرسمي | DEFERRED | قبل تنفيذ حقول/قالب التقرير الرسمي؛ TASK-052/G5 يقتصر على skeleton |
+| ADR-012 | Product Owner | RESOLVED / ACCEPTED | تقرير المرافقة غير الرسمي محدد لـTASK-052؛ النموذج الوزاري الرسمي ما زال بلا مصدر ويحتاج قرارًا منفصلًا عند وروده |
 | ADR-013 | الجهة المالكة للمرجع البيداغوجي، عبر Product Owner | DEFERRED | قبل وسم أو إدخال أي محتوى OFFICIAL في TASK-060/G6؛ foundation بلا محتوى موثق ممكنة |
 | ADR-014 | Product Owner والجهة المختصة بالخصوصية | DEFERRED | قبل سياسة حذف/احتفاظ الإنتاج في G7، وقبل أي نشر للمقترحات؛ لا مشاركة عامة ضمن المهام الحالية |
 | ADR-015 | Product Owner والجهة صاحبة الاستمارة الإدارية | RESOLVED / ACCEPTED | حُسمت الحقول والتحقق والتوجيه والتصحيح وحدود MVP قبل TASK-030/G3؛ لا يغيّر ذلك حالة TASK-030 |

@@ -24,6 +24,8 @@ model District {
 model Inspector {
   id                 String                        @id @default(uuid()) @db.Uuid
   email              String                        @unique
+  name               String?
+  surname            String?
   passwordHash       String
   status             String
   createdAt          DateTime                      @default(now())

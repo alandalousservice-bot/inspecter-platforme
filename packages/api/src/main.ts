@@ -4,6 +4,7 @@ import { registerAuthRoutes } from './identity/auth-routes.js';
 import { requireAuthenticatedInspector } from './identity/auth-routes.js';
 import { registerInstitutionRoutes } from './institutions/routes.js';
 import { registerDistrictContextRoute } from './identity/district-routes.js';
+import { registerProfessionalIdentityRoutes } from './identity/professional-identity-routes.js';
 import { registerTeacherSubmissionRoutes } from './intake/routes.js';
 import { registerInspectorSubmissionRoutes } from './intake/inspector-routes.js';
 import { registerSubmissionDecisionRoute } from './intake/decision-routes.js';
@@ -19,6 +20,7 @@ createApp((app) => {
   registerAuthRoutes(app, prisma);
   const requireInspector = requireAuthenticatedInspector(prisma);
   registerDistrictContextRoute(app, prisma, requireInspector);
+  registerProfessionalIdentityRoutes(app, prisma, requireInspector);
   registerInstitutionRoutes(app, prisma, requireInspector);
   registerTeacherSubmissionRoutes(app, prisma);
   registerInspectorSubmissionRoutes(app, prisma, requireInspector);

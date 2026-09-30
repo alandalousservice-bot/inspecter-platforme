@@ -6,7 +6,7 @@
 
 | مجموعة | كيان | حقول/علاقات أساسية وحدود |
 |---|---|---|
-| Identity | Inspector | email unique، passwordHash، status؛ ليس Teacher |
+| Identity | Inspector | email unique، passwordHash، status؛ `name/surname` مهنيان nullable كزوج بعد TASK-052A؛ ليس Teacher |
 | Identity | District | name، externalCode اختياري؛ لا افتراض مقاطعة واحدة |
 | Identity | InspectorDistrictMembership | inspectorId/districtId، role، validFrom/validTo؛ نطاق وصول قابل للتغيير تاريخيًا |
 | Intake | TeacherSubmission | `districtId` FK من رابط المقاطعة؛ `submittedProfile` snapshot تاريخي غير متحقق. شكل G3 القديم يحفظ `primaryInstitutionName/additionalInstitutionNames`؛ شكل ما بعد TASK-041 يحفظ `workplace` لمؤسسة واحدة، دون تغيير snapshots القديمة. status يبدأ `PENDING` ثم `ACCEPTED/REJECTED/INTERNAL_REVIEW`، submittedAt وبيانات القرار وacceptedTeacherId؛ لا login أو Institution/Teacher أو ربط مؤسسة من public POST؛ ADR-015/ADR-029 |
@@ -16,7 +16,7 @@
 | Schedule | WeeklySchedule | teacherId، academicYear، revision؛ جدول حالي واحد لكل Teacher وسنة، بلا status أو validFrom/validTo أو تاريخ نسخ |
 | Schedule | WeeklyScheduleSlot | scheduleId، dayOfWeek، startMinute/endMinute، levelLabel/groupLabel/notes اختيارية؛ سياق المكان من مؤسسة Teacher الحالية المعتمدة، بلا institutionId أو assignmentId |
 | Visit | PedagogicalVisit | عقد [ADR-031](DECISIONS.md#adr-031--pedagogicalvisit-scheduling-and-historical-context-task-050): districtId/inspectorId/teacherId/institutionId وسnapshot اسم المؤسسة، فترة مخططة وسنة جدول صريحة، occurredAt، status/revision؛ بلا نوع أو notes أو حقول تقرير |
-| Visit | InspectionReport | visitId unique، templateVersion nullable، status، narrative/recommendations structure مبدئي، finalizedAt، immutable final snapshot؛ يتطور عند وصول النموذج |
+| Visit | InspectionReport | عقد [ADR-012](DECISIONS.md#adr-012--inspector-authored-pedagogical-accompaniment-report-task-052): visitId unique، نوع/مصدر/إصدار ثابت، نصوص مرافقة محددة، DRAFT/FINAL، revision، finalizedAt/by، لقطة هوية نهائية؛ ليس قالبًا وزاريًا |
 | Visit | FollowUp | reportId/teacherId، ownerInspectorId، dueAt، status، note، completedAt؛ توصية قابلة للمتابعة |
 | Training | TrainingEvent | districtId، type/title/date، status؛ foundation فقط |
 | Training | TrainingParticipation | eventId/teacherId، participationStatus nullable؛ تفاصيل الحضور مؤجلة |
@@ -78,6 +78,36 @@ TASK-035 يقرأ ويعدّل حقول Teacher الحالية فقط وفق [ع
 `WeeklyScheduleSlot`: `id UUID PK`, `scheduleId UUID NOT NULL` FK إلى WeeklySchedule (`onDelete: Restrict`, `onUpdate: Cascade`)، `dayOfWeek Int NOT NULL` من 1 الاثنين إلى 7 الأحد، `startMinute/endMinute Int NOT NULL` مع `0 <= startMinute < endMinute <= 1440`، `levelLabel String?`, `groupLabel String?`, `notes String?`، و`createdAt/updatedAt`. القيم الاختيارية غير الفارغة بعد trim وUnicode NFC واختزال فراغات العرض؛ محارف التحكم مرفوضة؛ الحدود بعد التنظيف Unicode code points 100/100/500 على الترتيب. تفرض الهجرة أيضًا حدود `char_length` نفسها على الأعمدة الاختيارية كدفاع DB (وتحسب PostgreSQL بها المحارف، لا UTF-8 bytes)؛ التطبيع والتحقق من محارف التحكم مسؤولية طبقة التطبيق، بلا triggers. لا curriculum FK أو institutionId أو assignmentId أو timezone/تاريخ لكل slot؛ سياق المؤسسة في العرض من Teacher الحالي.
 
 يمنع قيد PostgreSQL GiST exclusion تداخل `(scheduleId,dayOfWeek,int4range(startMinute,endMinute,'[)'))` لنفس الجدول واليوم؛ `[)` يسمح بتجاور نهاية slot وبداية التالي. `btree_gist` مثبتة في سلسلة migrations منذ TASK-022؛ هجرة TASK-047 forward-only مستقلة، مع تحقق clean+upgrade. الفهارس: unique `(teacherId,academicYear)`، وslot `(scheduleId,dayOfWeek,startMinute,endMinute)` لقراءة اليوم بترتيب الوقت، و`(dayOfWeek,startMinute)` لدعم بحث TASK-044 المستقبلي؛ لا فهرس إضافي على `teacherId` إذ يغطيه مفتاح uniqueness كبادئة. لا مؤسسة لازمة لكل slot في DB؛ TASK-048 تمنع mutation عندما `Teacher.institutionId=NULL`.
+
+## Inspector professional identity prerequisite (TASK-052A)
+
+Migration مستقلة forward-only تضيف إلى `Inspector` حقلَي `name String?` و`surname String?` فقط، دون تغيير `email/passwordHash/status/id/Session/memberships`. القيم القديمة NULL ولا يُشتق الاسم من البريد ولا يُملأ اصطناعيًا. قيد DB يجعل الحقلين NULL معًا أو غير NULL معًا، ويرفض النص الفارغ/المكوّن من فراغات في كل حقل غير NULL؛ 1..100 Unicode code points لكل حقل بعد التطبيع في API. لا `NOT NULL` الآن لأن Inspector rows قائمة ولا مصدر أسماء معتمدًا لها. عند إدخال Inspector جديد في مسار إنشاء حساب مستقبلي، يشترط ذلك المسار الاسم واللقب قبل التفعيل؛ لا يضيف TASK-052A مسار إنشاء حساب. إتمام Report يشترط الاسمَين فعليًا مهما كانت nullability التخزينية.
+
+## InspectionReport persistence contract (ADR-012 / TASK-052)
+
+Migration واحدة جديدة forward-only بعد TASK-052A تنشئ `InspectionReport` فقط، دون تعديل Visit أو migrations سابقة أو backfill. جدول الحقول:
+
+| Field | Prisma / DB | Invariant |
+|---|---|---|
+| `id` | `String @id @default(uuid()) @db.Uuid` | هوية التقرير |
+| `visitId` | `String @unique @db.Uuid` | FK إلى `PedagogicalVisit.id`؛ تقرير واحد/زيارة |
+| `reportType` | `String` NOT NULL DEFAULT `PEDAGOGICAL_ACCOMPANIMENT` | قيمة أولى وحيدة؛ CHECK allowlist |
+| `templateSource` | `String` NOT NULL DEFAULT `INSPECTOR_AUTHORED` | ليست OFFICIAL؛ CHECK allowlist |
+| `templateVersion` | `Int` NOT NULL DEFAULT 1 | الإصدار الأول ثابت، CHECK `=1` لهذا النوع/المصدر؛ لا يُعدل بعد الإنشاء |
+| `status` | `String` NOT NULL DEFAULT `DRAFT` | `DRAFT/FINAL` فقط؛ CHECK |
+| `revision` | `Int` NOT NULL DEFAULT 1 | CHECK `>=1`، يزيد مرة لكل تغيير فعلي/إتمام |
+| `levelClass` | `String?` | مستوى/قسم؛ حد 100 code points |
+| `lessonTopic` | `String?` | ميدان بيداغوجي أو موضوع حصة؛ حد 200 code points |
+| `pedagogicalObservations`, `strengths`, `improvementAreas`, `guidanceRecommendations`, `inspectorConclusion` | `String?` لكل منها | نصوص مستقلة؛ حد 4000 code points لكل حقل |
+| `finalizedAt` | `DateTime? @db.Timestamp(3)` | وقت الخادم UTC؛ NULL في DRAFT |
+| `finalizedByInspectorId` | `String? @db.Uuid` | Inspector المصادق؛ NULL في DRAFT |
+| `finalizedInspectorNameSnapshot`, `finalizedInspectorSurnameSnapshot` | `String?` | لقطة مهنية من Inspector.name/surname عند FINAL فقط، حد 100 لكل منها |
+| `finalizedTeacherNameSnapshot`, `finalizedTeacherSurnameSnapshot` | `String?` | لقطة من Teacher.name/surname عند FINAL فقط، حد 100 لكل منها |
+| `createdAt`, `updatedAt` | `DateTime` default now / `@updatedAt` | تواريخ سجل قابلة للتعديل |
+
+كل النصوص nullable في المسودة؛ عدم وجود قيمة يُحفظ `NULL` لا `''`. `FINAL` يشترط DB CHECK: `levelClass`, `lessonTopic`, `inspectorConclusion` غير NULL وغير فارغة بعد trim؛ `finalizedAt/finalizedByInspectorId` واللقطات الأربع غير NULL وغير فارغة. `DRAFT` يشترط أن حقول الإتمام واللقطات جميعها NULL. CHECK يضبط طول code points بــPostgreSQL `char_length` للحقول المذكورة، ويرفض النص الفارغ/المكوّن من فراغات في كل حقل نصي غير NULL. فحص زيارة `COMPLETED`، ثبات النهائي، و`revision`/انتقالات الحالة تُنفذ في الخدمة/تحديث مشروط داخل transaction، لأن CHECK لا يفحص صف Visit أو تاريخ التحديث. لا حقل Report لاسم Institution أو academicYear أو وقت Visit؛ تُقرأ من Visit التاريخي. لا `content JSON` أو جدول نسخ أو حقول توقيع/تنقيط/مرفقات.
+
+FK `visitId → PedagogicalVisit.id` و`finalizedByInspectorId → Inspector.id` بـ`onDelete: Restrict,onUpdate: Restrict`. `visitId` unique يخدم البحث من زيارة؛ فهرس `finalizedByInspectorId` فقط للـFK، ولا دليل تقارير عام في TASK-052. قراءة/إتمام Report تتطلب المفتش المسؤول وعضويته الحالية في `Visit.districtId` وفق ADR-031؛ لا يُستمد النطاق من Report body. لا حذف صلب أو أرشفة في MVP؛ ADR-014 OPEN.
 
 ## PedagogicalVisit persistence contract (ADR-031 / TASK-050)
 
