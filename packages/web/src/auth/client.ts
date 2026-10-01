@@ -137,6 +137,18 @@ export type TeacherQualificationInput = {
   qualificationDate?: string | null;
 };
 
+export type SupplementaryWorkplace = {
+  id: string;
+  institution: { id: string; name: string; municipality: string | null; archivedAt: string | null };
+  validFrom: string;
+  validTo: string | null;
+  isCurrent: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+export type SupplementaryWorkplaceInput = { institutionId: string; validFrom: string; validTo?: string | null };
+export type SupplementaryWorkplacePatch = { validFrom?: string; validTo?: string | null };
+
 export type TeacherDirectoryItem = {
   id: string;
   districtId: string;
@@ -584,6 +596,32 @@ export async function deleteTeacherQualification(teacherId: string, qualificatio
     method: 'DELETE', credentials: 'same-origin', headers: { 'x-csrf-token': csrfToken },
   });
   if (!response.ok) return readFailure(response);
+}
+
+export async function listSupplementaryWorkplaces(teacherId: string): Promise<{ items: SupplementaryWorkplace[] }> {
+  const response = await fetch(`/api/v1/teachers/${encodeURIComponent(teacherId)}/supplementary-workplaces`, { credentials: 'same-origin', cache: 'no-store' });
+  if (!response.ok) return readFailure(response);
+  return response.json() as Promise<{ items: SupplementaryWorkplace[] }>;
+}
+
+export async function createSupplementaryWorkplace(teacherId: string, input: SupplementaryWorkplaceInput): Promise<{ data: SupplementaryWorkplace }> {
+  const csrfToken = csrfCookie();
+  if (!csrfToken) throw new ApiRequestError('تعذر التحقق من الطلب. أعد تحميل الصفحة ثم حاول مجددًا.');
+  const response = await fetch(`/api/v1/teachers/${encodeURIComponent(teacherId)}/supplementary-workplaces`, {
+    method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify(input),
+  });
+  if (!response.ok) return readFailure(response);
+  return response.json() as Promise<{ data: SupplementaryWorkplace }>;
+}
+
+export async function patchSupplementaryWorkplace(teacherId: string, workplaceId: string, patch: SupplementaryWorkplacePatch): Promise<{ data: SupplementaryWorkplace }> {
+  const csrfToken = csrfCookie();
+  if (!csrfToken) throw new ApiRequestError('تعذر التحقق من الطلب. أعد تحميل الصفحة ثم حاول مجددًا.');
+  const response = await fetch(`/api/v1/teachers/${encodeURIComponent(teacherId)}/supplementary-workplaces/${encodeURIComponent(workplaceId)}`, {
+    method: 'PATCH', credentials: 'same-origin', headers: { 'content-type': 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify(patch),
+  });
+  if (!response.ok) return readFailure(response);
+  return response.json() as Promise<{ data: SupplementaryWorkplace }>;
 }
 
 export type TeacherCurrentInstitutionInput =

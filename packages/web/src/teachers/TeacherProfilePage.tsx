@@ -6,6 +6,7 @@ import {
 } from '../auth/client';
 import { Button, Card, CardContent, CardHeader, Dialog, EmptyState, ErrorState, Input, LoadingState, SuccessState } from '../ui';
 import { TeacherQualificationsSection } from './TeacherQualificationsSection';
+import { TeacherSupplementaryWorkplacesSection } from './TeacherSupplementaryWorkplacesSection';
 import './teacher-profile.css';
 
 const labels: Record<keyof TeacherProfilePatch, string> = {
@@ -387,6 +388,7 @@ export function TeacherProfilePage() {
             <Field label="هاتف المدير" value={profile.currentInstitution.directorPhone} />
           </dl> : <p className="teacher-profile__unassigned">لم تُعتمد مؤسسة حالية</p>}</CardContent>
         </Card>
+        <TeacherSupplementaryWorkplacesSection teacherId={profile.id} districtId={profile.districtId} homeInstitutionId={profile.currentInstitution?.id ?? null} />
       </> : <form onSubmit={(event) => { void saveProfile(event); }} noValidate aria-busy={savingProfile}>
         <h2>تعديل الملف المهني</h2>
         {successMessage && !success ? <p role="alert">{successMessage}</p> : null}

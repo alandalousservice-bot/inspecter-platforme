@@ -8,6 +8,7 @@ import { requireAuthenticatedMutationCsrf } from '../identity/auth-routes.js';
 import { cleanText, dateField, directorPhoneField, emailField, phoneField, PROFESSIONAL_STATUSES } from '../intake/submission-schema.js';
 import { projectDeclaredWorkplace } from '../intake/declared-workplace.js';
 import { requireInspectorDistrictMembership } from '../policy/district-access.js';
+import { algiersCalendarDate } from './supplementary-workplaces-domain.js';
 
 const fields = [
   'name', 'surname', 'birthDate', 'placeOfBirth', 'phone', 'email',
@@ -218,6 +219,15 @@ export function registerTeacherProfileRoutes(app: Express, database: PrismaClien
             directorPhone: currentInstitution.directorPhone,
           },
         };
+      }
+
+      const today = new Date(`${algiersCalendarDate()}T00:00:00.000Z`);
+      const conflictingSupplementary = await transaction.teacherSupplementaryWorkplace.findFirst({
+        where: { teacherId: teacher.id, institutionId: targetInstitutionId, OR: [{ validTo: null }, { validTo: { gt: today } }] },
+        select: { id: true },
+      });
+      if (conflictingSupplementary) {
+        throw new ApiError(409, 'CONFLICT', 'أنهِ علاقة تكملة النصاب الحالية أو المستقبلية قبل اعتماد المؤسسة الأم.');
       }
 
       const homeInstitutionFields = ['institutionAppointmentDate', 'institutionAppointmentNumber', 'financialControllerVisaNumber'] as const;

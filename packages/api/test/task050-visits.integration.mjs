@@ -80,7 +80,7 @@ before(async () => {
   runPrisma(['migrate', 'deploy'], cleanUrl);
   runPrisma(['migrate', 'status'], cleanUrl);
   const history = await admin.$queryRawUnsafe(`SELECT migration_name,finished_at FROM "${cleanSchema}"."_prisma_migrations" ORDER BY started_at`);
-  assert.equal(history.length, 16); assert.equal(history.at(-1)?.migration_name, '20261001100000_task_081_structured_teacher_qualifications');
+  assert.equal(history.length, 17); assert.equal(history.at(-1)?.migration_name, '20261001120000_task_082_teacher_supplementary_workplaces');
   assert.ok(history.some((row) => row.migration_name === migrationName)); assert.ok(history.every((row) => row.finished_at));
 
   tempRoot = mkdtempSync(join(tmpdir(), 'task050-prisma-upgrade-'));

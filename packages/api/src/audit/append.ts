@@ -9,6 +9,9 @@ export const AuditAction = {
   TEACHER_QUALIFICATION_CREATED: 'TEACHER_QUALIFICATION_CREATED',
   TEACHER_QUALIFICATION_UPDATED: 'TEACHER_QUALIFICATION_UPDATED',
   TEACHER_QUALIFICATION_DELETED: 'TEACHER_QUALIFICATION_DELETED',
+  TEACHER_SUPPLEMENTARY_WORKPLACE_CREATED: 'TEACHER_SUPPLEMENTARY_WORKPLACE_CREATED',
+  TEACHER_SUPPLEMENTARY_WORKPLACE_UPDATED: 'TEACHER_SUPPLEMENTARY_WORKPLACE_UPDATED',
+  TEACHER_SUPPLEMENTARY_WORKPLACE_CLOSED: 'TEACHER_SUPPLEMENTARY_WORKPLACE_CLOSED',
   INSPECTOR_PROFESSIONAL_IDENTITY_UPDATED: 'INSPECTOR_PROFESSIONAL_IDENTITY_UPDATED',
   INSPECTION_REPORT_FINALIZED: 'INSPECTION_REPORT_FINALIZED',
   FOLLOW_UP_STATE_CHANGED: 'FOLLOW_UP_STATE_CHANGED',
@@ -58,6 +61,21 @@ const eventContracts = {
   },
   [AuditAction.TEACHER_QUALIFICATION_DELETED]: {
     entityType: 'TeacherQualification', metadata: z.object({ teacherId: z.string().uuid() }).strict(),
+  },
+  [AuditAction.TEACHER_SUPPLEMENTARY_WORKPLACE_CREATED]: {
+    entityType: 'TeacherSupplementaryWorkplace',
+    metadata: z.object({ teacherId: z.string().uuid(), institutionId: z.string().uuid() }).strict(),
+  },
+  [AuditAction.TEACHER_SUPPLEMENTARY_WORKPLACE_UPDATED]: {
+    entityType: 'TeacherSupplementaryWorkplace',
+    metadata: z.object({
+      teacherId: z.string().uuid(), institutionId: z.string().uuid(),
+      changedFields: z.array(z.enum(['validFrom', 'validTo'])).min(1).max(2),
+    }).strict(),
+  },
+  [AuditAction.TEACHER_SUPPLEMENTARY_WORKPLACE_CLOSED]: {
+    entityType: 'TeacherSupplementaryWorkplace',
+    metadata: z.object({ teacherId: z.string().uuid(), institutionId: z.string().uuid() }).strict(),
   },
   [AuditAction.INSPECTOR_PROFESSIONAL_IDENTITY_UPDATED]: {
     entityType: 'Inspector',

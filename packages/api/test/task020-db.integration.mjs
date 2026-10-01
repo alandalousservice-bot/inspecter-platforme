@@ -202,8 +202,8 @@ after(async () => {
                COUNT(*) FILTER (WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL)::int AS applied
         FROM "${schemaName}"."_prisma_migrations"
       `);
-      assert.deepEqual(history[0], { total: 16, applied: 16 });
-      log('TASK-020 second deploy/status: PASS; migration history: 16/16 applied');
+      assert.deepEqual(history[0], { total: 17, applied: 17 });
+      log('TASK-020 second deploy/status: PASS; migration history: 17/17 applied');
       void secondDeploy;
     }
   } catch (error) {
@@ -236,6 +236,7 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
     'Teacher',
     'TeacherQualification',
     'TeacherSubmission',
+    'TeacherSupplementaryWorkplace',
     'WeeklySchedule',
     'WeeklyScheduleSlot',
     '_prisma_migrations',
@@ -283,7 +284,7 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
   `;
   const primaryKeys = constraints.filter((constraint) => constraint.contype === 'p');
   assert.deepEqual(primaryKeys.map(({ source_table }) => source_table).sort(), [
-    'AuditLog', 'District', 'FollowUp', 'InspectionReport', 'InspectionReportObservation', 'Inspector', 'InspectorDistrictMembership', 'Institution', 'PedagogicalVisit', 'Session', 'Teacher', 'TeacherQualification', 'TeacherSubmission', 'WeeklySchedule', 'WeeklyScheduleSlot',
+    'AuditLog', 'District', 'FollowUp', 'InspectionReport', 'InspectionReportObservation', 'Inspector', 'InspectorDistrictMembership', 'Institution', 'PedagogicalVisit', 'Session', 'Teacher', 'TeacherQualification', 'TeacherSubmission', 'TeacherSupplementaryWorkplace', 'WeeklySchedule', 'WeeklyScheduleSlot',
   ]);
   const foreignKeys = constraints.filter((constraint) => constraint.contype === 'f');
   assert.deepEqual(foreignKeys.map(({ source_table, target_table, confdeltype, confupdtype }) => ({
@@ -310,6 +311,8 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
     { source_table: 'TeacherSubmission', target_table: 'District', confdeltype: 'r', confupdtype: 'c' },
     { source_table: 'TeacherSubmission', target_table: 'Inspector', confdeltype: 'r', confupdtype: 'c' },
     { source_table: 'TeacherSubmission', target_table: 'Teacher', confdeltype: 'r', confupdtype: 'c' },
+    { source_table: 'TeacherSupplementaryWorkplace', target_table: 'Institution', confdeltype: 'r', confupdtype: 'c' },
+    { source_table: 'TeacherSupplementaryWorkplace', target_table: 'Teacher', confdeltype: 'r', confupdtype: 'c' },
     { source_table: 'WeeklySchedule', target_table: 'Teacher', confdeltype: 'r', confupdtype: 'c' },
     { source_table: 'WeeklyScheduleSlot', target_table: 'WeeklySchedule', confdeltype: 'r', confupdtype: 'c' },
   ]);
@@ -336,6 +339,7 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
     'Session_inspectorId_idx',
     'Teacher_districtId_surname_name_recordStatus_idx',
     'TeacherSubmission_districtId_status_submittedAt_idx',
+    'TeacherSupplementaryWorkplace_teacherId_validFrom_id_idx',
     'WeeklySchedule_teacherId_academicYear_key',
     'WeeklyScheduleSlot_scheduleId_dayOfWeek_startMinute_endMinute_i',
     'WeeklyScheduleSlot_dayOfWeek_startMinute_idx',
@@ -348,7 +352,7 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
   assert.match(emailUniqueIndex.indexdef, /\bemail\b/i);
   const uniqueIndexes = indexes.filter((index) => index.indexdef.includes('UNIQUE') && !index.indexname.endsWith('_pkey'));
   assert.deepEqual(uniqueIndexes.map(({ indexname }) => indexname), [
-    'InspectionReportObservation_reportId_criterionKey_key', 'InspectionReport_id_reportType_templateVersion_key', 'InspectionReport_visitId_key', 'Inspector_email_key', 'Institution_id_districtId_key', 'Session_tokenHash_key', 'TeacherSubmission_acceptedTeacherId_key', 'WeeklySchedule_teacherId_academicYear_key',
+    'InspectionReportObservation_reportId_criterionKey_key', 'InspectionReport_id_reportType_templateVersion_key', 'InspectionReport_visitId_key', 'Inspector_email_key', 'Institution_id_districtId_key', 'Session_tokenHash_key', 'TeacherSubmission_acceptedTeacherId_key', 'Teacher_id_districtId_key', 'WeeklySchedule_teacherId_academicYear_key',
   ]);
 
   const migrationHistory = await prismaClient.$queryRawUnsafe(`
@@ -356,7 +360,7 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
            COUNT(*) FILTER (WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL)::int AS applied
     FROM "${schemaName}"."_prisma_migrations"
   `);
-  assert.deepEqual(migrationHistory[0], { total: 16, applied: 16 });
+  assert.deepEqual(migrationHistory[0], { total: 17, applied: 17 });
 
   await t.test('creates the four models with UUIDs, nullability, and resolvable relations', async () => {
     const runId = randomBytes(6).toString('hex');
