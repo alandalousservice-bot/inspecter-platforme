@@ -3,17 +3,21 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { InstitutionsPage } from './InstitutionsPage';
 import type { Institution } from '../auth/client';
+import { ApiRequestError } from '../auth/client';
 
-const { createInstitution, getCurrentDistricts, listInstitutions } = vi.hoisted(() => ({
+const { createInstitution, getCurrentDistricts, listInstitutions, updateInstitution } = vi.hoisted(() => ({
   createInstitution: vi.fn(),
   getCurrentDistricts: vi.fn(),
   listInstitutions: vi.fn(),
+  updateInstitution: vi.fn(),
 }));
-vi.mock('../auth/client', () => ({ createInstitution, getCurrentDistricts, listInstitutions }));
+vi.mock('../auth/client', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../auth/client')>(), createInstitution, getCurrentDistricts, listInstitutions, updateInstitution,
+}));
 
 const districtOne = { id: 'district-1', name: 'مقاطعة الشمال' };
 const districtTwo = { id: 'district-2', name: 'مقاطعة الجنوب' };
-const rowOne = { id: 'institution-1', districtId: districtOne.id, name: 'مدرسة النور', externalCode: null, municipality: null, address: null, directorPhone: null, archivedAt: null, createdAt: '', updatedAt: '' };
+const rowOne = { id: 'institution-1', districtId: districtOne.id, name: 'مدرسة النور', externalCode: null, municipality: null, address: null, directorPhone: null, email: null, archivedAt: null, createdAt: '', updatedAt: '' };
 const page = (data: Institution[] = [], nextCursor: string | null = null, total = data.length) => ({ data, page: { limit: 25, nextCursor, total } });
 
 beforeAll(() => {
@@ -25,6 +29,7 @@ beforeEach(() => {
   getCurrentDistricts.mockResolvedValue([districtOne]);
   listInstitutions.mockResolvedValue(page());
   createInstitution.mockResolvedValue({ data: rowOne });
+  updateInstitution.mockResolvedValue({ data: rowOne });
 });
 
 afterEach(() => {
@@ -138,6 +143,24 @@ describe('TASK-024 Institution list and create UI', () => {
     await waitFor(() => expect(listInstitutions).toHaveBeenCalledTimes(2));
   });
 
+  it('creates with optional email and exposes a minimal authorized email edit action', async () => {
+    listInstitutions.mockResolvedValueOnce(page()).mockResolvedValueOnce(page([{ ...rowOne, email: 'school@example.dz' }], null, 1));
+    renderPage();
+    const dialog = await openCreate();
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'اسم المؤسسة' }), { target: { value: 'مدرسة جديدة' } });
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'البريد الإلكتروني' }), { target: { value: 'school@example.dz' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'إنشاء المؤسسة' }));
+    await screen.findByRole('heading', { name: 'تم إنشاء المؤسسة بنجاح.' });
+    expect(createInstitution).toHaveBeenCalledWith({ districtId: districtOne.id, name: 'مدرسة جديدة', email: 'school@example.dz' });
+    await screen.findByRole('cell', { name: 'school@example.dz' });
+    fireEvent.click(screen.getByRole('button', { name: 'تعديل البريد' }));
+    const editDialog = screen.getByRole('dialog', { name: 'تعديل بريد المؤسسة' });
+    fireEvent.change(within(editDialog).getByRole('textbox', { name: 'البريد الإلكتروني' }), { target: { value: 'new@example.dz' } });
+    fireEvent.click(within(editDialog).getByRole('button', { name: 'حفظ البريد' }));
+    await screen.findByRole('heading', { name: 'تم تحديث بريد المؤسسة بنجاح.' });
+    expect(updateInstitution).toHaveBeenCalledWith('institution-1', { email: 'new@example.dz' });
+  });
+
   it('allows selecting among multiple authorized Districts and requires a choice', async () => {
     getCurrentDistricts.mockResolvedValueOnce([districtOne, districtTwo]);
     renderPage();
@@ -171,7 +194,7 @@ describe('TASK-024 Institution list and create UI', () => {
   });
 
   it('shows server validation and scope errors without technical details or identifiers', async () => {
-    createInstitution.mockRejectedValueOnce(Object.assign(new Error('تحقق من البيانات المدخلة.'), { fields: { name: ['قيمة غير صالحة.'] } }));
+    createInstitution.mockRejectedValueOnce(new ApiRequestError('تحقق من البيانات المدخلة.', { name: ['قيمة غير صالحة.'] }, 400));
     renderPage();
     const dialog = await openCreate();
     fireEvent.change(within(dialog).getByRole('textbox', { name: 'اسم المؤسسة' }), { target: { value: 'اسم صالح' } });
@@ -179,14 +202,14 @@ describe('TASK-024 Institution list and create UI', () => {
     expect(await within(dialog).findByText('تحقق من البيانات المدخلة.')).toBeTruthy();
     expect(within(dialog).getByText('قيمة غير صالحة.')).toBeTruthy();
 
-    createInstitution.mockRejectedValueOnce(new Error('المورد غير موجود ضمن نطاق الوصول.'));
+    createInstitution.mockRejectedValueOnce(new ApiRequestError('المورد غير موجود ضمن نطاق الوصول.', undefined, 404));
     fireEvent.change(within(dialog).getByRole('textbox', { name: 'اسم المؤسسة' }), { target: { value: 'مؤسسة خارج النطاق' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'إنشاء المؤسسة' }));
     expect(await within(dialog).findByText('المورد غير موجود ضمن نطاق الوصول.')).toBeTruthy();
     expect(within(dialog).queryByText(/district-1|stack|request-id/i)).toBeNull();
   });
 
-  it('keeps Arabic RTL labels and exposes only API-supported create actions', async () => {
+  it('keeps Arabic RTL labels and exposes only API-supported create/email-edit actions', async () => {
     const { container } = renderPage();
     expect(container.querySelector('[dir="rtl"]')).toBeTruthy();
     const search = screen.getByRole('textbox', { name: 'البحث عن مؤسسة' });
@@ -195,6 +218,6 @@ describe('TASK-024 Institution list and create UI', () => {
     await openCreate();
     expect(screen.getByRole('textbox', { name: 'اسم المؤسسة' })).toBeTruthy();
     const buttonNames = screen.getAllByRole('button').map((button) => button.textContent ?? '').join(' ');
-    expect(buttonNames).not.toMatch(/تعديل|حذف|أرشفة|إلغاء الأرشفة/);
+    expect(buttonNames).not.toMatch(/حذف|أرشفة|إلغاء الأرشفة/);
   });
 });

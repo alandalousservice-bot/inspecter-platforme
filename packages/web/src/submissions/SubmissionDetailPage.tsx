@@ -14,7 +14,7 @@ const reasonLabels: Record<DuplicateReason, string> = {
   SAME_NAME_AND_DOB: 'تطابق الاسم واللقب وتاريخ الميلاد',
 };
 const professionalStatusLabels: Record<string, string> = {
-  PERMANENT: 'مرسم', TRAINEE: 'متربص', CONTRACT: 'متعاقد', TEMPORARY_CONTRACT: 'متعاقد مؤقت',
+  PERMANENT: 'مرسم', TRAINEE: 'متربص', CONTRACT: 'متعاقد', TEMPORARY_CONTRACT: 'متعاقد مؤقت', SUBSTITUTE: 'مستخلف',
 };
 
 function formatDate(value: string): string {

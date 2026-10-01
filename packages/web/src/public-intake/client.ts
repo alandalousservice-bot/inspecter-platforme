@@ -5,7 +5,7 @@ export type TeacherSubmissionPayload = {
   placeOfBirth: string;
   phone: string;
   email: string;
-  professionalStatus: 'PERMANENT' | 'TRAINEE' | 'CONTRACT' | 'TEMPORARY_CONTRACT';
+  professionalStatus: 'PERMANENT' | 'TRAINEE' | 'CONTRACT' | 'TEMPORARY_CONTRACT' | 'SUBSTITUTE';
   employmentDate: string;
   confirmationDate?: string;
   qualifications?: string;

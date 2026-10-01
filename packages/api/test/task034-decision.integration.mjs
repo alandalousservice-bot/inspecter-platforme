@@ -176,7 +176,11 @@ test('clean chain creates Teacher columns, indexes, and restricted FKs', async (
   const columns = await db.$queryRaw`SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_schema=${schemaName} AND table_name='Teacher'`;
   assert.deepEqual(columns.map((row) => row.column_name).sort(), [
     'id', 'districtId', 'institutionId', 'name', 'surname', 'birthDate', 'placeOfBirth', 'phone', 'email', 'professionalStatus',
-    'employedAt', 'confirmedAt', 'qualifications', 'recordStatus', 'archivedAt', 'createdAt', 'updatedAt',
+    'employedAt', 'confirmedAt', 'qualifications', 'professionalFramework', 'firstEducationAppointmentDate',
+    'firstEducationAppointmentDecisionNumber', 'firstInstallationDate', 'traineeshipDate', 'institutionAppointmentDate',
+    'institutionAppointmentNumber', 'financialControllerVisaNumber', 'administrativeCategory', 'administrativeSection',
+    'administrativeGrade', 'administrativeClassificationEffectiveDate', 'birthProvince', 'personalAddress', 'administrativeNote',
+    'recordStatus', 'archivedAt', 'createdAt', 'updatedAt',
   ].sort());
   for (const field of ['id', 'districtId', 'name', 'surname', 'recordStatus', 'createdAt', 'updatedAt']) {
     assert.equal(columns.find((row) => row.column_name === field)?.is_nullable, 'NO');

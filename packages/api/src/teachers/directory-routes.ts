@@ -22,7 +22,7 @@ const listQuerySchema = z.object({
   q: normalizedQuery.optional(),
   institutionId: uuid.optional(),
   hasCurrentInstitution: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),
-  professionalStatus: z.enum(['PERMANENT', 'TRAINEE', 'CONTRACT', 'TEMPORARY_CONTRACT']).optional(),
+  professionalStatus: z.enum(['PERMANENT', 'TRAINEE', 'CONTRACT', 'TEMPORARY_CONTRACT', 'SUBSTITUTE']).optional(),
   recordStatus: z.enum(['ACTIVE', 'INACTIVE']).default('ACTIVE'),
   academicYear: academicYearQuery.optional(),
   dayOfWeek: positiveIntegerQuery(1, 7).optional(),

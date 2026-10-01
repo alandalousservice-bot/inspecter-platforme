@@ -299,3 +299,7 @@ UUID المقاطعة المشوه يعيد `400` عامًا؛ مقاطعة غي
 الطلبات المخزنة قبل TASK-041 تبقى بصيغة G3 ولا تُعاد كتابتها. قارئ الطلب للمفتش يتعرف على الشكلين دون تخمين قيم مفقودة؛ `GET /submissions` يبقي `primaryInstitutionName` كاسم حقل **عرض متوافق** مستمد من الاسم القديم أو `workplace.institutionName` الجديد، وتعرض واجهة التفصيل بيانات workplace الجديدة أو الاسم والأسماء الإضافية التاريخية القديمة مع وسم واضح. `GET /teachers/:id` المستقبلي يعرض `declaredWorkplace` الموحّد و`currentInstitution` المعتمدة منفصلين كما أعلاه. لا يتيح ذلك إرسال شكل G3 القديم من جديد بعد تفعيل العقد الجديد، ولا يُعاد تفسير الأسماء الإضافية القديمة كروابط حالية.
 
 الطباعة: `/print` route داخل الواجهة يجلب snapshot موثقًا من endpoints أعلاه؛ `@media print` A4، حفظ PDF من المتصفح. لا يُعلن عن API لملف PDF مولد على الخادم قبل إثبات الحاجة. رفع الملفات وTrainingEvent CRUD عقود مؤجلة؛ foundations في [DATABASE](DATABASE.md) لا تعني endpoints عاملة. تفاصيل الحالة في [UI_MAP](UI_MAP.md).
+
+## TASK-080 Teacher/Institution administrative API evolution (ADR-036, completed)
+
+[عقد TASK-080 التفصيلي](architecture/TASK_080_TEACHER_ADMINISTRATIVE_MASTER_DATA.md) يوثق الإضافات المتوافقة المنفذة لـ`GET/PATCH /api/v1/teachers/:id` و`GET/POST/PATCH /api/v1/institutions` وحقل `professionalStatus=SUBSTITUTE` في public POST وفلتر Teacher directory. يسبق هذا القسم قوائم allowlist الأقدم **لهذه الإضافات فقط**؛ تبقى سلوكيات النطاق وCSRF والخصوصية والصفحات والردود الأخرى كما هي. لا route جديد ولا حقول إدارية عامة في public body. TASK-080 مكتملة؛ تفاصيل الحقول والإسقاطات في العقد المشار إليه.

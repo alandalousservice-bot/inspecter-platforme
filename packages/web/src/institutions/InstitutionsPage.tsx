@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router';
 import { Button, Card, CardContent, CardHeader, DataTable, Dialog, EmptyState, ErrorState, Input, LoadingState, SuccessState, type DataTableColumn } from '../ui';
-import { createInstitution, getCurrentDistricts, listInstitutions, type DistrictOption, type Institution } from '../auth/client';
+import { ApiRequestError, createInstitution, getCurrentDistricts, listInstitutions, updateInstitution, type DistrictOption, type Institution } from '../auth/client';
 import './institutions.css';
 
 const PAGE_SIZE = 25;
@@ -24,11 +24,16 @@ export function InstitutionsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [name, setName] = useState('');
   const [externalCode, setExternalCode] = useState('');
+  const [email, setEmail] = useState('');
   const [selectedDistrictId, setSelectedDistrictId] = useState('');
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [createError, setCreateError] = useState('');
   const [creating, setCreating] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [editingInstitution, setEditingInstitution] = useState<Institution | null>(null);
+  const [emailDraft, setEmailDraft] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [emailSaving, setEmailSaving] = useState(false);
 
   const currentCursor = cursorHistory[pageIndex] ?? '';
 
@@ -68,6 +73,8 @@ export function InstitutionsPage() {
   const columns = useMemo<DataTableColumn<Institution>[]>(() => [
     { id: 'name', header: 'اسم المؤسسة', render: (row) => row.name },
     { id: 'externalCode', header: 'الرمز الخارجي', render: (row) => row.externalCode || '—' },
+    { id: 'email', header: 'البريد الإلكتروني', render: (row) => row.email || '—' },
+    { id: 'actions', header: 'إجراء', render: (row) => <Button variant="secondary" onClick={() => { setEditingInstitution(row); setEmailDraft(row.email ?? ''); setEmailError(''); }}>تعديل البريد</Button> },
   ], []);
 
   function submitSearch(event: FormEvent<HTMLFormElement>) {
@@ -82,6 +89,7 @@ export function InstitutionsPage() {
   function openCreateDialog() {
     setName('');
     setExternalCode('');
+    setEmail('');
     setSelectedDistrictId(districts.length === 1 ? districts[0].id : '');
     setFormErrors({});
     setCreateError('');
@@ -105,6 +113,8 @@ export function InstitutionsPage() {
     if (!name.trim()) errors.name = 'أدخل اسم المؤسسة.';
     else if (name.trim().length > 200) errors.name = 'يجب ألا يتجاوز الاسم 200 حرف.';
     if (externalCode.trim().length > 100) errors.externalCode = 'يجب ألا يتجاوز الرمز 100 حرف.';
+    const normalizedEmail = email.trim();
+    if (normalizedEmail && (Array.from(normalizedEmail).length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(normalizedEmail))) errors.email = 'أدخل بريدًا إلكترونيًا صالحًا لا يتجاوز 254 حرفًا.';
     if (districts.length === 0) errors.districtId = 'لا توجد مقاطعة حالية متاحة لإنشاء مؤسسة.';
     else if (!selectedDistrictId || !districts.some((district) => district.id === selectedDistrictId)) {
       errors.districtId = 'اختر المقاطعة.';
@@ -119,6 +129,7 @@ export function InstitutionsPage() {
         districtId: selectedDistrictId,
         name: name.trim(),
         ...(externalCode.trim() ? { externalCode: externalCode.trim() } : {}),
+        ...(normalizedEmail ? { email: normalizedEmail } : {}),
       });
       setDialogOpen(false);
       setSuccessMessage('تم إنشاء المؤسسة بنجاح.');
@@ -137,9 +148,33 @@ export function InstitutionsPage() {
         }
         setFormErrors(fieldErrors);
       }
-      setCreateError(error instanceof Error ? error.message : 'تعذر إنشاء المؤسسة. تحقق من البيانات وحاول مجددًا.');
+      setCreateError(error instanceof ApiRequestError
+        ? error.message
+        : 'تعذر إنشاء المؤسسة. تحقق من البيانات والصلاحيات ثم حاول مجددًا.');
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function saveInstitutionEmail(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingInstitution || emailSaving) return;
+    const value = emailDraft.trim();
+    if (value && (Array.from(value).length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(value))) {
+      setEmailError('أدخل بريدًا إلكترونيًا صالحًا لا يتجاوز 254 حرفًا.');
+      return;
+    }
+    setEmailSaving(true);
+    setEmailError('');
+    try {
+      await updateInstitution(editingInstitution.id, { email: value || null });
+      setEditingInstitution(null);
+      setSuccessMessage('تم تحديث بريد المؤسسة بنجاح.');
+      setRefreshKey((current) => current + 1);
+    } catch {
+      setEmailError('تعذر تحديث البريد. تحقق من البيانات والصلاحيات ثم حاول مجددًا.');
+    } finally {
+      setEmailSaving(false);
     }
   }
 
@@ -212,10 +247,22 @@ export function InstitutionsPage() {
           ) : null}
           <Input id="institution-name" label="اسم المؤسسة" required maxLength={200} value={name} error={formErrors.name} onChange={(event) => setName(event.currentTarget.value)} />
           <Input id="institution-code" label="الرمز الخارجي" hint="اختياري" maxLength={100} value={externalCode} error={formErrors.externalCode} onChange={(event) => setExternalCode(event.currentTarget.value)} />
+          <Input id="institution-email" label="البريد الإلكتروني" type="email" hint="اختياري" maxLength={254} value={email} error={formErrors.email} onChange={(event) => setEmail(event.currentTarget.value)} />
           {createError ? <ErrorState description={createError} /> : null}
           <div className="institution-form__actions">
             <Button type="submit" disabled={creating || districtsLoading || districtsError || districts.length === 0}>{creating ? 'جارٍ الإنشاء…' : 'إنشاء المؤسسة'}</Button>
             <Button type="button" variant="secondary" disabled={creating} onClick={() => setDialogOpen(false)}>إلغاء</Button>
+          </div>
+        </form>
+      </Dialog>
+      <Dialog open={editingInstitution !== null} title="تعديل بريد المؤسسة" onClose={() => { if (!emailSaving) setEditingInstitution(null); }} actions={null}>
+        <form className="institution-form" onSubmit={(event) => void saveInstitutionEmail(event)} noValidate>
+          <p>{editingInstitution?.name}</p>
+          <Input id="institution-edit-email" label="البريد الإلكتروني" type="email" maxLength={254} hint="اتركه فارغًا لمسح البريد المسجل." value={emailDraft} error={emailError} onChange={(event) => setEmailDraft(event.currentTarget.value)} />
+          {emailError && !emailError.includes('بريدًا') ? <p role="alert">{emailError}</p> : null}
+          <div className="institution-form__actions">
+            <Button type="submit" disabled={emailSaving}>{emailSaving ? 'جارٍ الحفظ…' : 'حفظ البريد'}</Button>
+            <Button type="button" variant="secondary" disabled={emailSaving} onClick={() => setEditingInstitution(null)}>إلغاء</Button>
           </div>
         </form>
       </Dialog>

@@ -5,7 +5,7 @@ import { Button, Card, CardContent, CardHeader, DataTable, ErrorState, Input, Lo
 import './teacher-directory.css';
 
 const LIMIT = 25;
-const PROFESSIONAL_LABELS = { PERMANENT: 'مرسم', TRAINEE: 'متربص', CONTRACT: 'متعاقد', TEMPORARY_CONTRACT: 'متعاقد مؤقت' } as const;
+const PROFESSIONAL_LABELS = { PERMANENT: 'مرسم', TRAINEE: 'متربص', CONTRACT: 'متعاقد', TEMPORARY_CONTRACT: 'متعاقد مؤقت', SUBSTITUTE: 'مستخلف' } as const;
 const DAYS = ['الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد'];
 const SEARCH_KEYS = ['q', 'districtId', 'institutionId', 'hasCurrentInstitution', 'professionalStatus', 'recordStatus', 'academicYear', 'dayOfWeek', 'minuteOfDay', 'worksToday', 'worksNow'] as const;
 
@@ -217,7 +217,7 @@ export function TeacherDirectoryPage() {
             {params.has('institutionId') ? <Button variant="secondary" onClick={() => { setInstitutionDraft(''); setInstitutionQuery(''); applyChanges({ institutionId: undefined }); }}>مسح اختيار المؤسسة</Button> : null}
           </div>
           <div className="ui-field"><label className="ui-field__label" htmlFor="teacher-assignment-filter">المؤسسة الحالية المعتمدة</label><select id="teacher-assignment-filter" className="ui-input" value={params.get('hasCurrentInstitution') ?? ''} onChange={(event) => applyChanges({ hasCurrentInstitution: event.currentTarget.value || undefined, institutionId: event.currentTarget.value === 'false' ? undefined : params.get('institutionId') ?? undefined })}><option value="">الكل</option><option value="true">لديه مؤسسة حالية معتمدة</option><option value="false">لم تُعتمد له مؤسسة حالية</option></select></div>
-          <div className="ui-field"><label className="ui-field__label" htmlFor="teacher-professional-filter">الصفة المهنية</label><select id="teacher-professional-filter" className="ui-input" value={params.get('professionalStatus') ?? ''} onChange={(event) => applyChanges({ professionalStatus: event.currentTarget.value || undefined })}><option value="">كل الصفات</option><option value="PERMANENT">مرسم</option><option value="TRAINEE">متربص</option><option value="CONTRACT">متعاقد</option><option value="TEMPORARY_CONTRACT">متعاقد مؤقت</option></select></div>
+          <div className="ui-field"><label className="ui-field__label" htmlFor="teacher-professional-filter">الصفة المهنية</label><select id="teacher-professional-filter" className="ui-input" value={params.get('professionalStatus') ?? ''} onChange={(event) => applyChanges({ professionalStatus: event.currentTarget.value || undefined })}><option value="">كل الصفات</option><option value="PERMANENT">مرسم</option><option value="TRAINEE">متربص</option><option value="CONTRACT">متعاقد</option><option value="TEMPORARY_CONTRACT">متعاقد مؤقت</option><option value="SUBSTITUTE">مستخلف</option></select></div>
           <div className="ui-field"><label className="ui-field__label" htmlFor="teacher-record-filter">حالة السجل</label><select id="teacher-record-filter" className="ui-input" value={params.get('recordStatus') ?? 'ACTIVE'} onChange={(event) => applyChanges({ recordStatus: event.currentTarget.value === 'ACTIVE' ? undefined : event.currentTarget.value })}><option value="ACTIVE">نشط — الافتراضي</option><option value="INACTIVE">غير نشط</option></select></div>
         </div>
         <fieldset className="teacher-directory__schedule-filters"><legend>مرشحات التوزيع الأسبوعي</legend>

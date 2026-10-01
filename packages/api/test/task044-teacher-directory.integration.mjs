@@ -139,7 +139,7 @@ before(async () => {
     institutionId: index % 2 === 0 ? institutionA.id : null,
     name: `Demo ${String(index).padStart(3, '0')}`,
     surname: `Teacher ${String(index).padStart(3, '0')}`,
-    professionalStatus: ['PERMANENT', 'TRAINEE', 'CONTRACT', 'TEMPORARY_CONTRACT'][index % 4],
+    professionalStatus: ['PERMANENT', 'TRAINEE', 'CONTRACT', 'TEMPORARY_CONTRACT', 'SUBSTITUTE'][index % 5],
     recordStatus: 'ACTIVE',
   })) });
   const bulkTeachers = await db.teacher.findMany({ where: { districtId: districtA.id, name: { startsWith: 'Demo ' } }, orderBy: { name: 'asc' }, select: { id: true } });
@@ -153,7 +153,7 @@ before(async () => {
   await createTeacher({ name: 'غير نشط', surname: 'أستاذ', recordStatus: 'INACTIVE' });
   await createTeacher({ name: 'بلا مؤسسة', surname: 'نشط', institutionId: null });
   await createTeacher({ name: 'مع أرشفة مستقلة', surname: 'نشط', archivedAt: new Date('2026-01-01T00:00:00Z') });
-  for (const professionalStatus of ['PERMANENT', 'TRAINEE', 'CONTRACT', 'TEMPORARY_CONTRACT']) {
+  for (const professionalStatus of ['PERMANENT', 'TRAINEE', 'CONTRACT', 'TEMPORARY_CONTRACT', 'SUBSTITUTE']) {
     await createTeacher({ name: `حالة ${professionalStatus}`, surname: 'اختبار', professionalStatus });
   }
   await createTeacher({ name: 'NULL', surname: 'مهني', professionalStatus: null });
@@ -262,7 +262,7 @@ test('TASK-044 authenticated scoped directory, search, schedule filters and stab
     assert.equal((await list(`institutionId=${institutionA.id}&hasCurrentInstitution=false`)).response.status, 400);
     assert.equal((await list(`institutionId=${outsideInstitution.id}`)).response.status, 404);
     assert.equal((await list(`institutionId=${institutionB.id}&districtId=${districtA.id}`)).response.status, 404);
-    for (const status of ['PERMANENT', 'TRAINEE', 'CONTRACT', 'TEMPORARY_CONTRACT']) {
+    for (const status of ['PERMANENT', 'TRAINEE', 'CONTRACT', 'TEMPORARY_CONTRACT', 'SUBSTITUTE']) {
       const filtered = await list(`professionalStatus=${status}`);
       assert.ok(filtered.body.data.every((teacher) => teacher.professionalStatus === status));
       assert.ok(filtered.body.page.total > 0);

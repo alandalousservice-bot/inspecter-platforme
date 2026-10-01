@@ -26,7 +26,7 @@ test('valid Arabic submission normalizes the single structured workplace', () =>
   assert.deepEqual(parsed.workplace, { institutionName: 'مدرسة النور', municipality: 'بلدية الجزائر', institutionAddress: 'شارع الاستقلال', directorPhone: '+21321234567' });
 });
 
-test('only the four documented professional statuses are accepted', () => {
+test('all five documented professional statuses are accepted', () => {
   for (const professionalStatus of PROFESSIONAL_STATUSES) {
     assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, professionalStatus }).success, true);
   }

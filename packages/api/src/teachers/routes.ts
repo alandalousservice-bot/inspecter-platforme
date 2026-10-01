@@ -12,9 +12,23 @@ import { requireInspectorDistrictMembership } from '../policy/district-access.js
 const fields = [
   'name', 'surname', 'birthDate', 'placeOfBirth', 'phone', 'email',
   'professionalStatus', 'employedAt', 'confirmedAt', 'qualifications',
+  'professionalFramework', 'firstEducationAppointmentDate', 'firstEducationAppointmentDecisionNumber',
+  'firstInstallationDate', 'traineeshipDate', 'institutionAppointmentDate', 'institutionAppointmentNumber',
+  'financialControllerVisaNumber', 'administrativeCategory', 'administrativeSection', 'administrativeGrade',
+  'administrativeClassificationEffectiveDate', 'birthProvince', 'personalAddress', 'administrativeNote',
 ] as const;
 type EditableField = typeof fields[number];
 const nullableDate = dateField.nullable();
+const administrativeText = (maximum: number, multiline = false) => z.string().transform((raw, context) => {
+  const invalidRawControl = [...raw].some((character) => /[\p{Cc}]/u.test(character) && !(multiline && (character === '\n' || character === '\r')));
+  let value = raw.normalize('NFC');
+  value = multiline ? value.replace(/\r\n?/gu, '\n').trim() : value.trim().replace(/\s+/gu, ' ');
+  if (invalidRawControl || !value || Array.from(value).length > maximum) {
+    context.addIssue({ code: 'custom', message: 'قيمة غير صالحة.' });
+    return z.NEVER;
+  }
+  return value;
+});
 const patchSchema = z.object({
   name: cleanText(100, true).optional(),
   surname: cleanText(100, true).optional(),
@@ -26,6 +40,21 @@ const patchSchema = z.object({
   employedAt: nullableDate.optional(),
   confirmedAt: nullableDate.optional(),
   qualifications: cleanText(1000).nullable().optional(),
+  professionalFramework: administrativeText(120).nullable().optional(),
+  firstEducationAppointmentDate: nullableDate.optional(),
+  firstEducationAppointmentDecisionNumber: administrativeText(120).nullable().optional(),
+  firstInstallationDate: nullableDate.optional(),
+  traineeshipDate: nullableDate.optional(),
+  institutionAppointmentDate: nullableDate.optional(),
+  institutionAppointmentNumber: administrativeText(120).nullable().optional(),
+  financialControllerVisaNumber: administrativeText(120).nullable().optional(),
+  administrativeCategory: administrativeText(100).nullable().optional(),
+  administrativeSection: administrativeText(100).nullable().optional(),
+  administrativeGrade: administrativeText(100).nullable().optional(),
+  administrativeClassificationEffectiveDate: nullableDate.optional(),
+  birthProvince: administrativeText(100).nullable().optional(),
+  personalAddress: administrativeText(300).nullable().optional(),
+  administrativeNote: administrativeText(1000, true).nullable().optional(),
 }).strict().refine((value) => Object.keys(value).length > 0, { message: 'يلزم حقل واحد على الأقل.' });
 type Patch = z.infer<typeof patchSchema>;
 const institutionCreateSchema = z.object({
@@ -78,6 +107,11 @@ async function readProfile(database: Pick<PrismaClient, 'teacher'>, id: string) 
     birthDate: toCalendar(current.birthDate),
     employedAt: toCalendar(current.employedAt),
     confirmedAt: toCalendar(current.confirmedAt),
+    firstEducationAppointmentDate: toCalendar(current.firstEducationAppointmentDate),
+    firstInstallationDate: toCalendar(current.firstInstallationDate),
+    traineeshipDate: toCalendar(current.traineeshipDate),
+    institutionAppointmentDate: toCalendar(current.institutionAppointmentDate),
+    administrativeClassificationEffectiveDate: toCalendar(current.administrativeClassificationEffectiveDate),
     declaredInstitutions,
     declaredWorkplace,
     currentInstitution: institution,
@@ -112,15 +146,19 @@ export function registerTeacherProfileRoutes(app: Express, database: PrismaClien
       if (!teacher) throw notFound();
       await requireInspectorDistrictMembership(transaction, inspectorId, teacher.districtId);
       validateResultingDates(teacher, patch);
+      if (teacher.institutionId === null && [patch.institutionAppointmentDate, patch.institutionAppointmentNumber, patch.financialControllerVisaNumber].some((value) => value !== undefined && value !== null)) {
+        throw new ApiError(409, 'CONFLICT', 'لا يمكن تسجيل بيانات تعيين المؤسسة قبل اعتماد مؤسسة حالية.');
+      }
 
       const changed: Partial<Record<EditableField, string | Date | null>> = {};
       for (const field of fields) {
         const value = patch[field];
         if (value === undefined) continue;
-        const existing = field === 'birthDate' || field === 'employedAt' || field === 'confirmedAt'
-          ? toCalendar(teacher[field]) : teacher[field];
-        if (value !== existing) changed[field] = field === 'birthDate' || field === 'employedAt' || field === 'confirmedAt'
-          ? toDate(value) : value;
+        const dateFields = ['birthDate', 'employedAt', 'confirmedAt', 'firstEducationAppointmentDate', 'firstInstallationDate', 'traineeshipDate', 'institutionAppointmentDate', 'administrativeClassificationEffectiveDate'];
+        const existing = dateFields.includes(field)
+          ? toCalendar(teacher[field] as Date | null) : teacher[field];
+        if (value !== existing) changed[field] = dateFields.includes(field)
+          ? toDate(value as string | null) : value;
       }
       const changedFields = Object.keys(changed).sort() as EditableField[];
       if (changedFields.length === 0) return;
@@ -182,7 +220,14 @@ export function registerTeacherProfileRoutes(app: Express, database: PrismaClien
         };
       }
 
-      await transaction.teacher.update({ where: { id: teacher.id }, data: { institutionId: targetInstitutionId } });
+      const homeInstitutionFields = ['institutionAppointmentDate', 'institutionAppointmentNumber', 'financialControllerVisaNumber'] as const;
+      const clearedHomeFields = homeInstitutionFields.filter((field) => teacher[field] !== null);
+      await transaction.teacher.update({ where: { id: teacher.id }, data: {
+        institutionId: targetInstitutionId,
+        institutionAppointmentDate: null,
+        institutionAppointmentNumber: null,
+        financialControllerVisaNumber: null,
+      } });
       if (createdInstitution) {
         await appendAuditEvent(transaction, {
           source: 'HTTP', actorInspectorId: inspectorId, districtId: teacher.districtId,
@@ -198,6 +243,13 @@ export function registerTeacherProfileRoutes(app: Express, database: PrismaClien
           ? { institutionId: targetInstitutionId }
           : { previousInstitutionId: teacher.institutionId, institutionId: targetInstitutionId },
       });
+      if (clearedHomeFields.length) {
+        await appendAuditEvent(transaction, {
+          source: 'HTTP', actorInspectorId: inspectorId, districtId: teacher.districtId,
+          action: AuditAction.TEACHER_PROFILE_UPDATED, entityType: 'Teacher', entityId: teacher.id,
+          requestId, metadata: { changedFields: clearedHomeFields.sort() },
+        });
+      }
       const currentInstitution = createdInstitution ?? await transaction.institution.findUniqueOrThrow({ where: { id: targetInstitutionId } });
       return {
         teacherId: teacher.id,

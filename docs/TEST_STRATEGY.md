@@ -97,3 +97,7 @@ Connected browser على Vite + API + PostgreSQL الاختبار المعزول
 - الأمر يقرأ credential من `D:\pg-task020-temp\task020-test-url.secret`، ويتحقق قبل الاتصال أن الهدف `127.0.0.1:55432/task020_test` بدور `task020_test_user`. لا يطبع أو يحفظ connection string في ملفات المشروع. يطبق migration chain في schema مؤقتة باسم فريد ويزيل ذلك schema عند انتهاء الاختبار.
 - Fixtures اصطناعية فقط؛ واجهة المتصفح تنفذ public submission وقرارات Inspector وTeacher PATCH عبر API الفعلي وCSRF الحقيقي. Prisma في الاختبار يستخدم للتهيئة/التحقق من invariants فقط.
 - اختبارات قاعدة البيانات TASK-020..035 عبر `npm run test:db` تتطلب `TEST_DATABASE_URL` مؤقتًا إلى قاعدة الاختبار المعزولة ذاتها؛ يمنع استخدام port 5432 أو أي قاعدة بعيدة/إنتاجية. مخرجات Playwright (`test-results/` و`playwright-report/`) مؤقتة ولا تُتبع في Git.
+
+## TASK-080 completed test evidence
+
+مصفوفة [عقد TASK-080](architecture/TASK_080_TEACHER_ADMINISTRATIVE_MASTER_DATA.md) نُفذت واجتازت: migration clean/upgrade على PostgreSQL المعزولة، `SUBSTITUTE` من الاستمارة إلى القبول والملف والدليل، حدود/تطبيع/خصوصية الحقول الإدارية والبريد، تدقيق ذري بأسماء الحقول فقط، إسقاطات بلا تسرب، وregressions DB لكل من TASK-035/044/047/050/052/053/053A/054؛ UI 163/163، API 29/29، DB/integration 142/142، connected browser suites، typecheck/lint/build/smoke/diff-check كلها PASS.

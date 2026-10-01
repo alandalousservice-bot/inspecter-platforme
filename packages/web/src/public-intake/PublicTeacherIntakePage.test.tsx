@@ -54,6 +54,7 @@ describe('TASK-031 public teacher intake', () => {
     expect(within(status).getByRole('option', { name: 'متربص' }).getAttribute('value')).toBe('TRAINEE');
     expect(within(status).getByRole('option', { name: 'متعاقد' }).getAttribute('value')).toBe('CONTRACT');
     expect(within(status).getByRole('option', { name: 'متعاقد مؤقت' }).getAttribute('value')).toBe('TEMPORARY_CONTRACT');
+    expect(within(status).getByRole('option', { name: 'مستخلف' }).getAttribute('value')).toBe('SUBSTITUTE');
     expect(container.textContent).not.toMatch(/PERMANENT|TRAINEE|CONTRACT/);
   });
 
@@ -94,6 +95,19 @@ describe('TASK-031 public teacher intake', () => {
     await screen.findByRole('heading', { name: 'تم استلام بياناتك' });
     const payload = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body)) as Record<string, unknown>;
     expect(payload.professionalStatus).toBe('TRAINEE');
+  });
+
+  it('submits SUBSTITUTE as the existing required status without adding public fields', async () => {
+    renderPage();
+    fillRequired();
+    fireEvent.change(screen.getByRole('combobox', { name: /الصفة المهنية/ }), { target: { value: 'SUBSTITUTE' } });
+    await submit();
+    await screen.findByRole('heading', { name: 'تم استلام بياناتك' });
+    const payload = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body)) as Record<string, unknown>;
+    expect(payload.professionalStatus).toBe('SUBSTITUTE');
+    expect(payload).not.toHaveProperty('professionalFramework');
+    expect(payload).not.toHaveProperty('birthProvince');
+    expect(payload).not.toHaveProperty('personalAddress');
   });
 
   it('blocks missing or malformed required values with associated accessible field errors', async () => {

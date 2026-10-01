@@ -5,6 +5,7 @@ export const PROFESSIONAL_STATUSES = [
   'TRAINEE',
   'CONTRACT',
   'TEMPORARY_CONTRACT',
+  'SUBSTITUTE',
 ] as const;
 
 const controlCharacters = /[\p{Cc}]/u;

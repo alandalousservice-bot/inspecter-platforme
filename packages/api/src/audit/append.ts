@@ -37,6 +37,10 @@ const eventContracts = {
     metadata: z.object({ changedFields: z.array(z.enum([
       'name', 'surname', 'birthDate', 'placeOfBirth', 'phone', 'email',
       'professionalStatus', 'employedAt', 'confirmedAt', 'qualifications',
+      'professionalFramework', 'firstEducationAppointmentDate', 'firstEducationAppointmentDecisionNumber',
+      'firstInstallationDate', 'traineeshipDate', 'institutionAppointmentDate', 'institutionAppointmentNumber',
+      'financialControllerVisaNumber', 'administrativeCategory', 'administrativeSection', 'administrativeGrade',
+      'administrativeClassificationEffectiveDate', 'birthProvince', 'personalAddress', 'administrativeNote',
     ])).min(1) }).strict(),
   },
   [AuditAction.INSPECTOR_PROFESSIONAL_IDENTITY_UPDATED]: {
@@ -52,7 +56,7 @@ const eventContracts = {
   [AuditAction.INSTITUTION_CREATED]: { entityType: 'Institution', metadata: z.object({}).strict() },
   [AuditAction.INSTITUTION_UPDATED]: {
     entityType: 'Institution',
-    metadata: z.object({ changedFields: z.array(z.enum(['name', 'municipality', 'address', 'directorPhone'])).min(1) }).strict(),
+    metadata: z.object({ changedFields: z.array(z.enum(['name', 'municipality', 'address', 'directorPhone', 'email'])).min(1) }).strict(),
   },
   [AuditAction.TEACHER_INSTITUTION_LINKED]: {
     entityType: 'Teacher',

@@ -5,7 +5,7 @@ import { appendAuditEvent, AuditAction } from '../audit/append.js';
 import { ApiError } from '../http/api-error.js';
 import { validateBody } from '../http/validate-body.js';
 import { requireAuthenticatedMutationCsrf } from '../identity/auth-routes.js';
-import { cleanText, directorPhoneField } from '../intake/submission-schema.js';
+import { cleanText, directorPhoneField, emailField } from '../intake/submission-schema.js';
 import { requireInspectorDistrictMembership } from '../policy/district-access.js';
 
 type InstitutionDatabase = Pick<PrismaClient, 'institution' | 'inspectorDistrictMembership' | '$transaction'>;
@@ -15,6 +15,7 @@ const workplaceFields = {
   municipality: cleanText(150, true).nullable().optional(),
   address: cleanText(300, true).nullable().optional(),
   directorPhone: directorPhoneField.nullable().optional(),
+  email: emailField.nullable().optional(),
 };
 const createSchema = z.object({
   districtId: uuid,
@@ -35,9 +36,9 @@ const listSchema = z.object({
 const institutionSelect = {
   id: true, districtId: true, name: true, externalCode: true,
   municipality: true, address: true, directorPhone: true,
-  archivedAt: true, createdAt: true, updatedAt: true,
+  email: true, archivedAt: true, createdAt: true, updatedAt: true,
 } as const;
-const changedInstitutionFields = ['name', 'municipality', 'address', 'directorPhone'] as const;
+const changedInstitutionFields = ['name', 'municipality', 'address', 'directorPhone', 'email'] as const;
 type ChangedInstitutionField = typeof changedInstitutionFields[number];
 type InstitutionUpdate = z.infer<typeof updateSchema>;
 

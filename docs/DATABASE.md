@@ -185,3 +185,7 @@ Migration واحدة forward-only **بعد** سلسلة G5 وقبل TASK-054: `v
 ## سياسة التاريخ والهجرات
 
 يحفظ القرار والزيارات والتقارير النهائية والمراجعات وسجل التدقيق؛ أرشفة Teacher/Institution/Proposal بدل الحذف المعتاد. عدم تغيير revision منشورة؛ نسخ المقترح يُنشئ proposal جديدًا ذا sourceRevision اختياري. migrations صغيرة بإستراتيجية expand/backfill/contract، مراجعة SQL والقيم الافتراضية والفهارس، backup قبل الإنتاج، تحقق rollback أو خطة forward fix؛ التنفيذ خارج طلب المعمارية. سياسة الاحتفاظ والحذف القانوني [OPEN](DECISIONS.md).
+
+## TASK-080 additive Teacher/Institution evolution (ADR-036, completed)
+
+بعد [ADR-036](DECISIONS.md#adr-036--teacher-information-workplace-and-administrative-profile-evolution)، سجل [TASK-080](architecture/TASK_080_TEACHER_ADMINISTRATIVE_MASTER_DATA.md) الحقول والأنواع والحدود، ونُفذت بإضافة migration واحدة forward-only. جداول/حقول TASK-081..086 خارجها. `professionalStatus` String وليس PostgreSQL enum؛ أضيفت `SUBSTITUTE` دون تحويل القيم السابقة. الأعمدة الجديدة nullable دون backfill، وتبقى `Teacher.qualifications` واللقطات التاريخية كما هي. وصف Teacher/Institution الفيزيائي الأقدم أعلاه هو baseline السابق لهذا التطور.

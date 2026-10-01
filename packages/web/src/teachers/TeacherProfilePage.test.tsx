@@ -16,6 +16,10 @@ const profile: TeacherProfile = {
   birthDate: '1985-03-04', placeOfBirth: 'وهران', phone: '+213555123456', email: 'Amina@example.dz',
   professionalStatus: 'PERMANENT', employedAt: '2005-09-01', confirmedAt: null,
   qualifications: 'شهادة', recordStatus: 'ACTIVE', archivedAt: null,
+  professionalFramework: null, firstEducationAppointmentDate: null, firstEducationAppointmentDecisionNumber: null,
+  firstInstallationDate: null, traineeshipDate: null, institutionAppointmentDate: null, institutionAppointmentNumber: null,
+  financialControllerVisaNumber: null, administrativeCategory: null, administrativeSection: null, administrativeGrade: null,
+  administrativeClassificationEffectiveDate: null, birthProvince: null, personalAddress: null, administrativeNote: null,
   createdAt: '2026-09-29T10:00:00Z', updatedAt: '2026-09-29T10:00:00Z',
   declaredInstitutions: { primaryInstitutionName: 'ابتدائية النور', additionalInstitutionNames: ['ابتدائية الفجر'] },
   declaredWorkplace: { institutionName: 'ابتدائية النور', municipality: 'وهران', institutionAddress: 'شارع النخيل', directorPhone: '+21321234567', legacyAdditionalInstitutionNames: ['ابتدائية الفجر'] },
@@ -24,7 +28,7 @@ const profile: TeacherProfile = {
 
 const institution: Institution = {
   id: 'institution-1', districtId: 'hidden-district', name: 'ابتدائية الأمل', externalCode: null,
-  municipality: 'وهران', address: 'شارع الاستقلال', directorPhone: '+21321234567', archivedAt: null,
+  municipality: 'وهران', address: 'شارع الاستقلال', directorPhone: '+21321234567', email: null, archivedAt: null,
   createdAt: '2026-09-29T10:00:00Z', updatedAt: '2026-09-29T10:00:00Z',
 };
 

@@ -202,7 +202,7 @@ after(async () => {
                COUNT(*) FILTER (WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL)::int AS applied
         FROM "${schemaName}"."_prisma_migrations"
       `);
-      assert.deepEqual(history[0], { total: 14, applied: 14 });
+      assert.deepEqual(history[0], { total: 15, applied: 15 });
       log('TASK-020 second deploy/status: PASS; migration history: 14/14 applied');
       void secondDeploy;
     }
@@ -352,7 +352,7 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
            COUNT(*) FILTER (WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL)::int AS applied
     FROM "${schemaName}"."_prisma_migrations"
   `);
-  assert.deepEqual(migrationHistory[0], { total: 14, applied: 14 });
+  assert.deepEqual(migrationHistory[0], { total: 15, applied: 15 });
 
   await t.test('creates the four models with UUIDs, nullability, and resolvable relations', async () => {
     const runId = randomBytes(6).toString('hex');

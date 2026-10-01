@@ -158,7 +158,11 @@ test('GET returns scoped current profile and minimal accepted declarations witho
   const { data } = await response.json();
   assert.deepEqual(Object.keys(data).sort(), [
     'id', 'districtId', 'name', 'surname', 'birthDate', 'placeOfBirth', 'phone', 'email', 'professionalStatus',
-    'employedAt', 'confirmedAt', 'qualifications', 'recordStatus', 'archivedAt', 'createdAt', 'updatedAt', 'declaredInstitutions', 'declaredWorkplace', 'currentInstitution',
+    'employedAt', 'confirmedAt', 'qualifications', 'professionalFramework', 'firstEducationAppointmentDate',
+    'firstEducationAppointmentDecisionNumber', 'firstInstallationDate', 'traineeshipDate', 'institutionAppointmentDate',
+    'institutionAppointmentNumber', 'financialControllerVisaNumber', 'administrativeCategory', 'administrativeSection',
+    'administrativeGrade', 'administrativeClassificationEffectiveDate', 'birthProvince', 'personalAddress', 'administrativeNote',
+    'recordStatus', 'archivedAt', 'createdAt', 'updatedAt', 'declaredInstitutions', 'declaredWorkplace', 'currentInstitution',
   ].sort());
   assert.equal(data.birthDate, '1985-03-04');
   assert.equal(data.recordStatus, 'ACTIVE');
@@ -203,6 +207,12 @@ test('PATCH edits each field, clears nullable fields, audits changed names and k
     ['name', 'سلمى'], ['surname', 'عماري'], ['birthDate', '1984-03-04'], ['placeOfBirth', 'الجزائر'],
     ['phone', '0555123457'], ['email', 'New@EXAMPLE.DZ'], ['professionalStatus', 'TRAINEE'],
     ['employedAt', '2006-09-01'], ['confirmedAt', '2008-09-01'], ['qualifications', 'شهادة ثانية'],
+    ['professionalFramework', '  cafe\u0301   إطار '], ['firstEducationAppointmentDate', '2001-09-01'],
+    ['firstEducationAppointmentDecisionNumber', ' قرار/١٢ '], ['firstInstallationDate', '2002-09-01'],
+    ['traineeshipDate', '2003-09-01'], ['administrativeCategory', '  صنف   أ '],
+    ['administrativeSection', 'شعبة'], ['administrativeGrade', 'درجة'],
+    ['administrativeClassificationEffectiveDate', '2004-09-01'], ['birthProvince', 'الجزائر'],
+    ['personalAddress', 'عنوان شخصي'], ['administrativeNote', 'سطر أول\r\nسطر  ثان'],
   ];
   for (const [field, value] of updates) {
     const response = await request(teacher.id, 'PATCH', { [field]: value });
@@ -211,6 +221,11 @@ test('PATCH edits each field, clears nullable fields, audits changed names and k
   const profile = (await (await request(teacher.id)).json()).data;
   assert.equal(profile.phone, '+213555123457');
   assert.equal(profile.email, 'New@example.dz');
+  assert.equal(profile.professionalFramework, 'café إطار');
+  assert.equal(profile.administrativeCategory, 'صنف أ');
+  assert.equal(profile.administrativeNote, 'سطر أول\nسطر  ثان');
+  const profileEvents = await db.auditLog.findMany({ where: { entityId: teacher.id, action: 'TEACHER_PROFILE_UPDATED' }, select: { metadata: true } });
+  assert.ok(profileEvents.every(({ metadata }) => !JSON.stringify(metadata).match(/عنوان شخصي|سطر أول|قرار\/١٢|تأشيرة/u)));
   assert.equal(await db.auditLog.count({ where: { entityId: teacher.id, action: 'TEACHER_PROFILE_UPDATED' } }), updates.length);
   for (const [field] of updates.slice(2)) {
     assert.equal((await request(teacher.id, 'PATCH', { [field]: null })).status, 200, field);
@@ -231,6 +246,13 @@ test('PATCH validates strict keys, empty values, dates and resulting chronology'
     { districtId: district.id }, { institutionId: randomUUID() }, { recordStatus: 'INACTIVE' }, { archivedAt: null },
     { acceptedTeacherId: randomUUID() }, { declaredInstitutions: {} }, { notes: 'secret' },
     { name: 'x'.repeat(101) }, { name: 'bad\u0001name' }, { professionalStatus: 'OTHER' },
+    { professionalFramework: ' ' }, { professionalFramework: 'x'.repeat(121) },
+    { professionalFramework: `e\u0301${'x'.repeat(120)}` }, { firstEducationAppointmentDecisionNumber: 'x'.repeat(121) },
+    { institutionAppointmentNumber: 'x'.repeat(121) }, { financialControllerVisaNumber: 'x'.repeat(121) },
+    { administrativeCategory: 'x'.repeat(101) }, { administrativeSection: 'bad\u0001text' },
+    { administrativeSection: 'x'.repeat(101) }, { administrativeGrade: 'x'.repeat(101) }, { birthProvince: 'x'.repeat(101) },
+    { personalAddress: 'x'.repeat(301) }, { administrativeNote: ' \n ' }, { administrativeNote: `x${'😀'.repeat(1000)}` },
+    { administrativeNote: 'bad\u0001text' },
     { birthDate: '2026-02-30' }, { birthDate: '9999-01-01' },
     { birthDate: '2010-01-01' }, { employedAt: '1980-01-01' }, { employedAt: '2010-01-01' },
     { confirmedAt: '2000-01-01' }]) {
@@ -238,6 +260,13 @@ test('PATCH validates strict keys, empty values, dates and resulting chronology'
     assert.equal(response.status, 400, JSON.stringify(body));
     const error = JSON.stringify(await response.json());
     assert.equal(error.includes('secret'), false);
+  }
+  for (const field of ['firstEducationAppointmentDate', 'firstInstallationDate', 'traineeshipDate', 'institutionAppointmentDate', 'administrativeClassificationEffectiveDate']) {
+    assert.equal((await request(teacher.id, 'PATCH', { [field]: '2026-02-30' })).status, 400, field);
+  }
+  for (const field of ['institutionAppointmentDate', 'institutionAppointmentNumber', 'financialControllerVisaNumber']) {
+    const response = await request(teacher.id, 'PATCH', { [field]: field.endsWith('Date') ? '2020-01-01' : 'REF-1' });
+    assert.equal(response.status, 409, field);
   }
 });
 
@@ -277,11 +306,62 @@ test('normalized-equivalent PATCH is no-op; changed audit is allowlisted and rol
   }
 });
 
+test('home-institution appointment facts are scoped to the current link, cleared atomically, and rollback on audit failure', async () => {
+  const { teacher } = await fixture();
+  const first = await db.institution.create({ data: { districtId: district.id, name: 'Current Home A' } });
+  const second = await db.institution.create({ data: { districtId: district.id, name: 'Current Home B' } });
+  await db.teacher.update({ where: { id: teacher.id }, data: {
+    institutionId: first.id, institutionAppointmentDate: new Date('2020-02-03T00:00:00Z'),
+    institutionAppointmentNumber: 'REF-20', financialControllerVisaNumber: 'VISA-20',
+  } });
+  await db.institution.update({ where: { id: first.id }, data: { email: 'home@example.invalid' } });
+  const same = await currentInstitutionRequest(teacher.id, { institutionId: first.id, expectedInstitutionId: first.id });
+  assert.equal(same.status, 200);
+  let saved = await db.teacher.findUniqueOrThrow({ where: { id: teacher.id } });
+  assert.equal(saved.institutionAppointmentDate.toISOString().slice(0, 10), '2020-02-03');
+  assert.equal(saved.institutionAppointmentNumber, 'REF-20');
+  assert.equal(saved.financialControllerVisaNumber, 'VISA-20');
+  assert.equal(await db.auditLog.count({ where: { entityId: teacher.id } }), 0);
+  const sameProfile = (await (await request(teacher.id)).json()).data;
+  assert.equal(sameProfile.currentInstitution.email, undefined);
+  assert.equal((await request(teacher.id, 'PATCH', { institutionAppointmentDate: '2021-02-03', institutionAppointmentNumber: 'REF-21', financialControllerVisaNumber: 'VISA-21' })).status, 200);
+  const noOpBefore = await db.teacher.findUniqueOrThrow({ where: { id: teacher.id } });
+  const noOpAuditBefore = await db.auditLog.count({ where: { entityId: teacher.id } });
+  assert.equal((await currentInstitutionRequest(teacher.id, { institutionId: first.id, expectedInstitutionId: first.id })).status, 200);
+  saved = await db.teacher.findUniqueOrThrow({ where: { id: teacher.id } });
+  assert.equal(saved.institutionAppointmentNumber, 'REF-21');
+  assert.equal(saved.updatedAt.getTime(), noOpBefore.updatedAt.getTime());
+  assert.equal(await db.auditLog.count({ where: { entityId: teacher.id } }), noOpAuditBefore);
+
+  await db.$executeRawUnsafe(`CREATE FUNCTION "${schemaName}".reject_task080_profile_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='TEACHER_PROFILE_UPDATED' THEN RAISE EXCEPTION 'synthetic audit failure'; END IF; RETURN NEW; END $$`);
+  await db.$executeRawUnsafe(`CREATE TRIGGER reject_task080_profile_audit BEFORE INSERT ON "${schemaName}"."AuditLog" FOR EACH ROW EXECUTE FUNCTION "${schemaName}".reject_task080_profile_audit()`);
+  try {
+    const failed = await currentInstitutionRequest(teacher.id, { institutionId: second.id, expectedInstitutionId: first.id });
+    assert.equal(failed.status, 500);
+    saved = await db.teacher.findUniqueOrThrow({ where: { id: teacher.id } });
+    assert.equal(saved.institutionId, first.id);
+    assert.equal(saved.institutionAppointmentNumber, 'REF-21');
+    assert.equal(saved.financialControllerVisaNumber, 'VISA-21');
+    assert.equal(await db.auditLog.count({ where: { entityId: teacher.id } }), noOpAuditBefore);
+  } finally {
+    await db.$executeRawUnsafe(`DROP TRIGGER reject_task080_profile_audit ON "${schemaName}"."AuditLog"`);
+    await db.$executeRawUnsafe(`DROP FUNCTION "${schemaName}".reject_task080_profile_audit()`);
+  }
+  const changed = await currentInstitutionRequest(teacher.id, { institutionId: second.id, expectedInstitutionId: first.id });
+  assert.equal(changed.status, 200);
+  saved = await db.teacher.findUniqueOrThrow({ where: { id: teacher.id } });
+  assert.equal(saved.institutionId, second.id);
+  assert.deepEqual([saved.institutionAppointmentDate, saved.institutionAppointmentNumber, saved.financialControllerVisaNumber], [null, null, null]);
+  const clearAudit = await db.auditLog.findFirstOrThrow({ where: { entityId: teacher.id, action: 'TEACHER_PROFILE_UPDATED' } });
+  assert.deepEqual(clearAudit.metadata, { changedFields: ['financialControllerVisaNumber', 'institutionAppointmentDate', 'institutionAppointmentNumber'] });
+  assert.equal(JSON.stringify(clearAudit.metadata).includes('VISA-21'), false);
+});
+
 test('G3 public intake to inspector review, accept, linked GET/PATCH and immutable source', async () => {
   const teacherCountBefore = await db.teacher.count();
   const submittedProfile = {
     firstName: 'سلمى', lastName: 'بوخاري', dateOfBirth: '1986-03-04', placeOfBirth: 'وهران',
-    phone: '0555123456', email: 'Salma@EXAMPLE.DZ', professionalStatus: 'PERMANENT',
+    phone: '0555123456', email: 'Salma@EXAMPLE.DZ', professionalStatus: 'SUBSTITUTE',
     employmentDate: '2006-09-01', workplace: { institutionName: 'ابتدائية النور', municipality: 'وهران', institutionAddress: 'شارع النخيل', directorPhone: '+21321234567' },
   };
   const publicResponse = await fetch(`${baseUrl}/api/v1/public/districts/${district.id}/submissions`, {
@@ -303,12 +383,13 @@ test('G3 public intake to inspector review, accept, linked GET/PATCH and immutab
     body: JSON.stringify({ action, expectedStatus }),
   });
   const accept = await decide(pending.id, 'ACCEPT');
-  assert.equal(accept.status, 200);
+  assert.equal(accept.status, 200, JSON.stringify(await accept.clone().json()));
   const accepted = await db.teacherSubmission.findUniqueOrThrow({ where: { id: pending.id } });
   assert.ok(accepted.acceptedTeacherId);
   assert.equal(await db.teacher.count({ where: { id: accepted.acceptedTeacherId } }), 1);
   const acceptedTeacher = await db.teacher.findUniqueOrThrow({ where: { id: accepted.acceptedTeacherId } });
   assert.equal(acceptedTeacher.institutionId, null);
+  assert.equal(acceptedTeacher.professionalStatus, 'SUBSTITUTE');
   assert.deepEqual(accepted.submittedProfile.workplace, submittedProfile.workplace);
   const detail = await fetch(`${baseUrl}/api/v1/submissions/${pending.id}`, { headers: { cookie: cookieHeader(cookies) } });
   assert.equal((await detail.json()).data.acceptedTeacherId, accepted.acceptedTeacherId);

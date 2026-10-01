@@ -33,6 +33,7 @@ const statusOptions = [
   ['TRAINEE', 'متربص'],
   ['CONTRACT', 'متعاقد'],
   ['TEMPORARY_CONTRACT', 'متعاقد مؤقت'],
+  ['SUBSTITUTE', 'مستخلف'],
 ] as const;
 
 const fieldLabels: Record<string, string> = {

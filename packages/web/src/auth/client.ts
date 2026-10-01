@@ -31,6 +31,7 @@ export type Institution = {
   municipality: string | null;
   address: string | null;
   directorPhone: string | null;
+  email: string | null;
   archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -101,6 +102,14 @@ export type TeacherProfile = {
   birthDate: string | null; placeOfBirth: string | null; phone: string | null;
   email: string | null; professionalStatus: string | null; employedAt: string | null;
   confirmedAt: string | null; qualifications: string | null;
+  professionalFramework: string | null;
+  firstEducationAppointmentDate: string | null; firstEducationAppointmentDecisionNumber: string | null;
+  firstInstallationDate: string | null; traineeshipDate: string | null;
+  institutionAppointmentDate: string | null; institutionAppointmentNumber: string | null;
+  financialControllerVisaNumber: string | null; administrativeCategory: string | null;
+  administrativeSection: string | null; administrativeGrade: string | null;
+  administrativeClassificationEffectiveDate: string | null; birthProvince: string | null;
+  personalAddress: string | null; administrativeNote: string | null;
   recordStatus: string; archivedAt: string | null; createdAt: string; updatedAt: string;
   declaredInstitutions: { primaryInstitutionName: string; additionalInstitutionNames: string[] } | null;
   declaredWorkplace: DeclaredWorkplace | null;
@@ -108,14 +117,18 @@ export type TeacherProfile = {
 };
 export type TeacherProfilePatch = Partial<Pick<TeacherProfile,
   'name' | 'surname' | 'birthDate' | 'placeOfBirth' | 'phone' | 'email'
-  | 'professionalStatus' | 'employedAt' | 'confirmedAt' | 'qualifications'>>;
+  | 'professionalStatus' | 'employedAt' | 'confirmedAt' | 'qualifications'
+  | 'professionalFramework' | 'firstEducationAppointmentDate' | 'firstEducationAppointmentDecisionNumber'
+  | 'firstInstallationDate' | 'traineeshipDate' | 'institutionAppointmentDate' | 'institutionAppointmentNumber'
+  | 'financialControllerVisaNumber' | 'administrativeCategory' | 'administrativeSection' | 'administrativeGrade'
+  | 'administrativeClassificationEffectiveDate' | 'birthProvince' | 'personalAddress' | 'administrativeNote'>>;
 
 export type TeacherDirectoryItem = {
   id: string;
   districtId: string;
   name: string;
   surname: string;
-  professionalStatus: 'PERMANENT' | 'TRAINEE' | 'CONTRACT' | 'TEMPORARY_CONTRACT' | null;
+  professionalStatus: 'PERMANENT' | 'TRAINEE' | 'CONTRACT' | 'TEMPORARY_CONTRACT' | 'SUBSTITUTE' | null;
   recordStatus: 'ACTIVE' | 'INACTIVE';
   currentInstitution: { id: string; name: string; municipality: string | null } | null;
 };
@@ -455,12 +468,24 @@ export async function listInstitutions(options: { q?: string; cursor?: string; l
   return response.json() as Promise<{ data: Institution[]; page: InstitutionPage }>;
 }
 
-export async function createInstitution(input: { districtId: string; name: string; externalCode?: string }) {
+export async function createInstitution(input: { districtId: string; name: string; externalCode?: string; email?: string }) {
   const csrfToken = csrfCookie();
   if (!csrfToken) throw new Error('تعذر التحقق من الطلب. أعد تحميل الصفحة ثم حاول مجددًا.');
   const response = await fetch('/api/v1/institutions', {
     method: 'POST',
     credentials: 'same-origin',
+    headers: { 'content-type': 'application/json', 'x-csrf-token': csrfToken },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) return readFailure(response);
+  return response.json() as Promise<{ data: Institution }>;
+}
+
+export async function updateInstitution(id: string, input: { email: string | null }): Promise<{ data: Institution }> {
+  const csrfToken = csrfCookie();
+  if (!csrfToken) throw new ApiRequestError('تعذر التحقق من الطلب. أعد تحميل الصفحة ثم حاول مجددًا.');
+  const response = await fetch(`/api/v1/institutions/${encodeURIComponent(id)}`, {
+    method: 'PATCH', credentials: 'same-origin',
     headers: { 'content-type': 'application/json', 'x-csrf-token': csrfToken },
     body: JSON.stringify(input),
   });

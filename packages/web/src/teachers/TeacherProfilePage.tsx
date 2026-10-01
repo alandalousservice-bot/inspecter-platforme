@@ -11,12 +11,28 @@ const labels: Record<keyof TeacherProfilePatch, string> = {
   name: 'الاسم', surname: 'اللقب', birthDate: 'تاريخ الميلاد', placeOfBirth: 'مكان الميلاد',
   phone: 'رقم الهاتف', email: 'البريد الإلكتروني', professionalStatus: 'الصفة المهنية',
   employedAt: 'تاريخ التوظيف', confirmedAt: 'تاريخ الترسيم/التثبيت', qualifications: 'المؤهلات',
+  professionalFramework: 'الإطار المهني', firstEducationAppointmentDate: 'تاريخ أول تعيين في التعليم',
+  firstEducationAppointmentDecisionNumber: 'رقم مقرر أول تعيين في التعليم', firstInstallationDate: 'تاريخ أول تنصيب',
+  traineeshipDate: 'تاريخ التربص', institutionAppointmentDate: 'تاريخ التعيين بالمؤسسة الحالية',
+  institutionAppointmentNumber: 'رقم مقرر التعيين بالمؤسسة الحالية', financialControllerVisaNumber: 'رقم تأشيرة المراقب المالي',
+  administrativeCategory: 'الصنف الإداري', administrativeSection: 'الشعبة الإدارية', administrativeGrade: 'الرتبة الإدارية',
+  administrativeClassificationEffectiveDate: 'تاريخ سريان التصنيف الإداري', birthProvince: 'ولاية الميلاد',
+  personalAddress: 'العنوان الشخصي', administrativeNote: 'ملاحظة إدارية',
 };
 const editable = Object.keys(labels) as (keyof TeacherProfilePatch)[];
+const editSections: Array<{ title: string; fields: (keyof TeacherProfilePatch)[] }> = [
+  { title: 'المعلومات الشخصية', fields: ['name', 'surname', 'birthDate', 'placeOfBirth', 'birthProvince'] },
+  { title: 'الوضعية المهنية', fields: ['professionalStatus', 'professionalFramework', 'employedAt', 'confirmedAt', 'qualifications'] },
+  { title: 'بيانات التعيين', fields: ['firstEducationAppointmentDate', 'firstEducationAppointmentDecisionNumber', 'firstInstallationDate', 'traineeshipDate', 'institutionAppointmentDate', 'institutionAppointmentNumber', 'financialControllerVisaNumber'] },
+  { title: 'التصنيف الإداري', fields: ['administrativeCategory', 'administrativeSection', 'administrativeGrade', 'administrativeClassificationEffectiveDate'] },
+  { title: 'بيانات الاتصال', fields: ['personalAddress', 'phone', 'email'] },
+  { title: 'ملاحظات إدارية', fields: ['administrativeNote'] },
+];
 const nullable = new Set<keyof TeacherProfilePatch>(editable.filter((field) => field !== 'name' && field !== 'surname'));
 const statusLabels: Record<string, string> = {
   ACTIVE: 'نشط', INACTIVE: 'غير نشط',
   PERMANENT: 'مرسم', TRAINEE: 'متربص', CONTRACT: 'متعاقد', TEMPORARY_CONTRACT: 'متعاقد مؤقت',
+  SUBSTITUTE: 'مستخلف',
 };
 const PAGE_SIZE = 25;
 
@@ -323,18 +339,29 @@ export function TeacherProfilePage() {
       {successMessage ? <SuccessState title={successMessage} /> : null}
       {!editing ? <>
         <div className="teacher-profile__actions"><Button onClick={beginEdit}>تعديل الملف</Button><Link to={`/app/teachers/${encodeURIComponent(profile.id)}/schedules`}>التوزيع الأسبوعي</Link></div>
-        <Card><CardHeader title="الهوية" /><CardContent><dl className="teacher-profile__facts">
+        <Card><CardHeader title="المعلومات الشخصية" /><CardContent><dl className="teacher-profile__facts">
           <Field label="الاسم" value={profile.name} /><Field label="اللقب" value={profile.surname} />
           <Field label="تاريخ الميلاد" value={profile.birthDate} /><Field label="مكان الميلاد" value={profile.placeOfBirth} />
+          <Field label="ولاية الميلاد" value={profile.birthProvince} />
           <Field label="حالة السجل" value={statusLabels[profile.recordStatus] ?? 'غير محددة'} />
         </dl></CardContent></Card>
-        <Card><CardHeader title="معلومات الاتصال" /><CardContent><dl className="teacher-profile__facts">
-          <Field label="رقم الهاتف" value={profile.phone} /><Field label="البريد الإلكتروني" value={profile.email} />
-        </dl></CardContent></Card>
-        <Card><CardHeader title="المعلومات المهنية" /><CardContent><dl className="teacher-profile__facts">
+        <Card><CardHeader title="الوضعية المهنية" /><CardContent><dl className="teacher-profile__facts">
           <Field label="الصفة المهنية" value={profile.professionalStatus ? statusLabels[profile.professionalStatus] ?? 'غير محددة' : null} />
+          <Field label="الإطار المهني" value={profile.professionalFramework} />
           <Field label="تاريخ التوظيف" value={profile.employedAt} /><Field label="تاريخ الترسيم/التثبيت" value={profile.confirmedAt} />
           <Field label="المؤهلات" value={profile.qualifications} />
+        </dl></CardContent></Card>
+        <Card><CardHeader title="بيانات التعيين" /><CardContent><dl className="teacher-profile__facts">
+          {editSections.find((section) => section.title === 'بيانات التعيين')?.fields.map((field) => <Field key={field} label={labels[field]} value={profile[field] as string | null} />)}
+        </dl></CardContent></Card>
+        <Card><CardHeader title="التصنيف الإداري" /><CardContent><dl className="teacher-profile__facts">
+          {editSections.find((section) => section.title === 'التصنيف الإداري')?.fields.map((field) => <Field key={field} label={labels[field]} value={profile[field] as string | null} />)}
+        </dl></CardContent></Card>
+        <Card><CardHeader title="بيانات الاتصال" /><CardContent><dl className="teacher-profile__facts">
+          {editSections.find((section) => section.title === 'بيانات الاتصال')?.fields.map((field) => <Field key={field} label={labels[field]} value={profile[field] as string | null} />)}
+        </dl></CardContent></Card>
+        <Card><CardHeader title="ملاحظات إدارية" /><CardContent><dl className="teacher-profile__facts">
+          {editSections.find((section) => section.title === 'ملاحظات إدارية')?.fields.map((field) => <Field key={field} label={labels[field]} value={profile[field] as string | null} />)}
         </dl></CardContent></Card>
         <Card><CardHeader title="جهة العمل المصرح بها — غير معتمدة" description="تصريح تاريخي وارد من الاستمارة، ولا يمثل اعتمادًا لمؤسسة." />
           <CardContent>{profile.declaredWorkplace ? <dl className="teacher-profile__facts">
@@ -361,26 +388,36 @@ export function TeacherProfilePage() {
       </> : <form onSubmit={(event) => { void saveProfile(event); }} noValidate aria-busy={savingProfile}>
         <h2>تعديل الملف المهني</h2>
         {successMessage && !success ? <p role="alert">{successMessage}</p> : null}
-        <div className="teacher-profile__form">
-          {editable.map((field) => <div key={field} className="teacher-profile__field">
+        {editSections.map((section) => <section key={section.title} aria-labelledby={`teacher-section-${section.title}`}>
+          <h3 id={`teacher-section-${section.title}`}>{section.title}</h3>
+          <div className="teacher-profile__form">
+          {section.fields.map((field) => <div key={field} className="teacher-profile__field">
             {field === 'professionalStatus' ? <div className="ui-field">
               <label className="ui-field__label" htmlFor={`teacher-${field}`}>{labels[field]}</label>
               <select id={`teacher-${field}`} className="ui-input" value={draft?.[field] ?? ''}
                 aria-invalid={Boolean(errors[field])} aria-describedby={errors[field] ? `teacher-${field}-error` : undefined}
                 onChange={(event) => change(field, event.target.value)} disabled={savingProfile}>
                 <option value="">اختر الصفة المهنية</option>
-                {(['PERMANENT', 'TRAINEE', 'CONTRACT', 'TEMPORARY_CONTRACT'] as const).map((value) =>
+                {(['PERMANENT', 'TRAINEE', 'CONTRACT', 'TEMPORARY_CONTRACT', 'SUBSTITUTE'] as const).map((value) =>
                   <option key={value} value={value}>{statusLabels[value]}</option>)}
               </select>{errors[field] ? <p id={`teacher-${field}-error`} role="alert">{errors[field]}</p> : null}
+            </div> : field === 'administrativeNote' ? <div className="ui-field">
+              <label className="ui-field__label" htmlFor={`teacher-${field}`}>{labels[field]}</label>
+              <textarea id={`teacher-${field}`} className="ui-input" maxLength={1000} rows={4} dir="auto" value={draft?.[field] ?? ''}
+                aria-invalid={Boolean(errors[field])} aria-describedby={errors[field] ? `teacher-${field}-error` : undefined}
+                onChange={(event) => change(field, event.target.value)} disabled={savingProfile} />
+              {errors[field] ? <p id={`teacher-${field}-error`} role="alert">{errors[field]}</p> : null}
             </div> : <Input id={`teacher-${field}`} label={labels[field]}
-              type={['birthDate', 'employedAt', 'confirmedAt'].includes(field) ? 'date' : field === 'email' ? 'email' : field === 'phone' ? 'tel' : 'text'}
+              type={['birthDate', 'employedAt', 'confirmedAt', 'firstEducationAppointmentDate', 'firstInstallationDate', 'traineeshipDate', 'institutionAppointmentDate', 'administrativeClassificationEffectiveDate'].includes(field) ? 'date' : field === 'email' ? 'email' : field === 'phone' ? 'tel' : 'text'}
+              maxLength={field === 'professionalFramework' || field === 'firstEducationAppointmentDecisionNumber' || field === 'institutionAppointmentNumber' || field === 'financialControllerVisaNumber' ? 120 : field === 'administrativeCategory' || field === 'administrativeSection' || field === 'administrativeGrade' || field === 'birthProvince' ? 100 : field === 'personalAddress' ? 300 : field === 'qualifications' ? 1000 : undefined}
               value={draft?.[field] ?? ''} onChange={(event) => change(field, event.target.value)}
               error={errors[field]} required={!nullable.has(field)} disabled={savingProfile} />}
             {nullable.has(field) ? <Button variant="subtle" disabled={savingProfile} onClick={() => clear(field)}
               aria-label={`مسح ${labels[field]}`}>مسح {labels[field]}</Button> : null}
             {cleared.has(field) ? <span role="status">سيُمسح هذا الحقل عند الحفظ.</span> : null}
           </div>)}
-        </div>
+          </div>
+        </section>)}
         <div className="teacher-profile__actions"><Button type="submit" disabled={savingProfile}>{savingProfile ? 'جارٍ الحفظ…' : 'حفظ التغييرات'}</Button>
           <Button variant="secondary" disabled={savingProfile} onClick={() => { setEditing(false); setDraft(undefined); setErrors({}); setSuccessMessage(''); }}>إلغاء</Button>
         </div>
