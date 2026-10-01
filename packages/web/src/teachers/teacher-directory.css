@@ -40,3 +40,4 @@
   .teacher-directory__pagination span { order: -1; width: 100%; }
   .teacher-directory__pagination button { flex: 1; }
 }
+.teacher-directory__actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }

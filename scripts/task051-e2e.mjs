@@ -61,7 +61,11 @@ try {
     const institution = await db.institution.create({ data: { districtId: district.id, name: 'ابتدائية TASK-051 الأصلية', municipality: 'الجزائر' } });
     const teacherInside = await db.teacher.create({ data: { districtId: district.id, institutionId: institution.id, name: 'محمد', surname: 'زيارة داخل الجدول', recordStatus: 'ACTIVE' } });
     const teacherOutside = await db.teacher.create({ data: { districtId: district.id, institutionId: institution.id, name: 'ليلى', surname: 'زيارة خارج الجدول', recordStatus: 'ACTIVE' } });
-    await db.weeklySchedule.create({ data: { teacherId: teacherInside.id, academicYear: '2026-2027', slots: { create: [{ dayOfWeek: 2, startMinute: 480, endMinute: 600 }] } } });
+    await db.weeklySchedule.create({ data: { teacherId: teacherInside.id, academicYear: '2026-2027', slots: { create: [
+      { dayOfWeek: 2, startMinute: 480, endMinute: 600 },
+      // TASK-053A's 2026-10-13 visit needs explicit TASK-083 workplace/date coverage.
+      { teacherId: teacherInside.id, districtId: district.id, institutionId: institution.id, workplaceBasis: 'HOME', validFrom: new Date('2026-10-13T00:00:00.000Z'), dayOfWeek: 2, startMinute: 480, endMinute: 600 },
+    ] } } });
     await db.weeklySchedule.create({ data: { teacherId: teacherOutside.id, academicYear: '2026-2027', slots: { create: [{ dayOfWeek: 2, startMinute: 480, endMinute: 600 }] } } });
     process.env.G3_E2E_DISTRICT_ID = district.id;
     process.env.TASK051_TEACHER_INSIDE_ID = teacherInside.id;

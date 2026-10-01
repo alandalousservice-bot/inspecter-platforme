@@ -7,8 +7,9 @@ import { validateBody } from '../http/validate-body.js';
 import { requireAuthenticatedMutationCsrf } from '../identity/auth-routes.js';
 import { requireInspectorDistrictMembership } from '../policy/district-access.js';
 import { algiersCalendarDate } from '../teachers/supplementary-workplaces-domain.js';
+import { applyScheduleConsistency } from './consistency.js';
+import { academicYearSchema } from './validation.js';
 
-const yearSchema = z.string().regex(/^\d{4}-\d{4}$/u).refine((value) => Number(value.slice(5)) === Number(value.slice(0, 4)) + 1);
 const optionalText = (max: number) => z.string().transform((value) => value.normalize('NFC').trim().replace(/\s+/gu, ' '))
   .refine((value) => value.length > 0 && Array.from(value).length <= max && !/[\p{Cc}]/u.test(value)).nullable().optional();
 const slotSchema = z.object({
@@ -20,7 +21,7 @@ const slotSchema = z.object({
 }).strict().refine((slot) => slot.startMinute < slot.endMinute, { message: 'وقت البداية يجب أن يسبق وقت النهاية.' })
   .refine((slot) => validDate(slot.validFrom) && (slot.validTo === undefined || slot.validTo === null || validDate(slot.validTo))
     && (slot.validTo == null || slot.validTo > slot.validFrom), { message: 'تحقق من فترة سريان الحصة.' });
-const createSchema = z.object({ academicYear: yearSchema, slots: z.array(slotSchema) }).strict();
+const createSchema = z.object({ academicYear: academicYearSchema, slots: z.array(slotSchema) }).strict();
 const expectedRevision = z.number().int().positive();
 const addSlotSchema = z.object({ expectedRevision, slot: slotSchema }).strict();
 const patchSlotSchema = z.object({
@@ -101,22 +102,7 @@ async function fetchSchedule(tx: Prisma.TransactionClient, id: string) {
   const schedule = await tx.weeklySchedule.findUnique({ where: { id }, include: { slots: { include: { institution: { select: { id: true, name: true, municipality: true, archivedAt: true } } } } } });
   if (!schedule) throw notFound();
   const teacher = await tx.teacher.findUnique({ where: { id: schedule.teacherId }, select: { institutionId: true, supplementaryWorkplaces: { select: { institutionId: true, validFrom: true, validTo: true } } } });
-  const today = algiersCalendarDate();
-  return { ...schedule, slots: schedule.slots.map((slot) => {
-    if (!slot.validFrom || !slot.institutionId) return { ...slot, consistency: { status: 'LEGACY_UNKNOWN' as const, reasonCode: 'LEGACY_LOCATION_UNKNOWN' } };
-    const from = slot.validFrom.toISOString().slice(0, 10); const to = slot.validTo?.toISOString().slice(0, 10) ?? null;
-    if (slot.institution?.archivedAt && (to === null || to > today)) return { ...slot, consistency: { status: 'NEEDS_CORRECTION' as const, reasonCode: 'INSTITUTION_ARCHIVED' } };
-    if (slot.workplaceBasis === 'SUPPLEMENTARY') {
-      const contained = teacher?.supplementaryWorkplaces.some((row) => row.institutionId === slot.institutionId
-        && row.validFrom.toISOString().slice(0, 10) <= from
-        && (row.validTo === null ? true : to !== null && to <= row.validTo.toISOString().slice(0, 10))) ?? false;
-      return { ...slot, consistency: contained ? { status: 'CONSISTENT' as const, reasonCode: null }
-        : { status: 'NEEDS_CORRECTION' as const, reasonCode: 'SUPPLEMENTARY_VALIDITY_CHANGED' } };
-    }
-    const homeChanged = teacher?.institutionId !== slot.institutionId && (to === null || to > today);
-    return { ...slot, consistency: homeChanged ? { status: 'NEEDS_CORRECTION' as const, reasonCode: 'HOME_CHANGED' }
-      : { status: 'CONSISTENT' as const, reasonCode: null } };
-  }) };
+  return { ...schedule, slots: applyScheduleConsistency(schedule.slots, teacher ?? { institutionId: null, supplementaryWorkplaces: [] }, algiersCalendarDate()) };
 }
 
 async function validateWorkplace(tx: Prisma.TransactionClient, teacher: { id: string; districtId: string; institutionId: string | null }, institutionId: string,
@@ -187,7 +173,7 @@ export function registerWeeklyScheduleRoutes(app: Express, database: PrismaClien
 
   app.get('/api/v1/teachers/:teacherId/schedules', async (request, response) => {
     const params = z.string().uuid().safeParse(request.params.teacherId);
-    const year = yearSchema.safeParse(request.query.academicYear);
+    const year = academicYearSchema.safeParse(request.query.academicYear);
     if (!params.success || !year.success) throw new ApiError(400, 'VALIDATION_ERROR', 'تحقق من البيانات المدخلة.');
     const teacher = await scopedTeacher(database, params.data, response.locals.inspectorId as string);
     const schedule = await database.weeklySchedule.findUnique({ where: { teacherId_academicYear: { teacherId: teacher.id, academicYear: year.data } }, select: { id: true } });

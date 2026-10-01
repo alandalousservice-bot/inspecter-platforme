@@ -123,6 +123,37 @@ export type TeacherProfilePatch = Partial<Pick<TeacherProfile,
   | 'financialControllerVisaNumber' | 'administrativeCategory' | 'administrativeSection' | 'administrativeGrade'
   | 'administrativeClassificationEffectiveDate' | 'birthProvince' | 'personalAddress' | 'administrativeNote'>>;
 
+export type TeacherInformationCard = {
+  asOfDate: string;
+  academicYear: string;
+  teacher: Omit<TeacherProfile, 'districtId' | 'createdAt' | 'updatedAt' | 'declaredInstitutions' | 'declaredWorkplace' | 'currentInstitution' | 'qualifications'>;
+  homeInstitution: null | {
+    id: string; name: string; municipality: string | null; email: string | null; archivedAt: string | null;
+    appointment: { institutionAppointmentDate: string | null; institutionAppointmentNumber: string | null; financialControllerVisaNumber: string | null };
+  };
+  currentSupplementaryWorkplaces: Array<{
+    id: string; institution: { id: string; name: string; municipality: string | null; archivedAt: string | null };
+    validFrom: string; validTo: string | null;
+  }>;
+  qualifications: { items: Array<{ id: string; name: string; issuingBody: string | null; qualificationDate: string | null }>; legacyText: string | null };
+  weeklySchedule: null | {
+    academicYear: string; revision: number;
+    currentSlots: Array<{
+      id: string; dayOfWeek: number; startMinute: number; endMinute: number;
+      institution: { id: string; name: string; municipality: string | null; archivedAt: string | null };
+      validFrom: string; validTo: string | null; workplaceBasis: 'HOME' | 'SUPPLEMENTARY';
+      consistency: { status: 'CONSISTENT' | 'NEEDS_CORRECTION'; reasonCode: string | null };
+    }>;
+    legacyUnknownSlots: Array<{
+      id: string; dayOfWeek: number; startMinute: number; endMinute: number; institution: null;
+      validFrom: null; validTo: null; workplaceBasis: null;
+      consistency: { status: 'LEGACY_UNKNOWN'; reasonCode: 'LEGACY_LOCATION_UNKNOWN' };
+    }>;
+  };
+  inspectionSummary: { lastInspectionDate: string | null; pedagogicalMark: string | null };
+  organizationalContext: { district: { name: string }; inspector: { name: string | null; surname: string | null } | null };
+};
+
 export type TeacherQualification = {
   id: string;
   name: string;
@@ -561,6 +592,13 @@ export async function getTeacherProfile(id: string): Promise<{ data: TeacherProf
   const response = await fetch(`/api/v1/teachers/${encodeURIComponent(id)}`, { credentials: 'same-origin' });
   if (!response.ok) return readFailure(response);
   return response.json() as Promise<{ data: TeacherProfile }>;
+}
+
+export async function getTeacherInformationCard(id: string, academicYear: string): Promise<{ data: { card: TeacherInformationCard } }> {
+  const query = new URLSearchParams({ academicYear });
+  const response = await fetch(`/api/v1/teachers/${encodeURIComponent(id)}/information-card?${query}`, { credentials: 'same-origin', cache: 'no-store' });
+  if (!response.ok) return readFailure(response);
+  return response.json() as Promise<{ data: { card: TeacherInformationCard } }>;
 }
 
 export async function patchTeacherProfile(id: string, patch: TeacherProfilePatch): Promise<{ data: TeacherProfile }> {

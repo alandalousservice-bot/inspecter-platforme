@@ -156,7 +156,7 @@ export function TeacherDirectoryPage() {
     { id: 'professional', header: 'الصفة المهنية', render: (row) => row.professionalStatus ? PROFESSIONAL_LABELS[row.professionalStatus] : 'غير محددة' },
     { id: 'institution', header: 'المؤسسة الحالية المعتمدة', render: (row) => row.currentInstitution ? <span>{row.currentInstitution.name}{row.currentInstitution.municipality ? <small className="teacher-directory__municipality">{row.currentInstitution.municipality}</small> : null}</span> : 'لم تُعتمد مؤسسة حالية' },
     { id: 'status', header: 'حالة السجل', render: (row) => <span className="teacher-directory__status">{displayStatus(row.recordStatus)}</span> },
-    { id: 'actions', header: 'الإجراءات', render: (row) => <Link className="teacher-directory__schedule-link" to={`/app/teachers/${encodeURIComponent(row.id)}/schedules`}>التوزيع الأسبوعي</Link> },
+    { id: 'actions', header: 'الإجراءات', render: (row) => <span className="teacher-directory__actions"><Link className="teacher-directory__schedule-link" to={`/app/teachers/${encodeURIComponent(row.id)}/information-card`}>بطاقة معلومات الأستاذ</Link><Link className="teacher-directory__schedule-link" to={`/app/teachers/${encodeURIComponent(row.id)}/schedules`}>التوزيع الأسبوعي</Link></span> },
   ], [districts]);
 
   function handleYearChange(event: ChangeEvent<HTMLInputElement>) {

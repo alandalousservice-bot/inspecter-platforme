@@ -1,0 +1,20 @@
+.teacher-card { display: grid; gap: var(--space-4); min-width: 0; }
+.teacher-card__heading h1, .teacher-card__heading p { margin: 0; }
+.teacher-card__heading > p:first-child, .teacher-card__as-of, .teacher-card__hint { color: var(--color-text-muted); }
+.teacher-card__name { margin-block-start: var(--space-2) !important; font-size: var(--font-size-card); font-weight: 700; }
+.teacher-card__facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: var(--space-4); margin: 0; }
+.teacher-card__fact { min-width: 0; overflow-wrap: anywhere; }
+.teacher-card__fact dt { color: var(--color-text-muted); }
+.teacher-card__fact dd { margin: 0; }
+.teacher-card__list { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.teacher-card__list li { display: grid; gap: var(--space-1); min-width: 0; padding-block: var(--space-3); border-block-end: 1px solid var(--color-border); overflow-wrap: anywhere; }
+.teacher-card__list li:last-child { border-block-end: 0; }
+.teacher-card__legacy, .teacher-card__day { margin-block-start: var(--space-4); padding-block-start: var(--space-3); border-block-start: 1px solid var(--color-border); }
+.teacher-card__legacy h3, .teacher-card__day h3 { margin: 0 0 var(--space-2); font-size: var(--font-size-body); }
+.teacher-card__legacy p, .teacher-card__note { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.teacher-card__warning { color: var(--color-warning); }
+.teacher-card__actions { display: flex; flex-wrap: wrap; gap: var(--space-4); }
+.teacher-card__hint { margin: 0; }
+@media (max-width: 48rem) { .teacher-card__actions { flex-direction: column; align-items: flex-start; } }
+.teacher-card__year-form { display: flex; align-items: end; flex-wrap: wrap; gap: var(--space-3); }
+.teacher-card__year-form > :first-child { flex: 1 1 16rem; }

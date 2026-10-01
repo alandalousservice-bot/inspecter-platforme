@@ -12,6 +12,7 @@ import { registerTeacherProfileRoutes } from './teachers/routes.js';
 import { registerTeacherQualificationRoutes } from './teachers/qualification-routes.js';
 import { registerTeacherSupplementaryWorkplaceRoutes } from './teachers/supplementary-workplace-routes.js';
 import { registerTeacherDirectoryRoutes } from './teachers/directory-routes.js';
+import { registerTeacherInformationCardRoutes } from './teachers/information-card-routes.js';
 import { registerWeeklyScheduleRoutes } from './schedules/routes.js';
 import { registerPedagogicalVisitRoutes } from './visits/routes.js';
 import { registerInspectionReportRoutes } from './reports/routes.js';
@@ -30,6 +31,7 @@ createApp((app) => {
   registerInspectorSubmissionRoutes(app, prisma, requireInspector);
   registerSubmissionDecisionRoute(app, prisma, requireInspector);
   registerTeacherDirectoryRoutes(app, prisma, requireInspector);
+  registerTeacherInformationCardRoutes(app, prisma, requireInspector);
   registerTeacherProfileRoutes(app, prisma, requireInspector);
   registerTeacherQualificationRoutes(app, prisma, requireInspector);
   registerTeacherSupplementaryWorkplaceRoutes(app, prisma, requireInspector);
