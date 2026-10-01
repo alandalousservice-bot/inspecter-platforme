@@ -64,9 +64,9 @@ function parseListQuery(request: Request): ListQuery {
   return parsed.data;
 }
 
-function currentAlgiersDayAndMinute(instant: Date): { dayOfWeek: number; minuteOfDay: number } {
+function currentAlgiersDayAndMinute(instant: Date): { dayOfWeek: number; minuteOfDay: number; date: string } {
   const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Africa/Algiers', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    timeZone: 'Africa/Algiers', year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
   }).formatToParts(instant);
   const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
   const days: Record<string, number> = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
@@ -74,7 +74,7 @@ function currentAlgiersDayAndMinute(instant: Date): { dayOfWeek: number; minuteO
   if (!dayOfWeek || values.hour === undefined || values.minute === undefined) {
     throw new Error('Unable to read Africa/Algiers time parts.');
   }
-  return { dayOfWeek, minuteOfDay: Number(values.hour) * 60 + Number(values.minute) };
+  return { dayOfWeek, minuteOfDay: Number(values.hour) * 60 + Number(values.minute), date: `${values.year}-${values.month}-${values.day}` };
 }
 
 function scheduleExists(academicYear: string, slot: Prisma.WeeklyScheduleSlotWhereInput): Prisma.TeacherWhereInput {
@@ -124,13 +124,17 @@ function buildWhere(query: ListQuery, districtIds: string[], instant: Date): Pri
     }
     if (query.worksToday || query.worksNow) {
       const local = currentAlgiersDayAndMinute(instant);
+      const localDate = new Date(`${local.date}T00:00:00.000Z`);
       conditions.push(scheduleExists(query.academicYear, query.worksNow
         ? {
           dayOfWeek: local.dayOfWeek,
           startMinute: { lte: local.minuteOfDay },
           endMinute: { gt: local.minuteOfDay },
+          institutionId: { not: null }, validFrom: { lte: localDate },
+          OR: [{ validTo: null }, { validTo: { gt: localDate } }],
         }
-        : { dayOfWeek: local.dayOfWeek }));
+        : { dayOfWeek: local.dayOfWeek, institutionId: { not: null }, validFrom: { lte: localDate },
+          OR: [{ validTo: null }, { validTo: { gt: localDate } }] }));
     }
   }
   return { AND: conditions };

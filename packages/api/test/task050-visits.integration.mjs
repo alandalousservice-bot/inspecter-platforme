@@ -25,6 +25,11 @@ const password = `task050-${randomUUID()}-synthetic`;
 let PrismaClient, admin, db, server, baseUrl, cleanSchema, upgradeSchema, tempRoot;
 let inspector, inactiveInspector, otherInspector, district, otherDistrict, institution, secondInstitution, teacher, otherTeacher, cookies, otherCookies;
 let visitQueryCount = 0;
+function activeCoverage(targetTeacher, selectedInstitution = targetTeacher.institutionId, validFrom = '2026-01-01T00:00:00.000Z') {
+  return Array.from({ length: 7 }, (_, i) => ({ teacherId: targetTeacher.id, districtId: district.id,
+    institutionId: selectedInstitution, workplaceBasis: 'HOME', validFrom: new Date(validFrom), validTo: null,
+    dayOfWeek: i + 1, startMinute: 0, endMinute: 1440 }));
+}
 
 function approvedUrl() {
   const raw = process.env.TEST_DATABASE_URL;
@@ -58,7 +63,9 @@ async function call(path, method = 'GET', body, selectedCookies = cookies, omitC
   if (selectedCookies && method !== 'GET' && !omitCsrf) headers['x-csrf-token'] = csrf(selectedCookies);
   return fetch(`${baseUrl}${path}`, { method, headers, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 }
-function bodyFor(start, end, teacherId = teacher.id) { return { teacherId, academicYear: '2026-2027', scheduledStartAt: start, scheduledEndAt: end, visitType: 'GUIDANCE' }; }
+function bodyFor(start, end, teacherId = teacher.id, institutionId = (teacherId === otherTeacher?.id ? secondInstitution?.id : institution?.id)) {
+  return { teacherId, institutionId, academicYear: '2026-2027', scheduledStartAt: start, scheduledEndAt: end, visitType: 'GUIDANCE' };
+}
 
 before(async () => {
   const rawUrl = approvedUrl();
@@ -80,7 +87,7 @@ before(async () => {
   runPrisma(['migrate', 'deploy'], cleanUrl);
   runPrisma(['migrate', 'status'], cleanUrl);
   const history = await admin.$queryRawUnsafe(`SELECT migration_name,finished_at FROM "${cleanSchema}"."_prisma_migrations" ORDER BY started_at`);
-  assert.equal(history.length, 17); assert.equal(history.at(-1)?.migration_name, '20261001120000_task_082_teacher_supplementary_workplaces');
+  assert.equal(history.length, 18); assert.equal(history.at(-1)?.migration_name, '20261002120000_task_083_workplace_aware_schedule_visits');
   assert.ok(history.some((row) => row.migration_name === migrationName)); assert.ok(history.every((row) => row.finished_at));
 
   tempRoot = mkdtempSync(join(tmpdir(), 'task050-prisma-upgrade-'));
@@ -88,7 +95,8 @@ before(async () => {
   const copiedSchema = join(tempRoot, 'schema.prisma');
   cpSync(join(migrationsDir, 'migration_lock.toml'), join(tempRoot, 'migration_lock.toml'));
   for (const entry of readdirSync(migrationsDir, { withFileTypes: true })) {
-    if (entry.isDirectory() && entry.name !== '20260930120000_task_053a_visit_type') cpSync(join(migrationsDir, entry.name), join(copiedMigrations, entry.name), { recursive: true });
+    if (entry.isDirectory() && entry.name !== '20260930120000_task_053a_visit_type'
+      && entry.name !== '20261002120000_task_083_workplace_aware_schedule_visits') cpSync(join(migrationsDir, entry.name), join(copiedMigrations, entry.name), { recursive: true });
   }
   cpSync(schemaPath, copiedSchema);
   const upgradeUrl = schemaUrl(rawUrl, upgradeSchema);
@@ -99,12 +107,19 @@ before(async () => {
   const oldInspector = await baseDb.inspector.create({ data: { email: `task050-g4-${randomUUID()}@example.invalid`, passwordHash: 'synthetic-hash', status: 'ACTIVE' } });
   const oldInstitution = await baseDb.institution.create({ data: { districtId: oldDistrict.id, name: 'G4 original institution' } });
   const oldTeacher = await baseDb.teacher.create({ data: { districtId: oldDistrict.id, institutionId: oldInstitution.id, name: 'G4', surname: 'Teacher' } });
+  const oldSchedule = await baseDb.weeklySchedule.create({ data: { teacherId: oldTeacher.id, academicYear: '2026-2027' } });
+  const oldSlotId = randomUUID();
+  await baseDb.$executeRaw`INSERT INTO "WeeklyScheduleSlot" ("id","scheduleId","dayOfWeek","startMinute","endMinute","createdAt","updatedAt") VALUES (${oldSlotId}::uuid,${oldSchedule.id}::uuid,1,480,540,now(),now())`;
+  const oldSupplementary = await baseDb.institution.create({ data: { districtId: oldDistrict.id, name: 'G4 supplementary institution' } });
+  const oldWorkplace = await baseDb.teacherSupplementaryWorkplace.create({ data: { teacherId: oldTeacher.id, districtId: oldDistrict.id, institutionId: oldSupplementary.id,
+    validFrom: new Date('2026-01-01T00:00:00Z'), validTo: new Date('2026-06-01T00:00:00Z') } });
   const oldVisitId = randomUUID();
   await baseDb.$executeRaw`INSERT INTO "PedagogicalVisit" ("id","districtId","inspectorId","teacherId","institutionId","institutionNameSnapshot","academicYear","scheduledStartAt","scheduledEndAt","occurredAt","status","revision","createdAt","updatedAt") VALUES (${oldVisitId}::uuid,${oldDistrict.id}::uuid,${oldInspector.id}::uuid,${oldTeacher.id}::uuid,${oldInstitution.id}::uuid,${oldInstitution.name},'2026-2027','2027-01-01T08:00:00Z'::timestamp,'2027-01-01T09:00:00Z'::timestamp,'2027-01-01T09:05:00Z'::timestamp,'COMPLETED',2,now(),now())`;
   const oldReport = await baseDb.inspectionReport.create({ data: { visitId: oldVisitId, status: 'DRAFT' } });
   const oldFollowUp = await baseDb.followUp.create({ data: { reportId: oldReport.id, ownerInspectorId: oldInspector.id, note: 'Upgrade preservation fixture', dueDate: new Date('2027-02-01T00:00:00Z') } });
   await baseDb.$disconnect();
   cpSync(join(migrationsDir, '20260930120000_task_053a_visit_type'), join(copiedMigrations, '20260930120000_task_053a_visit_type'), { recursive: true });
+  cpSync(join(migrationsDir, '20261002120000_task_083_workplace_aware_schedule_visits'), join(copiedMigrations, '20261002120000_task_083_workplace_aware_schedule_visits'), { recursive: true });
   runPrisma(['migrate', 'deploy'], upgradeUrl, copiedSchema);
   const upgraded = new PrismaClient({ datasources: { db: { url: upgradeUrl } } });
   await upgraded.$connect();
@@ -114,6 +129,14 @@ before(async () => {
   assert.equal(upgradedVisit.visitType, null); assert.equal(upgradedVisit.scheduledStartAt.toISOString(), '2027-01-01T08:00:00.000Z');
   assert.equal((await upgraded.inspectionReport.findUniqueOrThrow({ where: { id: oldReport.id } })).visitId, oldVisitId);
   assert.equal((await upgraded.followUp.findUniqueOrThrow({ where: { id: oldFollowUp.id } })).reportId, oldReport.id);
+  const oldSlot = await upgraded.weeklyScheduleSlot.findUniqueOrThrow({ where: { id: oldSlotId } });
+  assert.equal(oldSlot.institutionId, null); assert.equal(oldSlot.validFrom, null); assert.equal(oldSlot.validTo, null);
+  assert.equal(await upgraded.weeklyScheduleSlot.count({ where: { institutionId: { not: null } } }), 0, 'migration fabricated no historical slot institutions');
+  assert.equal(await upgraded.weeklyScheduleSlot.count({ where: { validFrom: { not: null } } }), 0, 'migration fabricated no historical slot dates');
+  assert.equal(await upgraded.teacherSupplementaryWorkplace.count({ where: { id: oldWorkplace.id, teacherId: oldTeacher.id, institutionId: oldSupplementary.id,
+    validFrom: new Date('2026-01-01T00:00:00Z'), validTo: new Date('2026-06-01T00:00:00Z') } }), 1, 'historical supplementary validity is unchanged');
+  assert.equal(await upgraded.pedagogicalVisit.count({ where: { id: oldVisitId, institutionNameSnapshot: oldInstitution.name, scheduledStartAt: new Date('2027-01-01T08:00:00Z'), scheduledEndAt: new Date('2027-01-01T09:00:00Z') } }), 1,
+    'migration rewrote no existing visit interval or institution snapshot');
   await upgraded.$disconnect();
 
   db = new PrismaClient({ datasources: { db: { url: cleanUrl } }, log: [{ level: 'query', emit: 'event' }] });
@@ -135,8 +158,8 @@ before(async () => {
   secondInstitution = await db.institution.create({ data: { districtId: district.id, name: 'Second institution' } });
   teacher = await db.teacher.create({ data: { districtId: district.id, institutionId: institution.id, name: 'أمينة', surname: 'زيارة', phone: '+213555555555', email: 'private@example.invalid' } });
   otherTeacher = await db.teacher.create({ data: { districtId: district.id, institutionId: secondInstitution.id, name: 'ليلى', surname: 'ثانية' } });
-  await db.weeklySchedule.create({ data: { teacherId: teacher.id, academicYear: '2026-2027', slots: { create: Array.from({ length: 7 }, (_, i) => ({ dayOfWeek: i + 1, startMinute: 0, endMinute: 1440 })) } } });
-  await db.weeklySchedule.create({ data: { teacherId: otherTeacher.id, academicYear: '2026-2027', slots: { create: Array.from({ length: 7 }, (_, i) => ({ dayOfWeek: i + 1, startMinute: 0, endMinute: 1440 })) } } });
+  await db.weeklySchedule.create({ data: { teacherId: teacher.id, academicYear: '2026-2027', slots: { create: activeCoverage(teacher) } } });
+  await db.weeklySchedule.create({ data: { teacherId: otherTeacher.id, academicYear: '2026-2027', slots: { create: activeCoverage(otherTeacher) } } });
   const app = createApp((instance) => { registerAuthRoutes(instance, db); registerPedagogicalVisitRoutes(instance, db, requireAuthenticatedInspector(db)); });
   server = app.listen(0, '127.0.0.1'); await new Promise((yes, no) => { server.once('listening', yes); server.once('error', no); });
   baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -195,12 +218,12 @@ test('TASK-050 migration, visit API lifecycle, privacy, scope, concurrency and a
     assert.equal(rejected.status, 404);
     const unassigned = await db.teacher.create({ data: { districtId: district.id, name: 'No', surname: 'Institution' } });
     const missingWorkplace = await call(path, 'POST', bodyFor('2026-09-30T10:00:00+01:00', '2026-09-30T11:00:00+01:00', unassigned.id));
-    assert.equal(missingWorkplace.status, 409); assert.equal((await missingWorkplace.json()).error.code, 'TEACHER_CURRENT_INSTITUTION_REQUIRED');
+    assert.equal(missingWorkplace.status, 409); assert.equal((await missingWorkplace.json()).error.code, 'VISIT_WORKPLACE_UNAVAILABLE');
     assert.equal((await call(`${path}?unknown=1`)).status, 400);
     assert.equal((await call(`${path}?status=PLANNED&status=CANCELLED`)).status, 400);
   });
 
-  const create = async (start, end, targetTeacher = teacher, targetType = 'GUIDANCE') => call(path, 'POST', { ...bodyFor(start, end, targetTeacher.id), visitType: targetType });
+  const create = async (start, end, targetTeacher = teacher, targetType = 'GUIDANCE') => call(path, 'POST', { ...bodyFor(start, end, targetTeacher.id, targetTeacher.institutionId ?? institution.id), visitType: targetType });
   await t.test('explicit canonical types, strict validation, legacy null read, and server-side filter', async () => {
     const values = ['GUIDANCE', 'TENURE_CONFIRMATION', 'PROMOTION_EVALUATION', 'MONITORING_FOLLOW_UP', 'EXCEPTIONAL'];
     const created = [];
@@ -274,7 +297,9 @@ test('TASK-050 migration, visit API lifecycle, privacy, scope, concurrency and a
 
   await t.test('exceptional retrospective visit uses actual interval and does not require weekly schedule', async () => {
     const noScheduleTeacher = await db.teacher.create({ data: { districtId: district.id, institutionId: institution.id, name: 'استثنائي', surname: 'دون جدول' } });
-    const payload = { teacherId: noScheduleTeacher.id, academicYear: '2026-2027', visitType: 'EXCEPTIONAL',
+    await db.teacherSupplementaryWorkplace.create({ data: { teacherId: noScheduleTeacher.id, districtId: district.id, institutionId: secondInstitution.id,
+      validFrom: new Date('2026-01-01T00:00:00.000Z'), validTo: new Date('2026-03-01T00:00:00.000Z') } });
+    const payload = { teacherId: noScheduleTeacher.id, institutionId: secondInstitution.id, academicYear: '2026-2027', visitType: 'EXCEPTIONAL',
       actualStartAt: '2026-02-10T08:00:00+01:00', actualEndAt: '2026-02-10T09:00:00+01:00', institutionContextConfirmed: true };
     const response = await call(path, 'POST', payload);
     assert.equal(response.status, 201); const visit = (await response.json()).data.visit;
@@ -294,22 +319,22 @@ test('TASK-050 migration, visit API lifecycle, privacy, scope, concurrency and a
   });
   await t.test('create, projection privacy, list filters, stable cursor, total and detail', async () => {
     const listTeacher = await db.teacher.create({ data: { districtId: district.id, institutionId: institution.id, name: 'قائمة', surname: 'مستقلة' } });
-    await db.weeklySchedule.create({ data: { teacherId: listTeacher.id, academicYear: '2026-2027', slots: { create: Array.from({ length: 7 }, (_, i) => ({ dayOfWeek: i + 1, startMinute: 0, endMinute: 1440 })) } } });
-    const response = await create('2026-09-28T08:30:00+01:00', '2026-09-28T09:30:00+01:00', listTeacher);
+    await db.weeklySchedule.create({ data: { teacherId: listTeacher.id, academicYear: '2026-2027', slots: { create: activeCoverage(listTeacher) } } });
+    const response = await create('2027-09-28T08:30:00+01:00', '2027-09-28T09:30:00+01:00', listTeacher);
     assert.equal(response.status, 201); assert.equal(response.headers.get('cache-control'), 'no-store');
     const visit = (await response.json()).data.visit;
     assert.equal(visit.status, 'PLANNED'); assert.equal(visit.revision, 1); assert.equal(visit.institution.name, 'Original institution');
-    assert.equal(visit.scheduledStartAt, '2026-09-28T07:30:00.000Z');
+    assert.equal(visit.scheduledStartAt, '2027-09-28T07:30:00.000Z');
     assert.equal(JSON.stringify(visit).includes('private@example.invalid'), false); assert.equal(JSON.stringify(visit).includes('+213555555555'), false);
     assert.equal('report' in visit, false); assert.equal('inspectorId' in visit, false);
     const event = await db.auditLog.findFirstOrThrow({ where: { entityId: visit.id, action: 'PEDAGOGICAL_VISIT_CREATED' } });
     assert.deepEqual(event.metadata, { visitType: 'GUIDANCE' }); assert.equal(event.districtId, district.id); assert.equal(event.actorInspectorId, inspector.id);
     const detail = await call(`${path}/${visit.id}`); assert.equal(detail.status, 200); assert.equal((await detail.json()).data.visit.institution.name, 'Original institution');
     const otherOwner = await call(`${path}/${visit.id}`, 'GET', undefined, otherCookies); assert.equal(otherOwner.status, 404);
-    const next = await create('2026-09-29T08:30:00+01:00', '2026-09-29T09:30:00+01:00', listTeacher); assert.equal(next.status, 201);
-    const third = await create('2026-09-30T08:30:00+01:00', '2026-09-30T09:30:00+01:00', listTeacher); assert.equal(third.status, 201);
-    const otherTeacherVisit = await create('2026-10-02T08:30:00+01:00', '2026-10-02T09:30:00+01:00', otherTeacher); assert.equal(otherTeacherVisit.status, 201);
-    const differentInspector = await call(path, 'POST', bodyFor('2026-10-01T08:30:00+01:00', '2026-10-01T09:30:00+01:00', otherTeacher.id), otherCookies); assert.equal(differentInspector.status, 201);
+    const next = await create('2027-09-29T08:30:00+01:00', '2027-09-29T09:30:00+01:00', listTeacher); assert.equal(next.status, 201);
+    const third = await create('2027-09-30T08:30:00+01:00', '2027-09-30T09:30:00+01:00', listTeacher); assert.equal(third.status, 201);
+    const otherTeacherVisit = await create('2027-10-02T08:30:00+01:00', '2027-10-02T09:30:00+01:00', otherTeacher); assert.equal(otherTeacherVisit.status, 201);
+    const differentInspector = await call(path, 'POST', bodyFor('2027-10-01T08:30:00+01:00', '2027-10-01T09:30:00+01:00', otherTeacher.id), otherCookies); assert.equal(differentInspector.status, 201);
     visitQueryCount = 0;
     const page1 = await call(`${path}?limit=1&districtId=${district.id}&teacherId=${listTeacher.id}`); assert.equal(page1.status, 200);
     assert.ok(visitQueryCount <= 3, `bounded Visit reads expected, actual query count ${visitQueryCount}`);
@@ -318,7 +343,7 @@ test('TASK-050 migration, visit API lifecycle, privacy, scope, concurrency and a
     assert.equal(page2.data.length, 1); assert.notEqual(page2.data[0].id, pageData1.data[0].id);
     const filtered = await call(`${path}?teacherId=${otherTeacher.id}&status=PLANNED`); assert.equal(filtered.status, 200);
     assert.equal((await filtered.json()).page.total, 1);
-    assert.equal((await call(`${path}?from=2026-09-29T00:00:00Z&to=2026-09-30T00:00:00Z`)).status, 200);
+    assert.equal((await call(`${path}?from=2027-09-29T00:00:00Z&to=2027-09-30T00:00:00Z`)).status, 200);
     assert.equal((await call(`${path}/${randomUUID()}`)).status, 404);
     assert.equal((await call(`${path}/not-a-uuid`)).status, 400);
     assert.ok([visit, pageData1.data[0]].every(Boolean));
@@ -378,7 +403,7 @@ test('TASK-050 migration, visit API lifecycle, privacy, scope, concurrency and a
 
   await t.test('advisory warning acknowledgement is exact, recomputed, and recorded without text', async () => {
     const noScheduleTeacher = await db.teacher.create({ data: { districtId: district.id, institutionId: secondInstitution.id, name: 'بدون', surname: 'جدول' } });
-    const input = bodyFor('2026-10-01T08:00:00+01:00', '2026-10-01T09:00:00+01:00', noScheduleTeacher.id);
+    const input = bodyFor('2027-01-03T08:00:00+01:00', '2027-01-03T09:00:00+01:00', noScheduleTeacher.id, secondInstitution.id);
     const warning = await call(path, 'POST', input); assert.equal(warning.status, 409); assert.equal((await warning.json()).error.code, 'VISIT_WEEKLY_SCHEDULE_MISSING');
     await db.weeklySchedule.create({ data: { teacherId: noScheduleTeacher.id, academicYear: '2026-2027' } });
     const stale = await call(path, 'POST', { ...input, scheduleWarningAcknowledgement: 'VISIT_WEEKLY_SCHEDULE_MISSING' });
@@ -415,7 +440,7 @@ test('TASK-050 migration, visit API lifecycle, privacy, scope, concurrency and a
     assert.notEqual(contestants[0].institutionId, contestants[1].institutionId);
     const createdAuditCountBeforeRace = await db.auditLog.count({ where: { actorInspectorId: inspector.id, action: 'PEDAGOGICAL_VISIT_CREATED' } });
     const inspectorRaceResponses = await Promise.all(contestants.map((contestant) => call(path, 'POST', {
-      ...bodyFor(iso(inspectorRaceStart), iso(inspectorRaceEnd), contestant.id),
+      ...bodyFor(iso(inspectorRaceStart), iso(inspectorRaceEnd), contestant.id, contestant.institutionId),
       scheduleWarningAcknowledgement: 'VISIT_WEEKLY_SCHEDULE_MISSING',
     })));
     assert.deepEqual(inspectorRaceResponses.map((item) => item.status).sort(), [201, 409]);
@@ -485,10 +510,119 @@ test('TASK-050 migration, visit API lifecycle, privacy, scope, concurrency and a
     const canceled = await call(`${path}/${inactiveVisit.id}`, 'PATCH', { operation: 'CANCEL', expectedRevision: 1 }); assert.equal(canceled.status, 200);
   });
 
+  await t.test('new visit workplace uses Africa/Algiers local start date, not UTC date', async () => {
+    const boundaryTeacher = await db.teacher.create({ data: { districtId: district.id, institutionId: institution.id, name: 'حد محلي', surname: 'الجزائر' } });
+    const validFrom = new Date('2030-01-02T00:00:00.000Z');
+    await db.teacherSupplementaryWorkplace.create({ data: { teacherId: boundaryTeacher.id, districtId: district.id, institutionId: secondInstitution.id,
+      validFrom, validTo: new Date('2030-01-03T00:00:00.000Z') } });
+    await db.weeklySchedule.create({ data: { teacherId: boundaryTeacher.id, academicYear: '2029-2030' } });
+    const input = { ...bodyFor('2030-01-01T23:30:00Z', '2030-01-02T00:30:00Z', boundaryTeacher.id, secondInstitution.id), academicYear: '2029-2030' };
+    const warning = await call(path, 'POST', input);
+    assert.equal(warning.status, 409); assert.equal((await warning.json()).error.code, 'VISIT_OUTSIDE_WEEKLY_SCHEDULE', 'eligible local-date workplace reaches advisory schedule validation');
+    const accepted = await call(path, 'POST', { ...input, scheduleWarningAcknowledgement: 'VISIT_OUTSIDE_WEEKLY_SCHEDULE' });
+    assert.equal(accepted.status, 201); assert.equal((await accepted.json()).data.visit.institution.id, secondInstitution.id);
+  });
+
+  await t.test('reschedule validates the final date and institution and recomputes its warning acknowledgement', async () => {
+    const activeHome = await db.institution.create({ data: { districtId: district.id, name: 'TASK-083 reschedule home' } });
+    const target = await db.teacher.create({ data: { districtId: district.id, institutionId: activeHome.id, name: 'إعادة', surname: 'جدولة نهائية' } });
+    await db.teacherSupplementaryWorkplace.create({ data: { teacherId: target.id, districtId: district.id, institutionId: secondInstitution.id,
+      validFrom: new Date('2030-01-01T00:00:00.000Z'), validTo: new Date('2030-03-01T00:00:00.000Z') } });
+    const initial = await call(path, 'POST', { ...bodyFor('2030-01-20T08:00:00+01:00', '2030-01-20T09:00:00+01:00', target.id, secondInstitution.id),
+      academicYear: '2029-2030', scheduleWarningAcknowledgement: 'VISIT_WEEKLY_SCHEDULE_MISSING' });
+    assert.equal(initial.status, 201); const visit = (await initial.json()).data.visit;
+    const schedule = await db.weeklySchedule.create({ data: { teacherId: target.id, academicYear: '2029-2030', slots: { create: [{
+      teacherId: target.id, districtId: district.id, institutionId: institution.id, workplaceBasis: 'HOME', validFrom: new Date('2030-02-05T00:00:00.000Z'),
+      dayOfWeek: 2, startMinute: 480, endMinute: 540,
+    }] } } });
+    assert.ok(schedule.id);
+    const finalState = { operation: 'RESCHEDULE', expectedRevision: 1, academicYear: '2029-2030',
+      scheduledStartAt: '2030-02-05T08:00:00+01:00', scheduledEndAt: '2030-02-05T09:00:00+01:00' };
+    const wrongAck = await call(`${path}/${visit.id}`, 'PATCH', { ...finalState, scheduleWarningAcknowledgement: 'VISIT_WEEKLY_SCHEDULE_MISSING' });
+    assert.equal(wrongAck.status, 409); assert.equal((await wrongAck.json()).error.code, 'VISIT_OUTSIDE_WEEKLY_SCHEDULE');
+    const accepted = await call(`${path}/${visit.id}`, 'PATCH', { ...finalState, scheduleWarningAcknowledgement: 'VISIT_OUTSIDE_WEEKLY_SCHEDULE' });
+    assert.equal(accepted.status, 200); const updated = (await accepted.json()).data.visit;
+    assert.equal(updated.institution.id, secondInstitution.id);
+    const institutionChange = await call(`${path}/${visit.id}`, 'PATCH', { ...finalState, expectedRevision: 2, institutionId: activeHome.id,
+      scheduledStartAt: '2030-02-06T08:00:00+01:00', scheduledEndAt: '2030-02-06T09:00:00+01:00', scheduleWarningAcknowledgement: 'VISIT_OUTSIDE_WEEKLY_SCHEDULE' });
+    const institutionChangeBody = await institutionChange.json();
+    assert.equal(institutionChange.status, 200, `final-state institution change rejected: ${institutionChangeBody.error?.code ?? 'unknown'}`);
+    const finalVisit = institutionChangeBody.data.visit;
+    assert.equal(finalVisit.institution.id, activeHome.id); assert.equal(finalVisit.institution.name, activeHome.name);
+  });
+
+  await t.test('warning coverage is institution-aware, date-applicable and full-interval; warning remains advisory', async () => {
+    const cases = [
+      { label: 'full selected-institution slot', institutionId: secondInstitution.id, range: ['2030-01-01', null], interval: [480, 600], expected: null },
+      { label: 'same-time home-institution slot', institutionId: institution.id, range: ['2030-01-01', null], interval: [480, 600], expected: 'VISIT_OUTSIDE_WEEKLY_SCHEDULE' },
+      { label: 'partial selected-institution slot', institutionId: secondInstitution.id, range: ['2030-01-01', null], interval: [480, 540], expected: 'VISIT_OUTSIDE_WEEKLY_SCHEDULE' },
+      { label: 'no slots', institutionId: null, range: null, interval: null, expected: 'VISIT_OUTSIDE_WEEKLY_SCHEDULE' },
+      { label: 'legacy unknown institution', institutionId: null, range: null, interval: [480, 600], expected: 'VISIT_OUTSIDE_WEEKLY_SCHEDULE', legacy: true },
+      { label: 'selected-institution slot outside validity', institutionId: secondInstitution.id, range: ['2030-01-09', null], interval: [480, 600], expected: 'VISIT_OUTSIDE_WEEKLY_SCHEDULE' },
+    ];
+    for (const [index, scenario] of cases.entries()) {
+      const visitDate = new Date(Date.UTC(2030, 0, 8 + index)).toISOString().slice(0, 10);
+      const weekday = new Date(`${visitDate}T00:00:00.000Z`).getUTCDay() || 7;
+      const target = await db.teacher.create({ data: { districtId: district.id, institutionId: institution.id, name: 'اختبار تغطية', surname: `حالة-${index}` } });
+      await db.teacherSupplementaryWorkplace.create({ data: { teacherId: target.id, districtId: district.id, institutionId: secondInstitution.id,
+        validFrom: new Date('2030-01-01T00:00:00.000Z'), validTo: new Date('2030-02-01T00:00:00.000Z') } });
+      const schedule = await db.weeklySchedule.create({ data: { teacherId: target.id, academicYear: '2029-2030' } });
+      if (scenario.interval) {
+        const validFrom = scenario.label === 'selected-institution slot outside validity'
+          ? new Date(new Date(`${visitDate}T00:00:00.000Z`).getTime() + 86_400_000).toISOString().slice(0, 10)
+          : scenario.range?.[0] === '2030-01-01' ? visitDate : scenario.range?.[0];
+        const dates = scenario.range ? [validFrom, scenario.range[1]] : null;
+        await db.weeklyScheduleSlot.create({ data: { scheduleId: schedule.id, teacherId: scenario.legacy ? undefined : target.id,
+          districtId: scenario.legacy ? undefined : district.id, institutionId: scenario.institutionId,
+          workplaceBasis: scenario.legacy ? undefined : (scenario.institutionId === institution.id ? 'HOME' : 'SUPPLEMENTARY'),
+          validFrom: scenario.legacy ? undefined : new Date(`${dates[0]}T00:00:00.000Z`),
+          validTo: scenario.legacy || dates[1] === null ? undefined : new Date(`${dates[1]}T00:00:00.000Z`),
+          dayOfWeek: weekday, startMinute: scenario.interval[0], endMinute: scenario.interval[1] } });
+      }
+      const start = `${visitDate}T08:00:00+01:00`; const end = `${visitDate}T10:00:00+01:00`;
+      const response = await call(path, 'POST', { ...bodyFor(start, end, target.id, secondInstitution.id), academicYear: '2029-2030' });
+      if (scenario.expected === null) {
+        assert.equal(response.status, 201, scenario.label);
+      } else {
+        assert.equal(response.status, 409, scenario.label);
+        assert.equal((await response.json()).error.code, scenario.expected, scenario.label);
+        const acknowledged = await call(path, 'POST', { ...bodyFor(start, end, target.id, secondInstitution.id), academicYear: '2029-2030', scheduleWarningAcknowledgement: scenario.expected });
+        assert.equal(acknowledged.status, 201, `${scenario.label} remains advisory after explicit acknowledgement`);
+      }
+    }
+  });
+
+  await t.test('planned supplementary visits preserve historical context after relation closure', async () => {
+    const lifecycleTeacher = await db.teacher.create({ data: { districtId: district.id, institutionId: institution.id, name: 'تاريخ', surname: 'مكان' } });
+    const relation = await db.teacherSupplementaryWorkplace.create({ data: { teacherId: lifecycleTeacher.id, districtId: district.id, institutionId: secondInstitution.id,
+      validFrom: new Date('2032-01-01T00:00:00.000Z'), validTo: new Date('2032-02-01T00:00:00.000Z') } });
+    const planned = [];
+    for (const hour of [8, 10]) {
+      const response = await call(path, 'POST', bodyFor(`2032-01-15T${String(hour).padStart(2, '0')}:00:00+01:00`, `2032-01-15T${String(hour + 1).padStart(2, '0')}:00:00+01:00`, lifecycleTeacher.id, secondInstitution.id));
+      assert.equal(response.status, 409); assert.equal((await response.json()).error.code, 'VISIT_WEEKLY_SCHEDULE_MISSING');
+      const accepted = await call(path, 'POST', { ...bodyFor(`2032-01-15T${String(hour).padStart(2, '0')}:00:00+01:00`, `2032-01-15T${String(hour + 1).padStart(2, '0')}:00:00+01:00`, lifecycleTeacher.id, secondInstitution.id), scheduleWarningAcknowledgement: 'VISIT_WEEKLY_SCHEDULE_MISSING' });
+      assert.equal(accepted.status, 201); planned.push((await accepted.json()).data.visit);
+    }
+    await db.teacherSupplementaryWorkplace.update({ where: { id: relation.id }, data: { validTo: new Date('2032-01-10T00:00:00.000Z') } });
+    for (const visit of planned) {
+      const detail = await call(`${path}/${visit.id}`); assert.equal(detail.status, 200);
+      const historical = (await detail.json()).data.visit;
+      assert.equal(historical.institution.id, secondInstitution.id); assert.equal(historical.institution.name, secondInstitution.name);
+    }
+    const reschedule = await call(`${path}/${planned[0].id}`, 'PATCH', { operation: 'RESCHEDULE', expectedRevision: 1, academicYear: planned[0].academicYear,
+      scheduledStartAt: planned[0].scheduledStartAt, scheduledEndAt: planned[0].scheduledEndAt, scheduleWarningAcknowledgement: 'VISIT_WEEKLY_SCHEDULE_MISSING' });
+    assert.equal(reschedule.status, 409); assert.equal((await reschedule.json()).error.code, 'VISIT_WORKPLACE_UNAVAILABLE');
+    const completed = await call(`${path}/${planned[0].id}`, 'PATCH', { operation: 'COMPLETE', expectedRevision: 1, occurredAt: new Date(Date.now() - 1000).toISOString() });
+    assert.equal(completed.status, 200); assert.equal((await completed.json()).data.visit.institution.id, secondInstitution.id);
+    const cancelled = await call(`${path}/${planned[1].id}`, 'PATCH', { operation: 'CANCEL', expectedRevision: 1 });
+    assert.equal(cancelled.status, 200); assert.equal((await cancelled.json()).data.visit.institution.id, secondInstitution.id);
+  });
+
   await t.test('audit append failure rolls back the visit mutation and log payload stays allowlisted', async () => {
     const rollbackTeacher = await db.teacher.create({ data: { districtId: district.id, institutionId: secondInstitution.id, name: 'Rollback', surname: 'Audit' } });
-    await db.weeklySchedule.create({ data: { teacherId: rollbackTeacher.id, academicYear: '2026-2027', slots: { create: Array.from({ length: 7 }, (_, i) => ({ dayOfWeek: i + 1, startMinute: 0, endMinute: 1440 })) } } });
-    const created = await create('2026-10-11T08:00:00+01:00', '2026-10-11T09:00:00+01:00', rollbackTeacher); const visit = (await created.json()).data.visit;
+    await db.weeklySchedule.create({ data: { teacherId: rollbackTeacher.id, academicYear: '2026-2027' } });
+    const created = await call(path, 'POST', { ...bodyFor('2026-10-11T08:00:00+01:00', '2026-10-11T09:00:00+01:00', rollbackTeacher.id, secondInstitution.id), scheduleWarningAcknowledgement: 'VISIT_OUTSIDE_WEEKLY_SCHEDULE' });
+    assert.equal(created.status, 201); const visit = (await created.json()).data.visit;
     await db.$executeRaw`CREATE FUNCTION task050_fail_visit_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW."action"='PEDAGOGICAL_VISIT_CANCELLED' THEN RAISE EXCEPTION 'synthetic audit failure'; END IF; RETURN NEW; END $$`;
     await db.$executeRaw`CREATE TRIGGER task050_fail_visit_audit BEFORE INSERT ON "AuditLog" FOR EACH ROW EXECUTE FUNCTION task050_fail_visit_audit()`;
     try {

@@ -8,7 +8,7 @@ import { VisitListPage } from './VisitListPage';
 import { formatAlgiers } from './time';
 
 const mocks = vi.hoisted(() => ({
-  getCurrentDistricts: vi.fn(), listTeachers: vi.fn(), listInstitutions: vi.fn(),
+  getCurrentDistricts: vi.fn(), listTeachers: vi.fn(), listInstitutions: vi.fn(), getValidWorkplaces: vi.fn(),
   listPedagogicalVisits: vi.fn(), getPedagogicalVisit: vi.fn(), createPedagogicalVisit: vi.fn(), patchPedagogicalVisit: vi.fn(),
 }));
 vi.mock('../auth/client', async (importOriginal) => ({ ...(await importOriginal<typeof import('../auth/client')>()), ...mocks }));
@@ -30,6 +30,10 @@ const districts = [district];
 
 beforeEach(() => {
   mocks.getCurrentDistricts.mockResolvedValue(districts);
+  mocks.getValidWorkplaces.mockResolvedValue({ data: { items: [
+    { id: institution.id, name: institution.name, municipality: institution.municipality, role: 'HOME' },
+    { id: '77777777-7777-4777-8777-777777777777', name: 'ابتدائية تكملة', municipality: null, role: 'SUPPLEMENTARY' },
+  ] } });
   mocks.listTeachers.mockResolvedValue({ data: [teacher], page: { limit: 10, total: 1, nextCursor: null } });
   mocks.listInstitutions.mockResolvedValue({ data: [institution], page: { limit: 10, total: 1, nextCursor: null } });
   mocks.listPedagogicalVisits.mockResolvedValue(page());
@@ -53,6 +57,10 @@ function renderRoute(path: string) {
 async function chooseTeacher() {
   await screen.findByRole('button', { name: /محمد علي/ });
   fireEvent.click(screen.getByRole('button', { name: /محمد علي/ }));
+}
+async function chooseWorkplace(id = institution.id) {
+  await screen.findByRole('option', { name: new RegExp(institution.name, 'u') });
+  fireEvent.change(screen.getByLabelText('مؤسسة الزيارة'), { target: { value: id } });
 }
 function chooseVisitType(value: string = 'GUIDANCE') {
   fireEvent.change(screen.getByLabelText(/نوع الزيارة/u), { target: { value } });
@@ -98,6 +106,7 @@ describe('TASK-051 visit management UI', () => {
     fireEvent.change(screen.getByLabelText(/السنة الدراسية/u), { target: { value: '2026-2027' } });
     fireEvent.change(screen.getByLabelText(/بداية الزيارة — توقيت الجزائر/u), { target: { value: '2026-10-15T09:30' } });
     fireEvent.change(screen.getByLabelText(/نهاية الزيارة — توقيت الجزائر/u), { target: { value: '2026-10-15T10:30' } });
+    await chooseWorkplace();
     fireEvent.click(screen.getByRole('button', { name: 'إنشاء الزيارة' }));
     await waitFor(() => expect(screen.getByTestId('current-location').textContent).toBe(`/app/visits/${visit.id}?status=PLANNED`));
     expect(screen.getByRole('link', { name: 'العودة إلى الزيارات' }).getAttribute('href')).toBe('/app/visits?status=PLANNED');
@@ -131,18 +140,19 @@ describe('TASK-051 visit management UI', () => {
     mocks.getCurrentDistricts.mockResolvedValue([district, districtB]);
     renderRoute('/app/visits/new');
     const choice = await screen.findByLabelText(/المقاطعة/u);
-    expect((screen.getByRole('button', { name: 'إنشاء الزيارة' }) as HTMLButtonElement).disabled).toBe(true);
+    await waitFor(() => expect((screen.getByRole('button', { name: 'إنشاء الزيارة' }) as HTMLButtonElement).disabled).toBe(true));
     fireEvent.change(choice, { target: { value: districtB.id } });
     await waitFor(() => expect(mocks.listTeachers).toHaveBeenLastCalledWith({ districtId: districtB.id, q: undefined, recordStatus: 'ACTIVE', limit: 10, cursor: undefined }));
   });
 
   it('disables create and explains missing approved institution with a profile link', async () => {
     mocks.listTeachers.mockResolvedValue({ data: [{ ...teacher, currentInstitution: null }], page: { limit: 10, total: 1, nextCursor: null } });
+    mocks.getValidWorkplaces.mockResolvedValue({ data: { items: [] } });
     renderRoute('/app/visits/new');
     await chooseTeacher();
     expect((await screen.findAllByText(/لم تُعتمد مؤسسة حالية لهذا الأستاذ/u)).length).toBeGreaterThan(0);
     expect(screen.getByRole('link', { name: 'مراجعة ملف الأستاذ' }).getAttribute('href')).toBe(`/app/teachers/${teacher.id}`);
-    expect((screen.getByRole('button', { name: 'إنشاء الزيارة' }) as HTMLButtonElement).disabled).toBe(true);
+    await waitFor(() => expect((screen.getByRole('button', { name: 'إنشاء الزيارة' }) as HTMLButtonElement).disabled).toBe(true));
   });
 
   it('requires explicit year and both times; successful create navigates to server Visit identity', async () => {
@@ -150,6 +160,8 @@ describe('TASK-051 visit management UI', () => {
     expect((screen.getByRole('button', { name: 'إنشاء الزيارة' }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByLabelText(/نوع الزيارة/u) as HTMLSelectElement).value).toBe('');
     chooseVisitType();
+    fireEvent.change(screen.getByLabelText(/بداية الزيارة — توقيت الجزائر/u), { target: { value: '2026-10-15T09:30' } });
+    await chooseWorkplace();
     fireEvent.submit(document.querySelector('form.visit-form')!);
     expect((await screen.findByRole('alert')).textContent).toContain('أدخل سنة دراسية صحيحة مثل 2026-2027.');
     expect(screen.getByLabelText(/السنة الدراسية/u).getAttribute('aria-describedby')).toContain('visit-create-error');
@@ -157,8 +169,9 @@ describe('TASK-051 visit management UI', () => {
     fireEvent.change(screen.getByLabelText(/بداية الزيارة — توقيت الجزائر/u), { target: { value: '2026-10-15T09:30' } });
     fireEvent.change(screen.getByLabelText(/نهاية الزيارة — توقيت الجزائر/u), { target: { value: '2026-10-15T10:30' } });
     fireEvent.change(screen.getByLabelText(/السنة الدراسية/u), { target: { value: '2026-2027' } });
+    await chooseWorkplace();
     fireEvent.click(screen.getByRole('button', { name: 'إنشاء الزيارة' }));
-    await waitFor(() => expect(mocks.createPedagogicalVisit).toHaveBeenCalledWith({ teacherId: teacher.id, academicYear: '2026-2027', visitType: 'GUIDANCE', scheduledStartAt: '2026-10-15T09:30:00+01:00', scheduledEndAt: '2026-10-15T10:30:00+01:00' }));
+    await waitFor(() => expect(mocks.createPedagogicalVisit).toHaveBeenCalledWith({ teacherId: teacher.id, institutionId: institution.id, academicYear: '2026-2027', visitType: 'GUIDANCE', scheduledStartAt: '2026-10-15T09:30:00+01:00', scheduledEndAt: '2026-10-15T10:30:00+01:00' }));
     expect(await screen.findByRole('heading', { name: 'تفاصيل الزيارة' })).toBeTruthy();
   });
 
@@ -177,10 +190,11 @@ describe('TASK-051 visit management UI', () => {
     fireEvent.change(screen.getByLabelText('طريقة تسجيل الزيارة الاستثنائية'), { target: { value: 'RETROSPECTIVE' } });
     fireEvent.change(screen.getByLabelText(/بداية الفترة الفعلية/u), { target: { value: '2026-02-10T09:00' } });
     fireEvent.change(screen.getByLabelText(/نهاية الفترة الفعلية/u), { target: { value: '2026-02-10T10:00' } });
+    await chooseWorkplace();
     expect((screen.getByRole('button', { name: 'إنشاء الزيارة' }) as HTMLButtonElement).disabled).toBe(false);
-    fireEvent.click(screen.getByLabelText(/أؤكد أن المؤسسة الحالية المعتمدة/u));
+    fireEvent.click(screen.getByLabelText(/أؤكد المؤسسة المختارة بوصفها مكان الزيارة/u));
     fireEvent.click(screen.getByRole('button', { name: 'إنشاء الزيارة' }));
-    await waitFor(() => expect(mocks.createPedagogicalVisit).toHaveBeenCalledWith({ teacherId: teacher.id, academicYear: '2026-2027', visitType: 'EXCEPTIONAL', actualStartAt: '2026-02-10T09:00:00+01:00', actualEndAt: '2026-02-10T10:00:00+01:00', institutionContextConfirmed: true }));
+    await waitFor(() => expect(mocks.createPedagogicalVisit).toHaveBeenCalledWith({ teacherId: teacher.id, institutionId: institution.id, academicYear: '2026-2027', visitType: 'EXCEPTIONAL', actualStartAt: '2026-02-10T09:00:00+01:00', actualEndAt: '2026-02-10T10:00:00+01:00', institutionContextConfirmed: true }));
   });
 
   it('requires deliberate weekly schedule acknowledgement and retries the same request', async () => {
@@ -190,11 +204,12 @@ describe('TASK-051 visit management UI', () => {
     fireEvent.change(screen.getByLabelText(/السنة الدراسية/u), { target: { value: '2026-2027' } });
     fireEvent.change(screen.getByLabelText(/بداية الزيارة — توقيت الجزائر/u), { target: { value: '2026-10-15T09:30' } });
     fireEvent.change(screen.getByLabelText(/نهاية الزيارة — توقيت الجزائر/u), { target: { value: '2026-10-15T10:30' } });
+    await chooseWorkplace();
     fireEvent.click(screen.getByRole('button', { name: 'إنشاء الزيارة' }));
     expect(await screen.findByRole('dialog', { name: 'تنبيه الجدول الأسبوعي' })).toBeTruthy();
     expect(screen.getByText(/تنبيه استشاري ولا يمنع التخطيط/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'متابعة مع هذا الموعد' }));
-    await waitFor(() => expect(mocks.createPedagogicalVisit).toHaveBeenLastCalledWith({ teacherId: teacher.id, academicYear: '2026-2027', visitType: 'GUIDANCE', scheduledStartAt: '2026-10-15T09:30:00+01:00', scheduledEndAt: '2026-10-15T10:30:00+01:00', scheduleWarningAcknowledgement: 'VISIT_OUTSIDE_WEEKLY_SCHEDULE' }));
+    await waitFor(() => expect(mocks.createPedagogicalVisit).toHaveBeenLastCalledWith({ teacherId: teacher.id, institutionId: institution.id, academicYear: '2026-2027', visitType: 'GUIDANCE', scheduledStartAt: '2026-10-15T09:30:00+01:00', scheduledEndAt: '2026-10-15T10:30:00+01:00', scheduleWarningAcknowledgement: 'VISIT_OUTSIDE_WEEKLY_SCHEDULE' }));
   });
 
   it('clears the advisory acknowledgement when the intended date changes', async () => {
@@ -204,6 +219,7 @@ describe('TASK-051 visit management UI', () => {
     fireEvent.change(screen.getByLabelText(/السنة الدراسية/u), { target: { value: '2026-2027' } });
     fireEvent.change(screen.getByLabelText(/بداية الزيارة — توقيت الجزائر/u), { target: { value: '2026-10-15T09:30' } });
     fireEvent.change(screen.getByLabelText(/نهاية الزيارة — توقيت الجزائر/u), { target: { value: '2026-10-15T10:30' } });
+    await chooseWorkplace();
     fireEvent.click(screen.getByRole('button', { name: 'إنشاء الزيارة' }));
     await screen.findByRole('dialog', { name: 'تنبيه الجدول الأسبوعي' });
     fireEvent.change(screen.getByLabelText(/نهاية الزيارة — توقيت الجزائر/u), { target: { value: '2026-10-15T11:00' } });
@@ -221,6 +237,7 @@ describe('TASK-051 visit management UI', () => {
     fireEvent.change(screen.getByLabelText(/السنة الدراسية/u), { target: { value: '2026-2027' } });
     fireEvent.change(screen.getByLabelText(/بداية الزيارة — توقيت الجزائر/u), { target: { value: '2026-10-15T09:30' } });
     fireEvent.change(screen.getByLabelText(/نهاية الزيارة — توقيت الجزائر/u), { target: { value: '2026-10-15T10:30' } });
+    await chooseWorkplace();
     fireEvent.click(screen.getByRole('button', { name: 'إنشاء الزيارة' }));
     await screen.findByRole('dialog', { name: 'تنبيه الجدول الأسبوعي' });
     if (field === 'district') fireEvent.change(screen.getByLabelText(/المقاطعة/u), { target: { value: districtB.id } });
@@ -307,7 +324,7 @@ describe('TASK-051 visit management UI', () => {
     fireEvent.click(screen.getByRole('button', { name: 'إعادة جدولة' }));
     fireEvent.change(screen.getByLabelText(/نهاية الزيارة — توقيت الجزائر/u), { target: { value: '2026-10-15T11:00' } });
     fireEvent.click(screen.getByRole('button', { name: 'حفظ الموعد' }));
-    await waitFor(() => expect(mocks.patchPedagogicalVisit).toHaveBeenCalledWith(visit.id, { operation: 'RESCHEDULE', expectedRevision: 3, academicYear: '2026-2027', scheduledStartAt: '2026-10-15T09:30:00+01:00', scheduledEndAt: '2026-10-15T11:00:00+01:00' }));
+    await waitFor(() => expect(mocks.patchPedagogicalVisit).toHaveBeenCalledWith(visit.id, { operation: 'RESCHEDULE', expectedRevision: 3, institutionId: institution.id, academicYear: '2026-2027', scheduledStartAt: '2026-10-15T09:30:00+01:00', scheduledEndAt: '2026-10-15T11:00:00+01:00' }));
     expect(await screen.findByRole('button', { name: 'تحديث البيانات' })).toBeTruthy();
     expect(mocks.patchPedagogicalVisit).toHaveBeenCalledTimes(1);
   });

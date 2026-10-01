@@ -84,6 +84,7 @@ model Institution {
   teachers                Teacher[]
   visits                  PedagogicalVisit[]
   supplementaryWorkplaces TeacherSupplementaryWorkplace[]
+  scheduleSlots          WeeklyScheduleSlot[]
 
   @@unique([id, districtId])
   @@index([districtId, name])
@@ -145,6 +146,7 @@ model Teacher {
   visits                                    PedagogicalVisit[]
   qualificationsStructured                  TeacherQualification[]
   supplementaryWorkplaces                   TeacherSupplementaryWorkplace[]
+  weeklyScheduleSlots                       WeeklyScheduleSlot[]
 
   @@unique([id, districtId])
   @@index([institutionId])
@@ -187,9 +189,11 @@ model WeeklySchedule {
   createdAt    DateTime             @default(now())
   updatedAt    DateTime             @updatedAt
   teacher      Teacher              @relation(fields: [teacherId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  slots        WeeklyScheduleSlot[]
+  slots        WeeklyScheduleSlot[] @relation("ScheduleSlots")
+  ownedSlots   WeeklyScheduleSlot[] @relation("SlotScheduleOwner")
 
   @@unique([teacherId, academicYear])
+  @@unique([id, teacherId])
 }
 
 model PedagogicalVisit {
@@ -319,8 +323,14 @@ model FollowUp {
 }
 
 model WeeklyScheduleSlot {
-  id          String         @id @default(uuid()) @db.Uuid
-  scheduleId  String         @db.Uuid
+  id             String         @id @default(uuid()) @db.Uuid
+  scheduleId     String         @db.Uuid
+  teacherId      String?        @db.Uuid
+  districtId     String?        @db.Uuid
+  institutionId  String?        @db.Uuid
+  validFrom      DateTime?      @db.Date
+  validTo        DateTime?      @db.Date
+  workplaceBasis String?
   dayOfWeek   Int
   startMinute Int
   endMinute   Int
@@ -329,9 +339,14 @@ model WeeklyScheduleSlot {
   notes       String?
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
-  schedule    WeeklySchedule @relation(fields: [scheduleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  schedule    WeeklySchedule @relation("ScheduleSlots", fields: [scheduleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  scheduleOwner WeeklySchedule? @relation("SlotScheduleOwner", fields: [scheduleId, teacherId], references: [id, teacherId], onDelete: Restrict, onUpdate: Cascade)
+  teacher       Teacher?       @relation(fields: [teacherId, districtId], references: [id, districtId], onDelete: Restrict, onUpdate: Cascade)
+  institution   Institution?   @relation(fields: [institutionId, districtId], references: [id, districtId], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([scheduleId, dayOfWeek, startMinute, endMinute])
+  @@index([institutionId])
+  @@index([teacherId, validFrom, validTo, dayOfWeek])
   @@index([dayOfWeek, startMinute])
 }
 

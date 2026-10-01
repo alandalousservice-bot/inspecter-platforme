@@ -120,7 +120,7 @@ const eventContracts = {
   [AuditAction.PEDAGOGICAL_VISIT_UPDATED]: {
     entityType: 'PedagogicalVisit',
     metadata: z.object({
-      changedFields: z.array(z.enum(['scheduledStartAt', 'scheduledEndAt', 'academicYear', 'visitType'])).min(1),
+      changedFields: z.array(z.enum(['scheduledStartAt', 'scheduledEndAt', 'academicYear', 'visitType', 'institutionId', 'institutionNameSnapshot'])).min(1),
       scheduleWarningCode: z.enum(['VISIT_WEEKLY_SCHEDULE_MISSING', 'VISIT_OUTSIDE_WEEKLY_SCHEDULE']).optional(),
     }).strict(),
   },

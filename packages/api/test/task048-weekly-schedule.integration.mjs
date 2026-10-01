@@ -10,6 +10,7 @@ import process from 'node:process';
 import { createApp } from '../dist/app.js';
 import { registerAuthRoutes, requireAuthenticatedInspector } from '../dist/identity/auth-routes.js';
 import { registerWeeklyScheduleRoutes } from '../dist/schedules/routes.js';
+import { registerTeacherSupplementaryWorkplaceRoutes } from '../dist/teachers/supplementary-workplace-routes.js';
 
 const require = createRequire(import.meta.url);
 const apiDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -72,7 +73,12 @@ before(async () => {
   institution = await db.institution.create({ data: { districtId: district.id, name: 'TASK-048 institution' } });
   teacher = await db.teacher.create({ data: { districtId: district.id, institutionId: institution.id, name: 'أمينة', surname: 'اختبار' } });
   unassignedTeacher = await db.teacher.create({ data: { districtId: district.id, name: 'ليلى', surname: 'غير مسندة' } });
-  const app = createApp((instance) => { registerAuthRoutes(instance, db); registerWeeklyScheduleRoutes(instance, db, requireAuthenticatedInspector(db)); });
+  const app = createApp((instance) => {
+    registerAuthRoutes(instance, db);
+    const guard = requireAuthenticatedInspector(db);
+    registerWeeklyScheduleRoutes(instance, db, guard);
+    registerTeacherSupplementaryWorkplaceRoutes(instance, db, guard);
+  });
   server = app.listen(0, '127.0.0.1'); await new Promise((yes, no) => { server.once('listening', yes); server.once('error', no); });
   baseUrl = `http://127.0.0.1:${server.address().port}`;
   cookies = await login(inspector); otherCookies = await login(otherInspector);
@@ -97,7 +103,7 @@ test('TASK-048 authenticated schedule lifecycle, scope, concurrency and audit at
   });
   await t.test('strict schedule create, audit, duplicate and unassigned prerequisite', async () => {
     const unassigned = await call(`/api/v1/teachers/${unassignedTeacher.id}/schedules`, 'POST', { academicYear: year, slots: [] });
-    assert.equal(unassigned.status, 409); assert.equal((await unassigned.json()).error.code, 'TEACHER_CURRENT_INSTITUTION_REQUIRED');
+    assert.equal(unassigned.status, 201);
     const unknown = await call(`/api/v1/teachers/${teacher.id}/schedules`, 'POST', { academicYear: year, slots: [], extra: true }); assert.equal(unknown.status, 400);
     const create = await call(`/api/v1/teachers/${teacher.id}/schedules`, 'POST', { academicYear: year, slots: [] });
     assert.equal(create.status, 201); const created = (await create.json()).data.schedule; assert.equal(created.revision, 1); assert.deepEqual(created.slots, []);
@@ -106,8 +112,8 @@ test('TASK-048 authenticated schedule lifecycle, scope, concurrency and audit at
     const race = await Promise.all(['2027-2028', '2027-2028'].map(() => call(`/api/v1/teachers/${teacher.id}/schedules`, 'POST', { academicYear: '2027-2028', slots: [] })));
     assert.deepEqual(race.map((response) => response.status).sort(), [201, 409]);
     const initialSlots = [
-      { dayOfWeek: 4, startMinute: 480, endMinute: 540 },
-      { dayOfWeek: 4, startMinute: 540, endMinute: 600 },
+      { institutionId: institution.id, validFrom: '2029-09-01', validTo: null, dayOfWeek: 4, startMinute: 480, endMinute: 540 },
+      { institutionId: institution.id, validFrom: '2029-09-01', validTo: null, dayOfWeek: 4, startMinute: 540, endMinute: 600 },
     ];
     const withInitialSlots = await call(`/api/v1/teachers/${teacher.id}/schedules`, 'POST', { academicYear: '2029-2030', slots: initialSlots });
     assert.equal(withInitialSlots.status, 201); assert.equal((await withInitialSlots.json()).data.schedule.slots.length, 2);
@@ -120,7 +126,7 @@ test('TASK-048 authenticated schedule lifecycle, scope, concurrency and audit at
   await t.test('adjacency, overlap, revision, patch normalization/no-op, delete-final and audit metadata', async () => {
     let schedule = (await (await call(getPath)).json()).data.schedule;
     const add = async (slot) => call(`/api/v1/schedules/${schedule.id}/slots`, 'POST', { expectedRevision: schedule.revision, slot });
-    const mondayA = { dayOfWeek: 1, startMinute: 480, endMinute: 540, levelLabel: null, groupLabel: null, notes: null };
+    const mondayA = { institutionId: institution.id, validFrom: '2026-10-05', validTo: null, dayOfWeek: 1, startMinute: 480, endMinute: 540, levelLabel: null, groupLabel: null, notes: null };
     let response = await add(mondayA); assert.equal(response.status, 201); schedule = (await response.json()).data.schedule; assert.equal(schedule.revision, 2);
     const firstId = schedule.slots[0].id;
     response = await add({ ...mondayA, startMinute: 540, endMinute: 600 }); assert.equal(response.status, 201); schedule = (await response.json()).data.schedule; assert.equal(schedule.revision, 3);
@@ -152,17 +158,92 @@ test('TASK-048 authenticated schedule lifecycle, scope, concurrency and audit at
     assert.ok(events.some((event) => event.metadata.affectedSlotIds[0] === patchTarget.id));
     assert.equal(events.at(-1).metadata.slotCount, 0);
   });
+  await t.test('TASK-083 workplace picker, dated slot projection, containment, legacy neutrality and cross-schedule overlap', async () => {
+    const workplaceTeacher = await db.teacher.create({ data: { districtId: district.id, institutionId: institution.id, name: 'مكان', surname: 'عمل' } });
+    const supplementary = await db.institution.create({ data: { districtId: district.id, name: 'TASK-083 supplementary' } });
+    const outside = await db.institution.create({ data: { districtId: otherDistrict.id, name: 'TASK-083 outside' } });
+    await db.teacherSupplementaryWorkplace.create({ data: { teacherId: workplaceTeacher.id, districtId: district.id, institutionId: supplementary.id,
+      validFrom: new Date('2035-09-01T00:00:00.000Z'), validTo: new Date('2035-12-01T00:00:00.000Z') } });
+
+    const picked = await call(`/api/v1/teachers/${workplaceTeacher.id}/valid-workplaces?date=2035-10-01`);
+    assert.equal(picked.status, 200);
+    assert.deepEqual((await picked.json()).data.items.map(({ id, role }) => ({ id, role })), [
+      { id: institution.id, role: 'HOME' }, { id: supplementary.id, role: 'SUPPLEMENTARY' },
+    ]);
+    const interval = await call(`/api/v1/teachers/${workplaceTeacher.id}/valid-workplaces?validFrom=2035-09-01&validTo=2035-10-01`);
+    assert.equal(interval.status, 200); assert.ok((await interval.json()).data.items.some((item) => item.id === supplementary.id));
+    assert.equal((await call(`/api/v1/teachers/${workplaceTeacher.id}/valid-workplaces?date=2035-10-01`, 'GET', undefined, null)).status, 401);
+    assert.equal((await call(`/api/v1/teachers/${outside.id}/valid-workplaces?date=2035-10-01`)).status, 404);
+    assert.equal((await call(`/api/v1/teachers/${workplaceTeacher.id}/valid-workplaces?date=2035-02-30`)).status, 400);
+    assert.equal((await call(`/api/v1/teachers/${workplaceTeacher.id}/valid-workplaces?date=2035-10-01&validFrom=2035-09-01`)).status, 400);
+
+    const createSchedule = async (academicYear) => {
+      const response = await call(`/api/v1/teachers/${workplaceTeacher.id}/schedules`, 'POST', { academicYear, slots: [] });
+      assert.equal(response.status, 201); return (await response.json()).data.schedule;
+    };
+    const first = await createSchedule('2035-2036');
+    const firstSlot = { institutionId: supplementary.id, validFrom: '2035-09-01', validTo: '2035-10-01', dayOfWeek: 7, startMinute: 480, endMinute: 540 };
+    const addedFirst = await call(`/api/v1/schedules/${first.id}/slots`, 'POST', { expectedRevision: first.revision, slot: firstSlot });
+    assert.equal(addedFirst.status, 201);
+    const firstProjection = (await addedFirst.json()).data.schedule.slots[0];
+    assert.equal(firstProjection.institution.name, supplementary.name); assert.equal(firstProjection.validFrom, '2035-09-01');
+    assert.deepEqual(firstProjection.consistency, { status: 'CONSISTENT', reasonCode: null });
+
+    const adjacentSchedule = await createSchedule('2036-2037');
+    const adjacent = await call(`/api/v1/schedules/${adjacentSchedule.id}/slots`, 'POST', { expectedRevision: 1, slot: { ...firstSlot, validFrom: '2035-10-01', validTo: '2035-11-01' } });
+    assert.equal(adjacent.status, 201, 'adjacent half-open periods are allowed across year labels');
+    const overlappingSchedule = await createSchedule('2037-2038');
+    const exclusion = await db.$queryRaw`SELECT conname FROM pg_constraint WHERE connamespace=current_schema()::regnamespace AND conname='WeeklyScheduleSlot_temporal_no_overlapping_teacher_slots'`;
+    assert.equal(exclusion.length, 1, 'the migration must install the cross-schedule temporal exclusion');
+    const overlap = await call(`/api/v1/schedules/${overlappingSchedule.id}/slots`, 'POST', { expectedRevision: 1, slot: { ...firstSlot, validFrom: '2035-09-15', validTo: '2035-09-20' } });
+    assert.equal(overlap.status, 400); assert.equal((await overlap.json()).error.code, 'WEEKLY_SCHEDULE_SLOT_OVERLAP');
+
+    const racePeriod = { institutionId: institution.id, validFrom: '2040-01-01', validTo: '2040-02-01', dayOfWeek: 1, startMinute: 480, endMinute: 540 };
+    const temporalRace = await Promise.all(['2040-2041', '2041-2042'].map((academicYear) =>
+      call(`/api/v1/teachers/${workplaceTeacher.id}/schedules`, 'POST', { academicYear, slots: [racePeriod] })));
+    assert.deepEqual(temporalRace.map((response) => response.status).sort(), [201, 400], 'the cross-schedule exclusion permits at most one concurrent applicable period');
+    const temporalLoser = temporalRace.find((response) => response.status === 400);
+    assert.equal((await temporalLoser.json()).error.code, 'WEEKLY_SCHEDULE_SLOT_OVERLAP');
+    assert.equal(await db.weeklyScheduleSlot.count({ where: { teacherId: workplaceTeacher.id, validFrom: new Date('2040-01-01T00:00:00.000Z') } }), 1);
+
+    const arbitrary = await call(`/api/v1/schedules/${overlappingSchedule.id}/slots`, 'POST', { expectedRevision: 1, slot: { ...firstSlot, institutionId: outside.id, validFrom: '2038-01-01', validTo: '2038-02-01' } });
+    assert.equal(arbitrary.status, 404);
+    const legacySchedule = await db.weeklySchedule.create({ data: { teacherId: workplaceTeacher.id, academicYear: '2038-2039', slots: { create: [{ dayOfWeek: 1, startMinute: 600, endMinute: 660 }] } } });
+    const legacyRead = await call(`/api/v1/teachers/${workplaceTeacher.id}/schedules?academicYear=2038-2039`);
+    const legacySlot = (await legacyRead.json()).data.schedule.slots[0];
+    assert.equal(legacySlot.institution, null); assert.equal(legacySlot.validFrom, null); assert.equal(legacySlot.validTo, null);
+    assert.equal(legacySlot.consistency.status, 'LEGACY_UNKNOWN');
+    const legacyEdit = await call(`/api/v1/slots/${legacySlot.id}`, 'PATCH', { expectedRevision: legacySchedule.revision, changes: { startMinute: 610 } });
+    assert.equal(legacyEdit.status, 400);
+    const legacyNoop = await call(`/api/v1/slots/${legacySlot.id}`, 'PATCH', { expectedRevision: legacySchedule.revision, changes: { startMinute: 600 } });
+    assert.equal(legacyNoop.status, 200); assert.equal((await legacyNoop.json()).data.schedule.slots[0].institutionId, null);
+
+    const relation = await db.teacherSupplementaryWorkplace.findFirstOrThrow({ where: { teacherId: workplaceTeacher.id, institutionId: supplementary.id } });
+    const closePath = `/api/v1/teachers/${workplaceTeacher.id}/supplementary-workplaces/${relation.id}`;
+    const closedRelation = await call(closePath, 'PATCH', { validTo: '2035-09-15' });
+    assert.equal(closedRelation.status, 200, 'TASK-082 permits closing the authoritative workplace interval');
+    const unchangedSlot = await db.weeklyScheduleSlot.findUniqueOrThrow({ where: { id: firstProjection.id } });
+    assert.deepEqual({ institutionId: unchangedSlot.institutionId, validFrom: unchangedSlot.validFrom?.toISOString(), validTo: unchangedSlot.validTo?.toISOString(), dayOfWeek: unchangedSlot.dayOfWeek, startMinute: unchangedSlot.startMinute, endMinute: unchangedSlot.endMinute },
+      { institutionId: supplementary.id, validFrom: '2035-09-01T00:00:00.000Z', validTo: '2035-10-01T00:00:00.000Z', dayOfWeek: 7, startMinute: 480, endMinute: 540 });
+    const afterWorkplaceChange = await call(`/api/v1/teachers/${workplaceTeacher.id}/schedules?academicYear=2035-2036`);
+    const afterSlot = (await afterWorkplaceChange.json()).data.schedule.slots[0];
+    assert.equal(afterSlot.id, firstProjection.id); assert.equal(afterSlot.institutionId, supplementary.id);
+    assert.deepEqual(afterSlot.consistency, { status: 'NEEDS_CORRECTION', reasonCode: 'SUPPLEMENTARY_VALIDITY_CHANGED' });
+    const archivedPicker = await db.institution.update({ where: { id: supplementary.id }, data: { archivedAt: new Date() } });
+    assert.ok(archivedPicker.archivedAt);
+    assert.equal((await call(`/api/v1/teachers/${workplaceTeacher.id}/valid-workplaces?date=2035-10-01`)).status, 200);
+  });
   await t.test('revision gives at most one concurrent winner and audit failure rolls back slot plus revision', async () => {
     const scheduleResponse = await call(`/api/v1/teachers/${teacher.id}/schedules`, 'POST', { academicYear: '2028-2029', slots: [] });
     const schedule = (await scheduleResponse.json()).data.schedule;
-    const candidate = { dayOfWeek: 1, startMinute: 100, endMinute: 200, levelLabel: null, groupLabel: null, notes: null };
+    const candidate = { institutionId: institution.id, validFrom: '2032-01-01', validTo: null, dayOfWeek: 1, startMinute: 100, endMinute: 200, levelLabel: null, groupLabel: null, notes: null };
     const race = await Promise.all([candidate, { ...candidate, dayOfWeek: 2 }].map((slot) => call(`/api/v1/schedules/${schedule.id}/slots`, 'POST', { expectedRevision: 1, slot })));
     assert.deepEqual(race.map((response) => response.status).sort(), [201, 409]);
     const afterRace = await db.weeklySchedule.findUniqueOrThrow({ where: { id: schedule.id }, include: { slots: true } }); assert.equal(afterRace.revision, 2); assert.equal(afterRace.slots.length, 1);
     await db.$executeRaw`CREATE FUNCTION task048_fail_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW."action" = 'WEEKLY_SCHEDULE_UPDATED' THEN RAISE EXCEPTION 'audit test failure'; END IF; RETURN NEW; END $$`;
     await db.$executeRaw`CREATE TRIGGER task048_fail_audit BEFORE INSERT ON "AuditLog" FOR EACH ROW EXECUTE FUNCTION task048_fail_audit()`;
     try {
-      const slot = { dayOfWeek: 3, startMinute: 100, endMinute: 200, levelLabel: null, groupLabel: null, notes: null };
+      const slot = { institutionId: institution.id, validFrom: '2032-01-01', validTo: null, dayOfWeek: 3, startMinute: 100, endMinute: 200, levelLabel: null, groupLabel: null, notes: null };
       const failed = await call(`/api/v1/schedules/${schedule.id}/slots`, 'POST', { expectedRevision: 2, slot }); assert.equal(failed.status, 500);
       const unchanged = await db.weeklySchedule.findUniqueOrThrow({ where: { id: schedule.id }, include: { slots: true } }); assert.equal(unchanged.revision, 2); assert.equal(unchanged.slots.length, 1);
     } finally { await db.$executeRaw`DROP TRIGGER task048_fail_audit ON "AuditLog"`; await db.$executeRaw`DROP FUNCTION task048_fail_audit()`; }

@@ -92,11 +92,11 @@ describe('Inspector Visit Report V1 editor', () => {
   it('preserves dirty content and does not auto-retry after a revision conflict', async () => {
     renderRoute(); await screen.findByRole('heading', { name: 'تقرير زيارة المفتش — الإصدار الأول' });
     const mark = screen.getByRole('textbox', { name: 'العلامة البيداغوجية (اختيارية من 0 إلى 20)' });
-    fireEvent.change(mark, { target: { value: '14.257' } });
+    fireEvent.change(mark, { target: { value: '14.25' } });
     mocks.saveInspectorVisitReport.mockRejectedValueOnce(new ApiRequestError('conflict', undefined, 409, 'REPORT_REVISION_CONFLICT'));
     fireEvent.click(screen.getByRole('button', { name: 'حفظ المسودة' }));
     expect(await screen.findByText(/احتفظنا بكتابتك/u)).toBeTruthy();
-    expect(screen.getByRole('textbox', { name: 'العلامة البيداغوجية (اختيارية من 0 إلى 20)' })).toHaveProperty('value', '14.257');
+    expect(screen.getByRole('textbox', { name: 'العلامة البيداغوجية (اختيارية من 0 إلى 20)' })).toHaveProperty('value', '14.25');
     expect(mocks.saveInspectorVisitReport).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('button', { name: 'تحميل النسخة الأحدث' })).toBeTruthy();
   });

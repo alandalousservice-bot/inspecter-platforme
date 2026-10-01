@@ -2,8 +2,9 @@ import { expect, test, type Page } from '@playwright/test';
 
 const inspectorEmail = process.env.G3_E2E_INSPECTOR_EMAIL;
 const inspectorPassword = process.env.G3_E2E_INSPECTOR_PASSWORD;
+const institutionId = process.env.TASK051_INSTITUTION_ID;
 const teacherName = 'محمد زيارة داخل الجدول';
-if (!inspectorEmail || !inspectorPassword) throw new Error('TASK-053A E2E fixture missing.');
+if (!inspectorEmail || !inspectorPassword || !institutionId) throw new Error('TASK-053A E2E fixture missing.');
 
 async function login(page: Page) {
   await page.goto('/login');
@@ -22,7 +23,11 @@ test('TASK-053A creates an explicitly typed visit, filters it server-side, and c
   await page.getByLabel('نوع الزيارة').selectOption('PROMOTION_EVALUATION');
   await page.getByLabel(/بداية الزيارة/u).fill('2026-10-13T08:30');
   await page.getByLabel(/نهاية الزيارة/u).fill('2026-10-13T09:00');
+  await page.getByLabel('مؤسسة الزيارة').selectOption(institutionId!);
   await page.getByRole('button', { name: 'إنشاء الزيارة' }).click();
+  if (await page.getByRole('dialog', { name: 'تنبيه الجدول الأسبوعي' }).isVisible().catch(() => false)) {
+    await page.getByRole('button', { name: 'متابعة مع هذا الموعد' }).click();
+  }
   await expect(page).toHaveURL(/\/app\/visits\/[0-9a-f-]+$/u);
   const visitId = new URL(page.url()).pathname.split('/').at(-1)!;
   await expect(page.getByText('زيارة الترقية / التقييم')).toBeVisible();

@@ -233,9 +233,16 @@ async function readFailure(response: Response): Promise<never> {
 export type WeeklyScheduleSlot = {
   id: string; dayOfWeek: number; startMinute: number; endMinute: number;
   levelLabel: string | null; groupLabel: string | null; notes: string | null;
+  institutionId: string | null; institution: { id: string; name: string; municipality: string | null; archivedAt: string | null } | null;
+  validFrom: string | null; validTo: string | null; workplaceBasis: 'HOME' | 'SUPPLEMENTARY' | null;
+  consistency: { status: 'CONSISTENT' | 'NEEDS_CORRECTION' | 'LEGACY_UNKNOWN'; reasonCode: string | null };
 };
 export type WeeklySchedule = { id: string; teacherId: string; academicYear: string; revision: number; slots: WeeklyScheduleSlot[] };
-export type WeeklyScheduleSlotInput = Omit<WeeklyScheduleSlot, 'id'>;
+export type WeeklyScheduleSlotInput = {
+  institutionId: string; validFrom: string; validTo: string | null; dayOfWeek: number; startMinute: number; endMinute: number;
+  levelLabel: string | null; groupLabel: string | null; notes: string | null;
+};
+export type ValidWorkplaceOption = { id: string; name: string; municipality: string | null; role: 'HOME' | 'SUPPLEMENTARY' };
 
 export type PedagogicalVisitStatus = 'PLANNED' | 'COMPLETED' | 'CANCELLED';
 export type PedagogicalVisitType = 'GUIDANCE' | 'TENURE_CONFIRMATION' | 'PROMOTION_EVALUATION' | 'MONITORING_FOLLOW_UP' | 'EXCEPTIONAL';
@@ -335,14 +342,14 @@ async function visitMutation<T>(path: string, method: 'POST' | 'PATCH' | 'PUT', 
   return response.json() as Promise<T>;
 }
 
-export type ScheduledVisitInput = { teacherId: string; academicYear: string; visitType: PedagogicalVisitType; scheduledStartAt: string; scheduledEndAt: string; scheduleWarningAcknowledgement?: ScheduleWarningCode };
-export type RetrospectiveExceptionalVisitInput = { teacherId: string; academicYear: string; visitType: 'EXCEPTIONAL'; actualStartAt: string; actualEndAt: string; institutionContextConfirmed: true };
+export type ScheduledVisitInput = { teacherId: string; institutionId: string; academicYear: string; visitType: PedagogicalVisitType; scheduledStartAt: string; scheduledEndAt: string; scheduleWarningAcknowledgement?: ScheduleWarningCode };
+export type RetrospectiveExceptionalVisitInput = { teacherId: string; institutionId: string; academicYear: string; visitType: 'EXCEPTIONAL'; actualStartAt: string; actualEndAt: string; institutionContextConfirmed: true };
 export function createPedagogicalVisit(input: ScheduledVisitInput | RetrospectiveExceptionalVisitInput) {
   return visitMutation<{ data: { visit: PedagogicalVisit } }>('/api/v1/visits', 'POST', input);
 }
 
 export type PedagogicalVisitPatch =
-  | { operation: 'RESCHEDULE'; expectedRevision: number; academicYear: string; scheduledStartAt: string; scheduledEndAt: string; scheduleWarningAcknowledgement?: ScheduleWarningCode }
+  | { operation: 'RESCHEDULE'; expectedRevision: number; academicYear: string; scheduledStartAt: string; scheduledEndAt: string; institutionId?: string; scheduleWarningAcknowledgement?: ScheduleWarningCode }
   | { operation: 'COMPLETE'; expectedRevision: number; occurredAt: string }
   | { operation: 'CANCEL'; expectedRevision: number }
   | { operation: 'SET_VISIT_TYPE'; expectedRevision: number; visitType: PedagogicalVisitType };
@@ -420,6 +427,13 @@ export async function getWeeklySchedule(teacherId: string, academicYear: string)
   const response = await fetch(`/api/v1/teachers/${encodeURIComponent(teacherId)}/schedules?${query}`, { credentials: 'same-origin' });
   if (!response.ok) return readFailure(response);
   return response.json() as Promise<{ data: { schedule: WeeklySchedule | null } }>;
+}
+
+export async function getValidWorkplaces(teacherId: string, query: { date: string } | { validFrom: string; validTo?: string }): Promise<{ data: { items: ValidWorkplaceOption[] } }> {
+  const params = new URLSearchParams(query);
+  const response = await fetch(`/api/v1/teachers/${encodeURIComponent(teacherId)}/valid-workplaces?${params}`, { credentials: 'same-origin', cache: 'no-store' });
+  if (!response.ok) return readFailure(response);
+  return response.json() as Promise<{ data: { items: ValidWorkplaceOption[] } }>;
 }
 
 async function scheduleMutation<T>(path: string, method: 'POST' | 'PATCH' | 'DELETE', body: unknown): Promise<T> {

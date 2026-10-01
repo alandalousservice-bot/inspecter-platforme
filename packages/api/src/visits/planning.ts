@@ -9,6 +9,12 @@ const localFormatter = new Intl.DateTimeFormat('en-CA', {
 const weekdayNumber: Record<string, number> = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
 
 export type ScheduleWarning = 'VISIT_WEEKLY_SCHEDULE_MISSING' | 'VISIT_OUTSIDE_WEEKLY_SCHEDULE';
+export type VisitScheduleSlot = Pick<WeeklyScheduleSlot, 'dayOfWeek' | 'startMinute' | 'endMinute' | 'institutionId' | 'validFrom' | 'validTo'>;
+
+export function algiersLocalDate(instant: Date): string {
+  const parts = localParts(instant);
+  return `${String(parts.year).padStart(4, '0')}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
+}
 
 export function parseOffsetTimestamp(value: string): Date {
   const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,3})?(Z|[+-](?:0\d|1[0-3]):[0-5]\d|[+-]14:00)$/u.exec(value);
@@ -41,7 +47,7 @@ function nextLocalDayBoundary(from: number, localDate: string): number {
   let high = from + 36 * 60 * 60 * 1000;
   const dateAt = (time: number) => {
     const parts = localParts(new Date(time));
-    return `${parts.year}-${parts.month}-${parts.day}`;
+    return `${String(parts.year).padStart(4, '0')}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
   };
   if (dateAt(high) === localDate) throw new Error('Could not find next local day boundary.');
   while (high - low > 1) {
@@ -56,18 +62,22 @@ export function scheduleWarning(
   start: Date,
   end: Date,
   scheduleExists: boolean,
-  slots: Pick<WeeklyScheduleSlot, 'dayOfWeek' | 'startMinute' | 'endMinute'>[],
+  slots: VisitScheduleSlot[],
+  institutionId: string,
 ): ScheduleWarning | undefined {
   if (!scheduleExists) return 'VISIT_WEEKLY_SCHEDULE_MISSING';
   let cursor = start.getTime();
   const finish = end.getTime();
   while (cursor < finish) {
     const local = localParts(new Date(cursor));
-    const localDate = `${local.year}-${local.month}-${local.day}`;
+    const localDate = `${String(local.year).padStart(4, '0')}-${String(local.month).padStart(2, '0')}-${String(local.day).padStart(2, '0')}`;
     const boundary = Math.min(finish, nextLocalDayBoundary(cursor, localDate));
     const endLocal = localParts(new Date(boundary));
     const endMinute = endLocal.year === local.year && endLocal.month === local.month && endLocal.day === local.day ? endLocal.minute : 1440;
-    const covering = slots.filter((slot) => slot.dayOfWeek === local.weekday)
+    const covering = slots.filter((slot) => slot.dayOfWeek === local.weekday
+      && slot.institutionId === institutionId && slot.validFrom !== null
+      && slot.validFrom.toISOString().slice(0, 10) <= localDate
+      && (slot.validTo === null || localDate < slot.validTo.toISOString().slice(0, 10)))
       .sort((left, right) => left.startMinute - right.startMinute || left.endMinute - right.endMinute);
     let coveredUntil = local.minute;
     for (const slot of covering) {

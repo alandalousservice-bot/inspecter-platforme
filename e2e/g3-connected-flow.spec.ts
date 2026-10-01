@@ -138,7 +138,6 @@ test('G3 connected browser workflow: public intake, decisions, profile edit and 
   await page.getByLabel('الاسم').fill(`اسم ${runTag}`);
   await page.getByRole('textbox', { name: 'رقم الهاتف' }).fill('0555123457');
   await page.getByLabel('الصفة المهنية', { exact: true }).selectOption('TRAINEE');
-  await page.getByRole('textbox', { name: 'المؤهلات' }).fill(`مؤهل ${runTag}`);
   await page.getByRole('button', { name: 'مسح مكان الميلاد' }).click();
   const saveButton = page.getByRole('button', { name: 'حفظ التغييرات' });
   let releasePatch!: () => void;
@@ -169,11 +168,12 @@ test('G3 connected browser workflow: public intake, decisions, profile edit and 
   await expect(page.getByText(`اسم ${runTag}`, { exact: true })).toBeVisible();
 
   const editedTeacher = await db.teacher.findUniqueOrThrow({ where: { id: teacher.id } });
-  expect(editedTeacher).toMatchObject({ name: `اسم ${runTag}`, surname: mainTeacher.lastName, phone: '+213555123457', professionalStatus: 'TRAINEE', qualifications: `مؤهل ${runTag}`, placeOfBirth: null });
+  expect(editedTeacher).toMatchObject({ name: `اسم ${runTag}`, surname: mainTeacher.lastName, phone: '+213555123457', professionalStatus: 'TRAINEE', placeOfBirth: null });
+  expect(editedTeacher.qualifications).toBe(beforeEdit.qualifications);
   expect(editedTeacher.updatedAt.getTime()).toBeGreaterThan(beforeEdit.updatedAt.getTime());
   const audit = await db.auditLog.findMany({ where: { entityId: teacher.id, action: 'TEACHER_PROFILE_UPDATED' } });
   expect(audit).toHaveLength(1);
-  expect(audit[0].metadata).toEqual({ changedFields: ['name', 'phone', 'placeOfBirth', 'professionalStatus', 'qualifications'] });
+  expect(audit[0].metadata).toEqual({ changedFields: ['name', 'phone', 'placeOfBirth', 'professionalStatus'] });
   expect(audit[0].actorInspectorId).toBeTruthy();
   expect(audit[0].districtId).toBe(districtId);
   expect(audit[0].requestId).toBeTruthy();
@@ -225,6 +225,10 @@ test('G3 connected browser workflow: public intake, decisions, profile edit and 
   await page.getByRole('button', { name: 'إنشاء توزيع فارغ' }).click();
   await expect(page.getByRole('heading', { name: 'إضافة حصة' })).toBeVisible();
   async function addScheduleSlot(start: string, end: string) {
+    const dateParts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Algiers', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+    const today = `${dateParts.find((part) => part.type === 'year')!.value}-${dateParts.find((part) => part.type === 'month')!.value}-${dateParts.find((part) => part.type === 'day')!.value}`;
+    await page.getByLabel('بداية السريان').fill(today);
+    await page.getByLabel('مكان العمل').selectOption(institutionA.id);
     await page.getByLabel('اليوم').selectOption('1');
     await page.getByLabel('وقت البداية').fill(start);
     await page.getByLabel('وقت النهاية').fill(end);
@@ -327,7 +331,7 @@ test('G3 connected browser workflow: public intake, decisions, profile edit and 
   await page.getByLabel('السنة الدراسية').fill('2026-2027');
   await page.getByRole('button', { name: 'عرض التوزيع' }).click();
   await expect(page.getByRole('heading', { name: 'لا يوجد توزيع لهذه السنة' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'إنشاء توزيع فارغ' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'إنشاء توزيع فارغ' })).toBeEnabled();
   await page.getByRole('link', { name: 'ملف الأستاذ', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/app/teachers/${reviewed.acceptedTeacherId}$`));
   await page.getByRole('button', { name: 'اعتماد المؤسسة' }).click();

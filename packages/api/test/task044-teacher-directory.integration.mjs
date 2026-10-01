@@ -167,15 +167,15 @@ before(async () => {
     createTeacher({ name: 'وقت', surname: 'يبدأ', institutionId: institutionA.id }),
     createTeacher({ name: 'وقت', surname: 'ينتهي', institutionId: institutionA.id }),
     createTeacher({ name: 'وقت', surname: 'مجاور', institutionId: institutionA.id }),
-    createTeacher({ name: 'يوم', surname: 'الأربعاء' }),
+    createTeacher({ name: 'يوم', surname: 'الأربعاء', institutionId: institutionA.id }),
   ]);
   const scheduleRows = slotTeachers.map((teacher) => ({ id: randomUUID(), teacherId: teacher.id, academicYear }));
   await db.weeklySchedule.createMany({ data: scheduleRows });
   await db.weeklyScheduleSlot.createMany({ data: [
-    { scheduleId: scheduleRows[0].id, dayOfWeek: 2, startMinute: 510, endMinute: 600 },
-    { scheduleId: scheduleRows[1].id, dayOfWeek: 2, startMinute: 480, endMinute: 510 },
-    { scheduleId: scheduleRows[2].id, dayOfWeek: 2, startMinute: 510, endMinute: 540 },
-    { scheduleId: scheduleRows[3].id, dayOfWeek: 3, startMinute: 510, endMinute: 600 },
+    { scheduleId: scheduleRows[0].id, teacherId: slotTeachers[0].id, districtId: districtA.id, institutionId: institutionA.id, workplaceBasis: 'HOME', validFrom: new Date('2026-09-01T00:00:00Z'), dayOfWeek: 2, startMinute: 510, endMinute: 600 },
+    { scheduleId: scheduleRows[1].id, teacherId: slotTeachers[1].id, districtId: districtA.id, institutionId: institutionA.id, workplaceBasis: 'HOME', validFrom: new Date('2026-09-01T00:00:00Z'), dayOfWeek: 2, startMinute: 480, endMinute: 510 },
+    { scheduleId: scheduleRows[2].id, teacherId: slotTeachers[2].id, districtId: districtA.id, institutionId: institutionA.id, workplaceBasis: 'HOME', validFrom: new Date('2026-09-01T00:00:00Z'), dayOfWeek: 2, startMinute: 510, endMinute: 540 },
+    { scheduleId: scheduleRows[3].id, teacherId: slotTeachers[3].id, districtId: districtA.id, institutionId: institutionA.id, workplaceBasis: 'HOME', validFrom: new Date('2026-09-01T00:00:00Z'), dayOfWeek: 3, startMinute: 510, endMinute: 600 },
   ] });
   Object.assign(globalThis, { task044DistrictBTeacher: districtBTeacher, task044SlotTeachers: slotTeachers });
 });

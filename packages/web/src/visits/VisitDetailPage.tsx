@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
-import { ApiRequestError, getPedagogicalVisit, patchPedagogicalVisit, type PedagogicalVisit, type PedagogicalVisitPatch, type PedagogicalVisitStatus, type PedagogicalVisitType, type ScheduleWarningCode } from '../auth/client';
+import { ApiRequestError, getPedagogicalVisit, getValidWorkplaces, patchPedagogicalVisit, type PedagogicalVisit, type PedagogicalVisitPatch, type PedagogicalVisitStatus, type PedagogicalVisitType, type ScheduleWarningCode, type ValidWorkplaceOption } from '../auth/client';
 import { Button, Card, CardContent, CardHeader, Dialog, ErrorState, Input, LoadingState, SuccessState } from '../ui';
 import { formatAlgiers, localDateTimeToOffset, utcToLocalDateTime } from './time';
 import './visits.css';
@@ -48,6 +48,10 @@ export function VisitDetailPage() {
   const [year, setYear] = useState('');
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
+  const [institutionId, setInstitutionId] = useState('');
+  const [workplaces, setWorkplaces] = useState<ValidWorkplaceOption[]>([]);
+  const [workplaceLoading, setWorkplaceLoading] = useState(false);
+  const [workplaceError, setWorkplaceError] = useState(false);
   const [formError, setFormError] = useState('');
   const [warning, setWarning] = useState<WarningState | null>(null);
   const [dialogAction, setDialogAction] = useState<DialogAction>(null);
@@ -62,10 +66,20 @@ export function VisitDetailPage() {
     finally { setLoading(false); }
   }, [id]);
   useEffect(() => { void load(); }, [load, refresh]);
+  useEffect(() => {
+    const date = start.slice(0, 10);
+    if (!rescheduling || !visit || !/^\d{4}-\d{2}-\d{2}$/u.test(date)) { setWorkplaces([]); return undefined; }
+    let active = true; setWorkplaceLoading(true); setWorkplaceError(false);
+    void getValidWorkplaces(visit.teacher.id, { date }).then(({ data }) => { if (active) setWorkplaces(data.items); })
+      .catch(() => { if (active) { setWorkplaces([]); setWorkplaceError(true); } })
+      .finally(() => { if (active) setWorkplaceLoading(false); });
+    return () => { active = false; };
+  }, [rescheduling, visit?.teacher.id, start]);
 
   function startReschedule() {
     if (!visit?.scheduledStartAt || !visit.scheduledEndAt) return;
     setYear(visit.academicYear); setStart(utcToLocalDateTime(visit.scheduledStartAt)); setEnd(utcToLocalDateTime(visit.scheduledEndAt));
+    setInstitutionId(visit.institution.id);
     setWarning(null); setFormError(''); setOperationError(''); setRescheduling(true);
   }
 
@@ -94,11 +108,12 @@ export function VisitDetailPage() {
 
   function submitReschedule(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (!visit || busy) return;
+    if (!institutionId) { setFormError('اختر مؤسسة صالحة لتاريخ الزيارة الجديد.'); return; }
     if (!/^\d{4}-\d{4}$/u.test(year) || Number(year.slice(5)) !== Number(year.slice(0, 4)) + 1) { setFormError('أدخل سنة دراسية صحيحة مثل 2026-2027.'); return; }
     const startAt = localDateTimeToOffset(start); const endAt = localDateTimeToOffset(end);
     if (!startAt || !endAt) { setFormError('أدخل تاريخًا ووقتًا صالحين بتوقيت الجزائر.'); return; }
     if (Date.parse(startAt) >= Date.parse(endAt)) { setFormError('يجب أن يسبق موعد البداية موعد النهاية.'); return; }
-    void applyReschedule({ operation: 'RESCHEDULE', expectedRevision: visit.revision, academicYear: year, scheduledStartAt: startAt, scheduledEndAt: endAt });
+    void applyReschedule({ operation: 'RESCHEDULE', expectedRevision: visit.revision, institutionId, academicYear: year, scheduledStartAt: startAt, scheduledEndAt: endAt });
   }
 
   async function executeTransition() {
@@ -140,8 +155,12 @@ export function VisitDetailPage() {
         {rescheduling ? <form className="visit-form" onSubmit={submitReschedule} aria-busy={busy}>
           <h2>إعادة جدولة الزيارة</h2>
           <Input id="visit-reschedule-year" label="السنة الدراسية" required value={year} onChange={(event) => { setYear(event.currentTarget.value); setWarning(null); }} hint="صيغة YYYY-YYYY والسنة الثانية تلي الأولى." aria-describedby={formError ? 'visit-reschedule-error' : undefined} />
-          <Input id="visit-reschedule-start" label="بداية الزيارة — توقيت الجزائر" type="datetime-local" required value={start} onChange={(event) => { setStart(event.currentTarget.value); setWarning(null); }} aria-describedby={formError ? 'visit-reschedule-error' : undefined} />
+          <Input id="visit-reschedule-start" label="بداية الزيارة — توقيت الجزائر" type="datetime-local" required value={start} onChange={(event) => { setStart(event.currentTarget.value); setInstitutionId(''); setWarning(null); }} aria-describedby={formError ? 'visit-reschedule-error' : undefined} />
           <Input id="visit-reschedule-end" label="نهاية الزيارة — توقيت الجزائر" type="datetime-local" required value={end} onChange={(event) => { setEnd(event.currentTarget.value); setWarning(null); }} aria-describedby={formError ? 'visit-reschedule-error' : undefined} />
+          <div className="visit-field"><label className="ui-field__label" htmlFor="visit-reschedule-workplace">مؤسسة الزيارة</label><select id="visit-reschedule-workplace" className="ui-input" required value={institutionId} disabled={busy || workplaceLoading} onChange={(event) => { setInstitutionId(event.currentTarget.value); setWarning(null); }}><option value="">اختر مؤسسة صالحة للتاريخ الجديد</option>
+            {institutionId && !workplaces.some((place) => place.id === institutionId) ? <option value={institutionId}>{visit.institution.name} — يلزم التحقق أو التصحيح</option> : null}
+            {workplaces.map((place) => <option key={place.id} value={place.id}>{place.name}{place.municipality ? ` — ${place.municipality}` : ''} ({place.role === 'HOME' ? 'أم' : 'تكملة نصاب'})</option>)}
+          </select>{workplaceLoading ? <p role="status">جارٍ تحميل المؤسسات الصالحة…</p> : null}{workplaceError ? <p role="alert">تعذر تحميل المؤسسات الصالحة لهذا التاريخ.</p> : null}</div>
           {start && end && start.slice(0, 10) !== end.slice(0, 10) ? <p>يمتد الموعد إلى تاريخ آخر؛ سيظهر تاريخ البداية والنهاية كاملين.</p> : null}
           {formError ? <p id="visit-reschedule-error" role="alert" className="visit-error">{formError}</p> : null}
           <div className="visit-actions"><Button type="submit" disabled={busy}>{busy ? 'جارٍ الحفظ…' : 'حفظ الموعد'}</Button><Button variant="secondary" disabled={busy} onClick={() => { setRescheduling(false); setWarning(null); }}>إلغاء إعادة الجدولة</Button></div>

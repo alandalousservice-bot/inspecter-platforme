@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { ApiRequestError, createPedagogicalVisit, getCurrentDistricts, type DistrictOption, type PedagogicalVisitType, type ScheduleWarningCode, type TeacherDirectoryItem } from '../auth/client';
+import { ApiRequestError, createPedagogicalVisit, getCurrentDistricts, getValidWorkplaces, type DistrictOption, type PedagogicalVisitType, type ScheduleWarningCode, type TeacherDirectoryItem, type ValidWorkplaceOption } from '../auth/client';
 import { Button, Card, CardContent, CardHeader, Dialog, ErrorState, Input, LoadingState } from '../ui';
 import { TeacherPicker } from './VisitPickers';
 import { localDateTimeToOffset } from './time';
 import './visits.css';
 
-type CreatePayload = { teacherId: string; academicYear: string; visitType: PedagogicalVisitType; scheduledStartAt: string; scheduledEndAt: string };
+type CreatePayload = { teacherId: string; institutionId: string; academicYear: string; visitType: PedagogicalVisitType; scheduledStartAt: string; scheduledEndAt: string };
 type WarningState = { code: ScheduleWarningCode; payload: CreatePayload } | { stale: true; payload: CreatePayload };
 const visitTypeLabels: Record<PedagogicalVisitType, string> = {
   GUIDANCE: 'زيارة توجيهية / تكوينية', TENURE_CONFIRMATION: 'زيارة التثبيت / الترسيم',
@@ -40,6 +40,10 @@ export function VisitCreatePage() {
   const [districtError, setDistrictError] = useState(false);
   const [districtId, setDistrictId] = useState('');
   const [teacher, setTeacher] = useState<TeacherDirectoryItem | null>(null);
+  const [institutionId, setInstitutionId] = useState('');
+  const [workplaces, setWorkplaces] = useState<ValidWorkplaceOption[]>([]);
+  const [workplaceLoading, setWorkplaceLoading] = useState(false);
+  const [workplaceError, setWorkplaceError] = useState(false);
   const [academicYear, setAcademicYear] = useState('');
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
@@ -60,7 +64,16 @@ export function VisitCreatePage() {
     return () => { active = false; };
   }, []);
 
-  const chooseTeacher = useCallback((value: TeacherDirectoryItem | null) => { setTeacher(value); setWarning(null); setFormError(''); }, []);
+  const chooseTeacher = useCallback((value: TeacherDirectoryItem | null) => { setTeacher(value); setInstitutionId(''); setWarning(null); setFormError(''); }, []);
+  useEffect(() => {
+    const date = start.slice(0, 10);
+    if (!teacher || !/^\d{4}-\d{2}-\d{2}$/u.test(date)) { setWorkplaces([]); return undefined; }
+    let active = true; setWorkplaceLoading(true); setWorkplaceError(false);
+    void getValidWorkplaces(teacher.id, { date }).then(({ data }) => { if (active) setWorkplaces(data.items); })
+      .catch(() => { if (active) { setWorkplaces([]); setWorkplaceError(true); } })
+      .finally(() => { if (active) setWorkplaceLoading(false); });
+    return () => { active = false; };
+  }, [teacher?.id, start]);
 
   async function send(payload: CreatePayload, acknowledgement?: ScheduleWarningCode) {
     if (submitting) return;
@@ -80,14 +93,14 @@ export function VisitCreatePage() {
     event.preventDefault(); if (saving) return;
     setFormError('');
     if (!districtId || !teacher) { setFormError('اختر المقاطعة والأستاذ أولًا.'); return; }
-    if (!teacher.currentInstitution) { setFormError('اعتمد مؤسسة حالية للأستاذ من ملفه قبل التخطيط.'); return; }
+    if (!institutionId) { setFormError('اختر مؤسسة صالحة في تاريخ بداية الزيارة.'); return; }
     if (!validAcademicYear(academicYear)) { setFormError('أدخل سنة دراسية صحيحة مثل 2026-2027.'); return; }
     if (!selectedVisitType) { setFormError('اختر نوع الزيارة.'); return; }
     if (selectedVisitType === 'EXCEPTIONAL' && exceptionalMode === 'RETROSPECTIVE') {
       const actualStart = localDateTimeToOffset(start); const actualEnd = localDateTimeToOffset(end);
       if (!actualStart || !actualEnd || Date.parse(actualStart) >= Date.parse(actualEnd) || Date.parse(actualEnd) > Date.now()) { setFormError('أدخل فترة فعلية صحيحة انتهت بالفعل.'); return; }
-      if (!institutionContextConfirmed) { setFormError('أكد أن المؤسسة المعروضة هي مؤسسة الزيارة وقت وقوعها.'); return; }
-      void createPedagogicalVisit({ teacherId: teacher.id, academicYear, visitType: 'EXCEPTIONAL', actualStartAt: actualStart, actualEndAt: actualEnd, institutionContextConfirmed: true })
+      if (!institutionContextConfirmed) { setFormError('أكد المؤسسة المختارة بوصفها مكان الزيارة وقت وقوعها.'); return; }
+      void createPedagogicalVisit({ teacherId: teacher.id, institutionId, academicYear, visitType: 'EXCEPTIONAL', actualStartAt: actualStart, actualEndAt: actualEnd, institutionContextConfirmed: true })
         .then((result) => navigate(`/app/visits/${encodeURIComponent(result.data.visit.id)}${location.search}`, { state: { success: 'تم تسجيل الزيارة الاستثنائية السابقة.' } }))
         .catch((error: unknown) => setFormError(readableError(error)))
         .finally(() => setSaving(false));
@@ -96,7 +109,7 @@ export function VisitCreatePage() {
     const startAt = localDateTimeToOffset(start); const endAt = localDateTimeToOffset(end);
     if (!startAt || !endAt) { setFormError('أدخل تاريخًا ووقتًا صالحين بتوقيت الجزائر.'); return; }
     if (Date.parse(startAt) >= Date.parse(endAt)) { setFormError('يجب أن يسبق موعد البداية موعد النهاية.'); return; }
-    void send({ teacherId: teacher.id, academicYear, visitType: selectedVisitType, scheduledStartAt: startAt, scheduledEndAt: endAt });
+    void send({ teacherId: teacher.id, institutionId, academicYear, visitType: selectedVisitType, scheduledStartAt: startAt, scheduledEndAt: endAt });
   }
 
   const canCreate = districts.length > 0 && !districtLoading && !districtError;
@@ -110,18 +123,20 @@ export function VisitCreatePage() {
       <form className="visit-form" onSubmit={submit} aria-busy={saving}>
         {districts.length === 1 ? <div className="visit-field"><span className="ui-field__label">المقاطعة</span><p>{districts[0].name}</p></div> : <div className="visit-field"><label className="ui-field__label" htmlFor="visit-create-district">المقاطعة <span aria-hidden="true">*</span></label><select id="visit-create-district" className="ui-input" required value={districtId} disabled={saving} aria-describedby={formError ? 'visit-create-error' : undefined} onChange={(event) => { setDistrictId(event.currentTarget.value); setTeacher(null); setWarning(null); setFormError(''); }}><option value="">اختر المقاطعة</option>{districts.map((district) => <option key={district.id} value={district.id}>{district.name}</option>)}</select></div>}
         {districtId ? <TeacherPicker districtId={districtId} selected={teacher} onSelect={chooseTeacher} disabled={saving} errorDescriptionId={formError ? 'visit-create-error' : undefined} /> : null}
-        {teacher && !teacher.currentInstitution ? <p className="visit-inline-note">لم تُعتمد مؤسسة حالية لهذا الأستاذ. <Link to={`/app/teachers/${encodeURIComponent(teacher.id)}`}>مراجعة ملف الأستاذ</Link></p> : null}
-        {teacher?.currentInstitution ? <p className="visit-inline-note">المؤسسة الحالية المعتمدة: {teacher.currentInstitution.name}{teacher.currentInstitution.municipality ? ` — ${teacher.currentInstitution.municipality}` : ''}</p> : null}
+        {teacher?.currentInstitution ? <p className="visit-inline-note">المؤسسة الأم الحالية: {teacher.currentInstitution.name}{teacher.currentInstitution.municipality ? ` — ${teacher.currentInstitution.municipality}` : ''}</p>
+          : teacher ? <p className="visit-inline-note">لم تُعتمد مؤسسة حالية لهذا الأستاذ. <Link to={`/app/teachers/${encodeURIComponent(teacher.id)}`}>مراجعة ملف الأستاذ</Link></p> : null}
         {teacher ? <p><Link to={`/app/teachers/${encodeURIComponent(teacher.id)}/schedules`}>عرض التوزيع الأسبوعي للأستاذ</Link></p> : null}
         <Input id="visit-academic-year" label="السنة الدراسية" required value={academicYear} onChange={(event) => { setAcademicYear(event.currentTarget.value); setWarning(null); }} hint="أدخلها صراحةً بصيغة YYYY-YYYY، مثل 2026-2027." aria-describedby={formError ? 'visit-create-error' : undefined} />
         <div className="visit-field"><label className="ui-field__label" htmlFor="visit-create-type">نوع الزيارة <span aria-hidden="true">*</span></label><select id="visit-create-type" className="ui-input" required value={selectedVisitType} disabled={saving} aria-describedby={formError ? 'visit-create-error' : undefined} onChange={(event) => { setSelectedVisitType(event.currentTarget.value as PedagogicalVisitType | ''); setExceptionalMode('SCHEDULED'); setInstitutionContextConfirmed(false); setWarning(null); setFormError(''); }}><option value="">اختر نوع الزيارة</option>{Object.entries(visitTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
         {selectedVisitType === 'EXCEPTIONAL' ? <div className="visit-field"><label className="ui-field__label" htmlFor="visit-exceptional-mode">طريقة تسجيل الزيارة الاستثنائية</label><select id="visit-exceptional-mode" className="ui-input" value={exceptionalMode} disabled={saving} onChange={(event) => { setExceptionalMode(event.currentTarget.value as 'SCHEDULED' | 'RETROSPECTIVE'); setWarning(null); setInstitutionContextConfirmed(false); }}><option value="SCHEDULED">زيارة مجدولة</option><option value="RETROSPECTIVE">تسجيل زيارة وقعت سابقًا</option></select></div> : null}
-        <Input id="visit-start" label={selectedVisitType === 'EXCEPTIONAL' && exceptionalMode === 'RETROSPECTIVE' ? 'بداية الفترة الفعلية — توقيت الجزائر' : 'بداية الزيارة — توقيت الجزائر'} type="datetime-local" required value={start} onChange={(event) => { setStart(event.currentTarget.value); setWarning(null); }} aria-describedby={formError ? 'visit-create-error' : undefined} />
+        <Input id="visit-start" label={selectedVisitType === 'EXCEPTIONAL' && exceptionalMode === 'RETROSPECTIVE' ? 'بداية الفترة الفعلية — توقيت الجزائر' : 'بداية الزيارة — توقيت الجزائر'} type="datetime-local" required value={start} onChange={(event) => { setStart(event.currentTarget.value); setInstitutionId(''); setWarning(null); }} aria-describedby={formError ? 'visit-create-error' : undefined} />
         <Input id="visit-end" label={selectedVisitType === 'EXCEPTIONAL' && exceptionalMode === 'RETROSPECTIVE' ? 'نهاية الفترة الفعلية — توقيت الجزائر' : 'نهاية الزيارة — توقيت الجزائر'} type="datetime-local" required value={end} onChange={(event) => { setEnd(event.currentTarget.value); setWarning(null); }} aria-describedby={formError ? 'visit-create-error' : undefined} />
-        {selectedVisitType === 'EXCEPTIONAL' && exceptionalMode === 'RETROSPECTIVE' ? <label className="visit-inline-note"><input type="checkbox" checked={institutionContextConfirmed} disabled={saving} onChange={(event) => setInstitutionContextConfirmed(event.currentTarget.checked)} /> أؤكد أن المؤسسة الحالية المعتمدة المعروضة هي المؤسسة التي وقعت فيها الزيارة</label> : null}
+        {teacher ? <div className="visit-field"><label className="ui-field__label" htmlFor="visit-workplace">مؤسسة الزيارة</label><select id="visit-workplace" className="ui-input" required value={institutionId} disabled={saving || workplaceLoading || !start} onChange={(event) => { setInstitutionId(event.currentTarget.value); setWarning(null); }}><option value="">اختر مؤسسة صالحة لهذا التاريخ</option>{workplaces.map((place) => <option key={place.id} value={place.id}>{place.name}{place.municipality ? ` — ${place.municipality}` : ''} ({place.role === 'HOME' ? 'أم' : 'تكملة نصاب'})</option>)}</select>
+          {workplaceLoading ? <p role="status">جارٍ تحميل المؤسسات الصالحة…</p> : null}{workplaceError ? <p role="alert">تعذر تحميل المؤسسات الصالحة لهذا التاريخ.</p> : null}{!workplaceLoading && !workplaceError && start && !workplaces.length ? <p>لا توجد مؤسسة معتمدة لهذا الأستاذ في التاريخ المحدد.</p> : null}</div> : null}
+        {selectedVisitType === 'EXCEPTIONAL' && exceptionalMode === 'RETROSPECTIVE' ? <label className="visit-inline-note"><input type="checkbox" checked={institutionContextConfirmed} disabled={saving || !institutionId} onChange={(event) => setInstitutionContextConfirmed(event.currentTarget.checked)} /> أؤكد المؤسسة المختارة بوصفها مكان الزيارة وقت وقوعها</label> : null}
         {start && end && start.slice(0, 10) !== end.slice(0, 10) ? <p role="status">يمتد الموعد إلى تاريخ آخر؛ سيظهر تاريخ البداية والنهاية كاملين.</p> : null}
         {formError ? <p id="visit-create-error" className="visit-error" role="alert">{formError}</p> : null}
-        <Button type="submit" disabled={saving || !districtId || !teacher || !teacher.currentInstitution || !selectedVisitType}>{saving ? 'جارٍ إنشاء الزيارة…' : 'إنشاء الزيارة'}</Button>
+        <Button type="submit" disabled={saving || !districtId || !teacher || !institutionId || !selectedVisitType}>{saving ? 'جارٍ إنشاء الزيارة…' : 'إنشاء الزيارة'}</Button>
       </form>
     </CardContent></Card> : null}
     <Dialog open={Boolean(warningDialog)} title={warningDialog && 'stale' in warningDialog ? 'تغيّر التوزيع الأسبوعي' : 'تنبيه الجدول الأسبوعي'}

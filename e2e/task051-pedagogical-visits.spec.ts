@@ -22,7 +22,7 @@ async function login(page: Page) {
   await expect(page).toHaveURL(/\/app\/institutions$/u);
 }
 
-async function planVisit(page: Page, teacherName: string, start: string, end: string) {
+async function planVisit(page: Page, teacherName: string, start: string, end: string, acknowledgeWarning = false) {
   await page.goto('/app/visits/new');
   await page.getByLabel('البحث عن أستاذ').fill(teacherName);
   await page.getByRole('button', { name: new RegExp(teacherName, 'u') }).click();
@@ -31,7 +31,12 @@ async function planVisit(page: Page, teacherName: string, start: string, end: st
   await page.getByLabel('نوع الزيارة').selectOption('GUIDANCE');
   await page.getByLabel(/بداية الزيارة/u).fill(start);
   await page.getByLabel(/نهاية الزيارة/u).fill(end);
+  await page.getByLabel('مؤسسة الزيارة').selectOption(institutionId!);
   await page.getByRole('button', { name: 'إنشاء الزيارة' }).click();
+  if (acknowledgeWarning) {
+    await page.getByRole('dialog', { name: 'تنبيه الجدول الأسبوعي' }).waitFor();
+    await page.getByRole('button', { name: 'متابعة مع هذا الموعد' }).click();
+  }
 }
 
 test.beforeAll(async () => {
@@ -48,7 +53,7 @@ test('TASK-051 connected list, create/advisory, reschedule, concurrency, complet
   await expect(page.getByRole('heading', { name: 'الزيارات التربوية' })).toBeVisible();
   await expect(page.getByText('إجمالي النتائج: 0', { exact: true }).first()).toBeVisible();
 
-  await planVisit(page, 'زيارة داخل الجدول', '2026-10-06T08:30', '2026-10-06T09:00');
+  await planVisit(page, 'زيارة داخل الجدول', '2026-10-06T08:30', '2026-10-06T09:00', true);
   await expect(page).toHaveURL(/\/app\/visits\/[0-9a-f-]+$/u);
   await expect(page.locator('dd').filter({ hasText: 'ابتدائية TASK-051 الأصلية' })).toBeVisible();
   const firstVisitId = new URL(page.url()).pathname.split('/').at(-1)!;

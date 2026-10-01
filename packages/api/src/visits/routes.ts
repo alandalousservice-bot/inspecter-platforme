@@ -5,7 +5,7 @@ import { appendAuditEvent, AuditAction } from '../audit/append.js';
 import { ApiError } from '../http/api-error.js';
 import { requireAuthenticatedMutationCsrf } from '../identity/auth-routes.js';
 import { requireInspectorDistrictMembership } from '../policy/district-access.js';
-import { parseOffsetTimestamp, scheduleWarning, yearSchemaValid, type ScheduleWarning } from './planning.js';
+import { algiersLocalDate, parseOffsetTimestamp, scheduleWarning, yearSchemaValid, type ScheduleWarning } from './planning.js';
 
 const uuid = z.string().uuid();
 const visitType = z.enum(['GUIDANCE', 'TENURE_CONFIRMATION', 'PROMOTION_EVALUATION', 'MONITORING_FOLLOW_UP', 'EXCEPTIONAL']);
@@ -25,17 +25,17 @@ const listSchema = z.object({
     context.addIssue({ code: 'custom', path: ['to'], message: 'قيمة غير صالحة.' });
   }
 });
-const scheduledCreateSchema = z.object({ teacherId: uuid, academicYear: year, visitType, scheduledStartAt: offsetDate, scheduledEndAt: offsetDate,
+const scheduledCreateSchema = z.object({ teacherId: uuid, institutionId: uuid, academicYear: year, visitType, scheduledStartAt: offsetDate, scheduledEndAt: offsetDate,
   scheduleWarningAcknowledgement: z.enum(['VISIT_WEEKLY_SCHEDULE_MISSING', 'VISIT_OUTSIDE_WEEKLY_SCHEDULE']).optional() }).strict()
   .refine((input) => parseOffsetTimestamp(input.scheduledStartAt) < parseOffsetTimestamp(input.scheduledEndAt), { path: ['scheduledEndAt'], message: 'قيمة غير صالحة.' });
-const retrospectiveCreateSchema = z.object({ teacherId: uuid, academicYear: year, visitType: z.literal('EXCEPTIONAL'), actualStartAt: offsetDate,
+const retrospectiveCreateSchema = z.object({ teacherId: uuid, institutionId: uuid, academicYear: year, visitType: z.literal('EXCEPTIONAL'), actualStartAt: offsetDate,
   actualEndAt: offsetDate, institutionContextConfirmed: z.literal(true) }).strict()
   .refine((input) => parseOffsetTimestamp(input.actualStartAt) < parseOffsetTimestamp(input.actualEndAt), { path: ['actualEndAt'], message: 'قيمة غير صالحة.' })
   .refine((input) => parseOffsetTimestamp(input.actualEndAt).getTime() <= Date.now(), { path: ['actualEndAt'], message: 'قيمة غير صالحة.' });
 const createSchema = z.union([scheduledCreateSchema, retrospectiveCreateSchema]);
 const expectedRevision = z.number().int().positive();
 const patchSchema = z.discriminatedUnion('operation', [
-  z.object({ operation: z.literal('RESCHEDULE'), expectedRevision, academicYear: year, scheduledStartAt: offsetDate, scheduledEndAt: offsetDate,
+  z.object({ operation: z.literal('RESCHEDULE'), expectedRevision, institutionId: uuid.optional(), academicYear: year, scheduledStartAt: offsetDate, scheduledEndAt: offsetDate,
     scheduleWarningAcknowledgement: z.enum(['VISIT_WEEKLY_SCHEDULE_MISSING', 'VISIT_OUTSIDE_WEEKLY_SCHEDULE']).optional() }).strict()
     .refine((input) => parseOffsetTimestamp(input.scheduledStartAt) < parseOffsetTimestamp(input.scheduledEndAt), { path: ['scheduledEndAt'], message: 'قيمة غير صالحة.' }),
   z.object({ operation: z.literal('COMPLETE'), expectedRevision, occurredAt: offsetDate }).strict(),
@@ -83,11 +83,25 @@ function checkOverlap(error: unknown): boolean {
     .some((constraint) => error.message.includes(constraint));
 }
 
-async function inspectSchedule(tx: Prisma.TransactionClient, teacherId: string, academicYear: string, start: Date, end: Date) {
+async function inspectSchedule(tx: Prisma.TransactionClient, teacherId: string, academicYear: string, start: Date, end: Date, institutionId: string) {
   const schedule = await tx.weeklySchedule.findUnique({
-    where: { teacherId_academicYear: { teacherId, academicYear } }, include: { slots: { select: { dayOfWeek: true, startMinute: true, endMinute: true } } },
+    where: { teacherId_academicYear: { teacherId, academicYear } }, include: { slots: { select: { dayOfWeek: true, startMinute: true, endMinute: true, institutionId: true, validFrom: true, validTo: true } } },
   });
-  return scheduleWarning(start, end, schedule !== null, schedule?.slots ?? []);
+  return scheduleWarning(start, end, schedule !== null, schedule?.slots ?? [], institutionId);
+}
+
+async function validateVisitInstitution(tx: Prisma.TransactionClient, teacher: { id: string; districtId: string; institutionId: string | null }, institutionId: string, start: Date) {
+  await tx.$queryRaw`SELECT id FROM "Institution" WHERE id = ${institutionId}::uuid FOR SHARE`;
+  const institution = await tx.institution.findUnique({ where: { id: institutionId } });
+  if (!institution || institution.districtId !== teacher.districtId || institution.archivedAt !== null) throw conflict('VISIT_WORKPLACE_UNAVAILABLE');
+  const date = algiersLocalDate(start);
+  const today = algiersLocalDate(new Date());
+  if (teacher.institutionId === institutionId && date >= today) return institution;
+  const dateValue = new Date(`${date}T00:00:00.000Z`);
+  const supplementary = await tx.teacherSupplementaryWorkplace.findFirst({ where: { teacherId: teacher.id, institutionId,
+    validFrom: { lte: dateValue }, OR: [{ validTo: null }, { validTo: { gt: dateValue } }] }, select: { id: true } });
+  if (supplementary) return institution;
+  throw conflict('VISIT_WORKPLACE_UNAVAILABLE');
 }
 
 function verifyAcknowledgement(warning: ScheduleWarning | undefined, acknowledgement?: ScheduleWarning) {
@@ -170,11 +184,8 @@ export function registerPedagogicalVisitRoutes(app: Express, database: PrismaCli
         if (!teacher) throw notFound();
         await requireInspectorDistrictMembership(tx, inspectorId, teacher.districtId, nowDate());
         if (teacher.recordStatus !== 'ACTIVE') throw conflict('TEACHER_INACTIVE');
-        if (!teacher.institutionId) throw conflict('TEACHER_CURRENT_INSTITUTION_REQUIRED');
-        await tx.$queryRaw`SELECT id FROM "Institution" WHERE id = ${teacher.institutionId}::uuid FOR UPDATE`;
-        const institution = await tx.institution.findUnique({ where: { id: teacher.institutionId } });
-        if (!institution || institution.districtId !== teacher.districtId || institution.archivedAt !== null) throw conflict('VISIT_WORKPLACE_UNAVAILABLE');
-        const warning = isScheduled ? await inspectSchedule(tx, teacher.id, input.academicYear, start, end) : undefined;
+        const institution = await validateVisitInstitution(tx, teacher, input.institutionId, start);
+        const warning = isScheduled ? await inspectSchedule(tx, teacher.id, input.academicYear, start, end, institution.id) : undefined;
         if (isScheduled) verifyAcknowledgement(warning, input.scheduleWarningAcknowledgement);
         const visit = await tx.pedagogicalVisit.create({ data: {
           districtId: teacher.districtId, inspectorId, teacherId: teacher.id,
@@ -220,10 +231,14 @@ export function registerPedagogicalVisitRoutes(app: Express, database: PrismaCli
     const requestId = response.locals.requestId as string;
     try {
       const visit = await database.$transaction(async (tx) => {
+        const first = await tx.pedagogicalVisit.findFirst({ where: { id: id.data, inspectorId }, select: { teacherId: true } });
+        if (!first) throw notFound();
+        if (input.operation === 'RESCHEDULE') await tx.$queryRaw`SELECT id FROM "Teacher" WHERE id = ${first.teacherId}::uuid FOR UPDATE`;
         const locked = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "PedagogicalVisit" WHERE id = ${id.data}::uuid FOR UPDATE`;
         if (!locked.length) throw notFound();
         const current = await tx.pedagogicalVisit.findFirst({ where: { id: id.data, inspectorId }, include: includeProjection });
         if (!current) throw notFound();
+        if (current.teacherId !== first.teacherId) throw notFound();
         await requireInspectorDistrictMembership(tx, inspectorId, current.districtId, nowDate());
         if (current.revision !== input.expectedRevision) throw conflict('VISIT_REVISION_CONFLICT');
         if (input.operation === 'SET_VISIT_TYPE') {
@@ -243,24 +258,23 @@ export function registerPedagogicalVisitRoutes(app: Express, database: PrismaCli
 
         if (input.operation === 'RESCHEDULE') {
           if (current.scheduledStartAt === null || current.scheduledEndAt === null) throw conflict('VISIT_STATE_CONFLICT');
-          const teacherLock = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "Teacher" WHERE id = ${current.teacherId}::uuid FOR UPDATE`;
-          if (!teacherLock.length) throw conflict('VISIT_WORKPLACE_CHANGED');
           const teacher = await tx.teacher.findUnique({ where: { id: current.teacherId } });
-          if (!teacher || teacher.recordStatus !== 'ACTIVE' || teacher.institutionId !== current.institutionId) throw conflict('VISIT_WORKPLACE_CHANGED');
-          await tx.$queryRaw`SELECT id FROM "Institution" WHERE id = ${current.institutionId}::uuid FOR UPDATE`;
-          const institution = await tx.institution.findUnique({ where: { id: current.institutionId } });
-          if (!institution || institution.districtId !== current.districtId || institution.archivedAt !== null) throw conflict('VISIT_WORKPLACE_CHANGED');
+          if (!teacher || teacher.recordStatus !== 'ACTIVE') throw conflict('VISIT_WORKPLACE_CHANGED');
           const start = parseOffsetTimestamp(input.scheduledStartAt);
           const end = parseOffsetTimestamp(input.scheduledEndAt);
-          const changedFields = (['scheduledStartAt', 'scheduledEndAt', 'academicYear'] as const).filter((field) => {
+          const institutionId = input.institutionId ?? current.institutionId;
+          const institution = await validateVisitInstitution(tx, teacher, institutionId, start);
+          const changedFields: string[] = (['scheduledStartAt', 'scheduledEndAt', 'academicYear'] as const).filter((field) => {
             if (field === 'academicYear') return input.academicYear !== current.academicYear;
             return (field === 'scheduledStartAt' ? start : end).getTime() !== (field === 'scheduledStartAt' ? current.scheduledStartAt! : current.scheduledEndAt!).getTime();
           });
-          if (!changedFields.length) return current;
-          const warning = await inspectSchedule(tx, current.teacherId, input.academicYear, start, end);
+          if (institutionId !== current.institutionId) changedFields.push('institutionId', 'institutionNameSnapshot');
+          const warning = await inspectSchedule(tx, current.teacherId, input.academicYear, start, end, institutionId);
           verifyAcknowledgement(warning, input.scheduleWarningAcknowledgement);
+          if (!changedFields.length) return current;
           const updated = await tx.pedagogicalVisit.update({ where: { id: current.id }, data: {
-            academicYear: input.academicYear, scheduledStartAt: start, scheduledEndAt: end, revision: { increment: 1 },
+            academicYear: input.academicYear, scheduledStartAt: start, scheduledEndAt: end,
+            institutionId: institution.id, institutionNameSnapshot: institution.name, revision: { increment: 1 },
           }, include: includeProjection });
           await appendAuditEvent(tx, { source: 'HTTP', actorInspectorId: inspectorId, districtId: current.districtId,
             action: AuditAction.PEDAGOGICAL_VISIT_UPDATED, entityType: 'PedagogicalVisit', entityId: current.id, requestId,

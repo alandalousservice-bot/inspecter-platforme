@@ -95,16 +95,17 @@ before(async () => {
   const task080Migration = '20261001090000_task_080_teacher_administrative_master_data';
   const task081Migration = '20261001100000_task_081_structured_teacher_qualifications';
   const task082Migration = '20261001120000_task_082_teacher_supplementary_workplaces';
+  const task083Migration = '20261002120000_task_083_workplace_aware_schedule_visits';
   const cleanBundle = migrationBundle('clean', ['20260929070000_task_050_pedagogical_visit', '20260930010000_task_052a_inspector_professional_identity', reportMigration, followUpMigration, visitTypeMigration, task054Migration]);
-  const upgradeBundle = migrationBundle('upgrade', [migrationName, '20260929070000_task_050_pedagogical_visit', '20260930010000_task_052a_inspector_professional_identity', reportMigration, followUpMigration, visitTypeMigration, task054Migration]);
+  const upgradeBundle = migrationBundle('upgrade', [migrationName, '20260929070000_task_050_pedagogical_visit', '20260930010000_task_052a_inspector_professional_identity', reportMigration, followUpMigration, visitTypeMigration, task054Migration, task083Migration]);
   const cleanUrl = schemaUrl(baseUrl, cleanSchema);
   runPrisma(['migrate', 'deploy'], cleanUrl, cleanBundle.schema);
   runPrisma(['migrate', 'status'], cleanUrl, cleanBundle.schema);
   cleanDb = new PrismaClient({ datasources: { db: { url: cleanUrl } } });
   await cleanDb.$connect();
   const cleanHistory = await appliedMigrations(cleanDb);
-  assert.equal(cleanHistory.at(-1)?.migration_name, task082Migration);
-  assert.equal(cleanHistory.length, 11);
+  assert.equal(cleanHistory.at(-1)?.migration_name, task083Migration);
+  assert.equal(cleanHistory.length, 12);
   assert.ok(cleanHistory.every((row) => row.finished_at));
 
   const upgradeUrl = schemaUrl(baseUrl, upgradeSchema);
@@ -125,6 +126,7 @@ before(async () => {
     .find((entry) => entry.isDirectory() && entry.name.startsWith('20260929050000'))?.name;
   assert.equal(task040Migration, '20260929050000_task_040_current_institution');
   cpSync(join(migrationsDir, migrationName), join(upgradeBundle.migrations, migrationName), { recursive: true });
+  cpSync(join(migrationsDir, task083Migration), join(upgradeBundle.migrations, task083Migration), { recursive: true });
   cpSync(join(migrationsDir, task080Migration), join(upgradeBundle.migrations, task080Migration), { recursive: true });
   runPrisma(['migrate', 'deploy'], upgradeUrl, upgradeBundle.schema);
 
@@ -138,7 +140,7 @@ before(async () => {
     assert.ok(upgradeHistory.some((row) => row.migration_name === migrationName));
     assert.ok(upgradeHistory.some((row) => row.migration_name === task081Migration));
     assert.ok(upgradeHistory.some((row) => row.migration_name === task082Migration));
-    assert.equal(upgradeHistory.length, 11);
+    assert.equal(upgradeHistory.length, 12);
     assert.ok(upgradeHistory.every((row) => row.finished_at));
   } finally {
     await legacy.$disconnect();
@@ -162,7 +164,7 @@ test('TASK-047 WeeklySchedule persistence invariants', async (t) => {
     const columns = await cleanDb.$queryRaw`SELECT table_name, column_name FROM information_schema.columns WHERE table_schema=${cleanSchema} AND table_name IN ('WeeklySchedule','WeeklyScheduleSlot') ORDER BY table_name, ordinal_position`;
     assert.deepEqual(columns.map(({ table_name, column_name }) => `${table_name}.${column_name}`), [
       'WeeklySchedule.id', 'WeeklySchedule.teacherId', 'WeeklySchedule.academicYear', 'WeeklySchedule.revision', 'WeeklySchedule.createdAt', 'WeeklySchedule.updatedAt',
-      'WeeklyScheduleSlot.id', 'WeeklyScheduleSlot.scheduleId', 'WeeklyScheduleSlot.dayOfWeek', 'WeeklyScheduleSlot.startMinute', 'WeeklyScheduleSlot.endMinute', 'WeeklyScheduleSlot.levelLabel', 'WeeklyScheduleSlot.groupLabel', 'WeeklyScheduleSlot.notes', 'WeeklyScheduleSlot.createdAt', 'WeeklyScheduleSlot.updatedAt',
+      'WeeklyScheduleSlot.id', 'WeeklyScheduleSlot.scheduleId', 'WeeklyScheduleSlot.dayOfWeek', 'WeeklyScheduleSlot.startMinute', 'WeeklyScheduleSlot.endMinute', 'WeeklyScheduleSlot.levelLabel', 'WeeklyScheduleSlot.groupLabel', 'WeeklyScheduleSlot.notes', 'WeeklyScheduleSlot.createdAt', 'WeeklyScheduleSlot.updatedAt', 'WeeklyScheduleSlot.teacherId', 'WeeklyScheduleSlot.districtId', 'WeeklyScheduleSlot.institutionId', 'WeeklyScheduleSlot.validFrom', 'WeeklyScheduleSlot.validTo', 'WeeklyScheduleSlot.workplaceBasis',
     ]);
     assert.equal(await cleanDb.$queryRaw`SELECT to_regclass(${`${cleanSchema}.WeeklyScheduleRevision`}) IS NOT NULL AS present`.then((rows) => rows[0].present), false);
     const constraints = await cleanDb.$queryRaw`SELECT conname, contype, confdeltype, confupdtype, pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE connamespace=${cleanSchema}::regnamespace`;
@@ -174,12 +176,14 @@ test('TASK-047 WeeklySchedule persistence invariants', async (t) => {
     assert.equal(slotScheduleFk?.contype, 'f');
     assert.equal(slotScheduleFk?.confdeltype, 'r');
     assert.equal(slotScheduleFk?.confupdtype, 'c');
-    assert.ok(constraints.some((row) => row.conname === 'WeeklyScheduleSlot_no_overlapping_same_day' && row.contype === 'x'));
+    assert.ok(constraints.some((row) => row.conname === 'WeeklyScheduleSlot_legacy_no_overlapping_same_day' && row.contype === 'x'));
+    assert.ok(constraints.some((row) => row.conname === 'WeeklyScheduleSlot_temporal_no_overlapping_teacher_slots' && row.contype === 'x'));
     const indexes = await cleanDb.$queryRaw`SELECT indexname FROM pg_indexes WHERE schemaname=${cleanSchema}`;
     assert.ok(indexes.some((row) => row.indexname === 'WeeklySchedule_teacherId_academicYear_key'));
     assert.ok(indexes.some((row) => row.indexname === 'WeeklyScheduleSlot_scheduleId_dayOfWeek_startMinute_endMinute_i'));
     assert.ok(indexes.some((row) => row.indexname === 'WeeklyScheduleSlot_dayOfWeek_startMinute_idx'));
-    assert.equal(columns.some((row) => /institution|assignment/i.test(row.column_name)), false);
+    assert.ok(indexes.some((row) => row.indexname === 'WeeklyScheduleSlot_teacherId_validFrom_validTo_dayOfWeek_idx'));
+    assert.ok(columns.some((row) => row.column_name === 'institutionId'));
   });
 
   await t.test('one schedule per Teacher/year, different years and teachers are allowed; revision defaults to 1', async () => {
