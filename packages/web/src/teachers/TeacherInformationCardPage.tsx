@@ -150,7 +150,7 @@ export function TeacherInformationCardPage() {
         <Fact label="المفتش" value={[card.organizationalContext.inspector?.name, card.organizationalContext.inspector?.surname].filter(Boolean).join(' ') || null} />
         <Fact label="السنة الدراسية" value={card.academicYear} />
       </dl></CardContent></Card>
-      <nav className="teacher-card__actions" aria-label="روابط ملف الأستاذ"><Link to={`/app/teachers/${encodeURIComponent(id)}`}>العودة إلى ملف الأستاذ</Link><Link to={schedulePath}>التوزيع الأسبوعي</Link></nav>
+      <nav className="teacher-card__actions" aria-label="روابط ملف الأستاذ"><Link to={`/app/teachers/${encodeURIComponent(id)}`}>العودة إلى ملف الأستاذ</Link><Link to={schedulePath}>التوزيع الأسبوعي</Link><Link to={`/app/teachers/${encodeURIComponent(id)}/information-card/print?academicYear=${encodeURIComponent(selectedYear)}`}>طباعة بطاقة المعلومات</Link></nav>
     </> : null}
   </main>;
 }

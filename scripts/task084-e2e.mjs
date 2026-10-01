@@ -6,6 +6,7 @@ import { dirname, resolve } from 'node:path';
 import process from 'node:process';
 
 const root = process.cwd();
+const task086Mode = process.env.TASK086_E2E === '1';
 const credentialText = readFileSync('D:\\pg-task020-temp\\task020-test-url.secret', 'utf8').trim();
 const rawUrl = credentialText.match(/^(?:TEST_DATABASE_URL|DATABASE_URL)=(.*)$/u)?.[1]?.trim() ?? credentialText;
 const parsed = new URL(rawUrl);
@@ -56,13 +57,13 @@ try {
   const academicYear = `${academicStart}-${academicStart + 1}`;
   const { hashPassword } = await import('../packages/api/dist/identity/password.js');
   try {
-    district = await db.district.create({ data: { name: `مقاطعة البطاقة ${tag}` } });
+    district = await db.district.create({ data: { name: task086Mode ? 'مقاطعة تجريبية لبطاقة المعلومات' : `مقاطعة البطاقة ${tag}` } });
     inspector = await db.inspector.create({ data: { email: `task084-${tag}@example.invalid`, passwordHash: await hashPassword(password), status: 'ACTIVE', name: 'مفتش تجريبي', surname: 'للبطاقة' } });
     await db.inspectorDistrictMembership.create({ data: { inspectorId: inspector.id, districtId: district.id, role: 'INSPECTOR', validFrom: new Date(`${addDays(today, -30)}T00:00:00.000Z`) } });
-    const home = await db.institution.create({ data: { districtId: district.id, name: `المؤسسة الأم ${tag}`, municipality: 'بلدية الاختبار', email: 'home@example.invalid' } });
-    supplementary = await db.institution.create({ data: { districtId: district.id, name: `مؤسسة تكملة ${tag}` } });
+    const home = await db.institution.create({ data: { districtId: district.id, name: task086Mode ? 'المؤسسة الأم التجريبية' : `المؤسسة الأم ${tag}`, municipality: 'بلدية الاختبار', email: 'home@example.invalid' } });
+    supplementary = await db.institution.create({ data: { districtId: district.id, name: task086Mode ? 'مؤسسة تكملة تجريبية' : `مؤسسة تكملة ${tag}` } });
     teacher = await db.teacher.create({ data: {
-      districtId: district.id, institutionId: home.id, name: `أستاذ البطاقة ${tag}`, surname: 'اختبار',
+      districtId: district.id, institutionId: home.id, name: task086Mode ? 'أستاذ البطاقة التجريبي' : `أستاذ البطاقة ${tag}`, surname: 'اختبار',
       professionalStatus: 'SUBSTITUTE', qualifications: 'مؤهل قديم غير مفصل', administrativeNote: 'ملاحظة إدارية اصطناعية',
     } });
     await db.teacherSupplementaryWorkplace.create({ data: { teacherId: teacher.id, districtId: district.id, institutionId: supplementary.id, validFrom: new Date(`${started}T00:00:00.000Z`) } });

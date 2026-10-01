@@ -10,6 +10,7 @@ import { SubmissionsPage } from './submissions/SubmissionsPage';
 import { SubmissionDetailPage } from './submissions/SubmissionDetailPage';
 import { TeacherProfilePage } from './teachers/TeacherProfilePage';
 import { TeacherInformationCardPage } from './teachers/TeacherInformationCardPage';
+import { TeacherInformationCardPrintPage } from './teachers/TeacherInformationCardPrintPage';
 import { TeacherDirectoryPage } from './teachers/TeacherDirectoryPage';
 import { WeeklySchedulePage } from './teachers/WeeklySchedulePage';
 import { VisitCreatePage } from './visits/VisitCreatePage';
@@ -38,6 +39,7 @@ createRoot(root).render(
           <Route path="teachers" element={<TeacherDirectoryPage />} />
           <Route path="teachers/:id" element={<TeacherProfilePage />} />
           <Route path="teachers/:id/information-card" element={<TeacherInformationCardPage />} />
+          <Route path="teachers/:id/information-card/print" element={<TeacherInformationCardPrintPage />} />
           <Route path="teachers/:id/schedules" element={<WeeklySchedulePage />} />
           <Route path="visits" element={<VisitListPage />} />
           <Route path="visits/new" element={<VisitCreatePage />} />

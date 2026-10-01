@@ -12,11 +12,12 @@ const task082 = process.env.TASK082_E2E === '1';
 const task083 = process.env.TASK083_E2E === '1';
 const task084 = process.env.TASK084_E2E === '1';
 const task085 = process.env.TASK085_E2E === '1';
+const task086 = process.env.TASK086_E2E === '1';
 if (!process.env.G3_E2E_DATABASE_URL) throw new Error('Run connected browser tests with the isolated E2E command.');
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: task085 ? 'task085-public-intake.spec.ts' : task084 ? 'task084-teacher-information-card.spec.ts' : task083 ? 'task083-workplace-aware-visits.spec.ts' : task082 ? 'task082-teacher-supplementary-workplaces.spec.ts' : task081 ? 'task081-teacher-qualifications.spec.ts' : task054 ? 'task054-inspector-visit-report.spec.ts' : task053 ? 'task053-followups.spec.ts' : task053a ? ['task051-pedagogical-visits.spec.ts', 'task053a-visit-types.spec.ts'] : task052 ? 'task052-inspection-report.spec.ts' : task052a ? 'task052a-professional-identity.spec.ts' : task051 ? 'task051-pedagogical-visits.spec.ts' : task045 ? 'task045-teacher-directory.spec.ts' : 'g3-connected-flow.spec.ts',
+  testMatch: task086 ? 'task086-information-card-print.spec.ts' : task085 ? 'task085-public-intake.spec.ts' : task084 ? 'task084-teacher-information-card.spec.ts' : task083 ? 'task083-workplace-aware-visits.spec.ts' : task082 ? 'task082-teacher-supplementary-workplaces.spec.ts' : task081 ? 'task081-teacher-qualifications.spec.ts' : task054 ? 'task054-inspector-visit-report.spec.ts' : task053 ? 'task053-followups.spec.ts' : task053a ? ['task051-pedagogical-visits.spec.ts', 'task053a-visit-types.spec.ts'] : task052 ? 'task052-inspection-report.spec.ts' : task052a ? 'task052a-professional-identity.spec.ts' : task051 ? 'task051-pedagogical-visits.spec.ts' : task045 ? 'task045-teacher-directory.spec.ts' : 'g3-connected-flow.spec.ts',
   fullyParallel: false,
   workers: 1,
   timeout: 120_000,
