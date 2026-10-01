@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { cpSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { after, before, test } from 'node:test';
@@ -13,6 +13,7 @@ import { registerTeacherSubmissionRoutes } from '../dist/intake/routes.js';
 import { registerInspectorSubmissionRoutes } from '../dist/intake/inspector-routes.js';
 import { registerSubmissionDecisionRoute } from '../dist/intake/decision-routes.js';
 import { createPublicSubmissionRateLimiter } from '../dist/intake/rate-limit.js';
+import { assertLiveTestDatabase, createOwnedTestSchema, dropOwnedTestSchema, generateTestSchema } from '../../../scripts/test-schema-safety.mjs';
 
 const require = createRequire(import.meta.url);
 const apiDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -25,7 +26,8 @@ const prismaPackage = JSON.parse(require('node:fs').readFileSync(prismaPackagePa
 const prismaCliPath = resolve(dirname(prismaPackagePath), prismaPackage.bin.prisma);
 const password = 'task085-synthetic-password';
 const sensitiveMarker = 'TASK085_PRIVATE_SENTINEL';
-let admin, cleanDb, upgradeDb, server, baseUrl, inspector, cookies, district, cleanSchema, upgradeSchema, tempRoot;
+let admin, cleanDb, upgradeDb, server, baseUrl, inspector, cookies, district, cleanSchema, upgradeSchema, tempRoot, baseDatabaseUrl;
+let cleanSchemaCreated = false; let upgradeSchemaCreated = false;
 
 const validSubmission = {
   firstName: 'أمينة', lastName: 'بن صالح', dateOfBirth: '1985-03-04', placeOfBirth: 'وهران',
@@ -56,7 +58,6 @@ function runPrisma(args, url, selectedSchema = schemaPath) {
   }
 }
 
-const scopedUrl = (base, schema) => { const url = new URL(base); url.searchParams.set('schema', schema); return url.toString(); };
 const cookiesFrom = (response) => response.headers.getSetCookie?.() ?? [response.headers.get('set-cookie') ?? ''];
 const csrf = (parts) => decodeURIComponent(parts.find((part) => part.startsWith('inspector_csrf=')).split(';', 1)[0].slice('inspector_csrf='.length));
 const cookieHeader = (parts) => parts.map((part) => part.split(';', 1)[0]).join('; ');
@@ -74,22 +75,19 @@ async function login() {
 const date = (value) => new Date(`${value}T00:00:00.000Z`);
 
 before(async () => {
-  const base = approvedUrl();
+  const base = approvedUrl(); baseDatabaseUrl = base;
   runPrisma(['generate'], base);
   const { PrismaClient } = await import('@prisma/client');
   const { hashPassword } = await import('../dist/identity/password.js');
   admin = new PrismaClient({ datasources: { db: { url: base } } }); await admin.$connect();
   const identity = await admin.$queryRaw`SELECT current_database() AS db,current_user AS role,inet_server_addr()::text AS address,inet_server_port() AS port`;
   assert.deepEqual(identity[0], { db: 'task020_test', role: 'task020_test_user', address: '127.0.0.1/32', port: 55432 });
-  const publicTables = await admin.$queryRaw`SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname='public' AND tablename !~ '^pg_'`;
-  const publicMigrations = await admin.$queryRaw`SELECT to_regclass('public._prisma_migrations') IS NOT NULL AS present`;
-  assert.deepEqual(publicTables, []); assert.equal(publicMigrations[0]?.present, false);
-
-  const tag = `${process.pid}_${randomBytes(5).toString('hex')}`;
-  cleanSchema = `task085_clean_${tag}`; upgradeSchema = `task085_upgrade_${tag}`;
-  await admin.$executeRawUnsafe(`CREATE SCHEMA "${cleanSchema}"`);
-  await admin.$executeRawUnsafe(`CREATE SCHEMA "${upgradeSchema}"`);
-  const cleanUrl = scopedUrl(base, cleanSchema); const upgradeUrl = scopedUrl(base, upgradeSchema);
+  cleanSchema = generateTestSchema('task085_clean'); upgradeSchema = generateTestSchema('task085_upgrade');
+  const cleanUrl = await createOwnedTestSchema(admin, base, cleanSchema);
+  cleanSchemaCreated = true;
+  const upgradeUrl = await createOwnedTestSchema(admin, base, upgradeSchema);
+  upgradeSchemaCreated = true;
+  await assertLiveTestDatabase(admin);
   runPrisma(['migrate', 'deploy'], cleanUrl);
   cleanDb = new PrismaClient({ datasources: { db: { url: cleanUrl } } }); await cleanDb.$connect();
 
@@ -100,6 +98,7 @@ before(async () => {
     if (entry.isDirectory() && entry.name < migrationName) cpSync(join(migrationsDir, entry.name), join(tempMigrations, entry.name), { recursive: true });
   }
   const tempSchema = join(tempRoot, 'schema.prisma'); cpSync(schemaPath, tempSchema);
+  await assertLiveTestDatabase(admin);
   runPrisma(['migrate', 'deploy'], upgradeUrl, tempSchema);
   const beforeIds = { districtId: randomUUID(), submissionId: randomUUID() };
   const beforeProfile = { firstName: 'Legacy', lastName: 'Teacher', workplace: { institutionName: 'قديم' } };
@@ -136,8 +135,8 @@ before(async () => {
 after(async () => {
   if (server) await new Promise((yes) => server.close(yes));
   await cleanDb?.$disconnect(); await upgradeDb?.$disconnect();
-  if (admin && cleanSchema) await admin.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${cleanSchema}" CASCADE`);
-  if (admin && upgradeSchema) await admin.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${upgradeSchema}" CASCADE`);
+  if (admin && cleanSchemaCreated) await dropOwnedTestSchema(admin, baseDatabaseUrl, cleanSchema);
+  if (admin && upgradeSchemaCreated) await dropOwnedTestSchema(admin, baseDatabaseUrl, upgradeSchema);
   await admin?.$disconnect();
   if (tempRoot) rmSync(tempRoot, { recursive: true, force: true });
 });

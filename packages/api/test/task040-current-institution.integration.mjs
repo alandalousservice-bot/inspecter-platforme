@@ -68,11 +68,6 @@ before(async () => {
   const identity = await admin.$queryRaw`SELECT current_database() AS db, current_user AS role`;
   assert.equal(identity[0]?.db, 'task020_test');
   assert.equal(identity[0]?.role, 'task020_test_user');
-  const publicTables = await admin.$queryRaw`SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname='public' AND tablename !~ '^pg_'`;
-  const publicMigrations = await admin.$queryRaw`SELECT to_regclass('public._prisma_migrations') IS NOT NULL AS present`;
-  assert.deepEqual(publicTables, []);
-  assert.equal(publicMigrations[0]?.present, false);
-
   cleanSchema = `task040_clean_${process.pid}_${randomBytes(5).toString('hex')}`;
   upgradeSchema = `task040_upgrade_${process.pid}_${randomBytes(5).toString('hex')}`;
   await admin.$executeRawUnsafe(`CREATE SCHEMA "${cleanSchema}"`);

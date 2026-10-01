@@ -101,3 +101,7 @@ Connected browser على Vite + API + PostgreSQL الاختبار المعزول
 ## TASK-080 completed test evidence
 
 مصفوفة [عقد TASK-080](architecture/TASK_080_TEACHER_ADMINISTRATIVE_MASTER_DATA.md) نُفذت واجتازت: migration clean/upgrade على PostgreSQL المعزولة، `SUBSTITUTE` من الاستمارة إلى القبول والملف والدليل، حدود/تطبيع/خصوصية الحقول الإدارية والبريد، تدقيق ذري بأسماء الحقول فقط، إسقاطات بلا تسرب، وregressions DB لكل من TASK-035/044/047/050/052/053/053A/054؛ UI 163/163، API 29/29، DB/integration 142/142، connected browser suites، typecheck/lint/build/smoke/diff-check كلها PASS.
+
+## Persistent local UAT and automated DB isolation
+
+`public` is the persistent local UAT workspace. Automated DB and connected E2E tests use fresh temporary PostgreSQL schemas in the authorized local test database, selected through Prisma's URL `schema` parameter. They verify the URL and live database identity before schema creation, migration, fixtures, and cleanup. Tests never run migrations, fixtures, reset, or data cleanup in `public`. Each run cleans only schemas it created and tracked; interrupted runs may leave stale schemas, which are detected for manual review and are never removed automatically. No remote/production database or port 5432 is permitted.

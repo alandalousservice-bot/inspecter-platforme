@@ -135,14 +135,6 @@ before(async () => {
   if (identity[0]?.db !== 'task020_test' || identity[0]?.role !== 'task020_test_user') {
     throw new Error('Database identity probe did not match the isolated test target.');
   }
-  const publicTables = await adminClient.$queryRaw`
-    SELECT tablename FROM pg_catalog.pg_tables
-    WHERE schemaname = 'public' AND tablename !~ '^pg_' ORDER BY tablename
-  `;
-  if (publicTables.length) throw new Error('Public test schema is not empty; refusing to proceed.');
-  const hasMigrationTable = await adminClient.$queryRaw`SELECT to_regclass('public._prisma_migrations') IS NOT NULL AS present`;
-  if (hasMigrationTable[0]?.present) throw new Error('Unexpected migration metadata in public test schema.');
-
   schemaName = `task021_${process.pid}_${randomBytes(6).toString('hex')}`;
   await adminClient.$executeRawUnsafe(`CREATE SCHEMA "${schemaName}"`);
   schemaCreated = true;

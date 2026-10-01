@@ -26,6 +26,12 @@
     "e2e:task084": "node scripts/task084-e2e.mjs",
     "e2e:task085": "node scripts/task085-e2e.mjs",
     "e2e:task086": "node scripts/task086-e2e.mjs",
+    "local:uat:init": "node scripts/local-uat.mjs init",
+    "local:uat:seed": "node scripts/local-uat.mjs seed",
+    "local:uat:api": "node scripts/local-uat.mjs api",
+    "local:uat:test": "node --test scripts/local-uat.test.mjs",
+    "test:isolation": "node --test scripts/test-schema-safety.test.mjs",
+    "local:uat:verify": "node scripts/local-uat-verify.mjs",
     "smoke": "node --test tests/smoke.test.mjs"
   },
   "devDependencies": {

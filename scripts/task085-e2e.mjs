@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import process from 'node:process';
+import { assertLiveTestDatabase, createOwnedTestSchema, dropOwnedTestSchema, generateTestSchema } from './test-schema-safety.mjs';
 
 const root = process.cwd();
 const credentialText = readFileSync('D:\\pg-task020-temp\\task020-test-url.secret', 'utf8').trim();
@@ -13,9 +14,8 @@ if (!['postgres:', 'postgresql:'].includes(parsed.protocol) || parsed.hostname !
   || decodeURIComponent(parsed.username) !== 'task020_test_user' || parsed.pathname !== '/task020_test') throw new Error('Refusing an unapproved TASK-085 test database.');
 
 const tag = randomBytes(6).toString('hex');
-const schema = `task085_e2e_${process.pid}_${tag}`;
-const isolated = new URL(rawUrl); isolated.searchParams.set('schema', schema);
-const databaseUrl = isolated.toString();
+const schema = generateTestSchema('task085_e2e');
+let databaseUrl;
 const apiRequire = createRequire(resolve(root, 'packages/api/package.json'));
 const prismaPackagePath = apiRequire.resolve('prisma/package.json');
 const prismaPath = resolve(dirname(prismaPackagePath), JSON.parse(readFileSync(prismaPackagePath, 'utf8')).bin.prisma);
@@ -34,9 +34,8 @@ try {
   const actual = identity[0];
   if (actual?.database !== 'task020_test' || actual?.role !== 'task020_test_user'
     || !/^127\.0\.0\.1(?:\/\d+)?$/u.test(actual?.address ?? '') || actual?.port !== 55432) throw new Error('Isolated DB identity mismatch.');
-  const existing = await admin.$queryRaw`SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname='public' AND tablename !~ '^pg_'`;
-  if (existing.length) throw new Error('Approved test database public schema is not empty.');
-  await admin.$executeRawUnsafe(`CREATE SCHEMA "${schema}"`); schemaCreated = true;
+  databaseUrl = await createOwnedTestSchema(admin, rawUrl, schema); schemaCreated = true;
+  await assertLiveTestDatabase(admin);
   const migrated = spawnSync(process.execPath, [prismaPath, 'migrate', 'deploy', '--schema', resolve(root, 'packages/api/prisma/schema.prisma')], {
     cwd: root, env: { ...process.env, DATABASE_URL: databaseUrl }, stdio: 'inherit', windowsHide: true,
   });
@@ -61,9 +60,7 @@ try {
 } finally {
   for (const name of ['G3_E2E_DATABASE_URL', 'G3_E2E_INSPECTOR_EMAIL', 'G3_E2E_INSPECTOR_PASSWORD', 'TASK085_E2E_DISTRICT_ID', 'TASK085_E2E_TAG', 'TASK085_E2E']) delete process.env[name];
   if (admin && schemaCreated) {
-    await admin.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
-    const left = await admin.$queryRaw`SELECT to_regnamespace(${schema})::text AS name`;
-    if (left[0]?.name) throw new Error('TASK-085 temporary schema cleanup failed.');
+    await dropOwnedTestSchema(admin, rawUrl, schema);
   }
   await admin?.$disconnect();
   password = undefined;

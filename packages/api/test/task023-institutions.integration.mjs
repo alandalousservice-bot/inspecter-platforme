@@ -98,10 +98,6 @@ before(async () => {
   await admin.$connect();
   const identity = await admin.$queryRaw`SELECT current_database() AS db, current_user AS role`;
   if (identity[0]?.db !== 'task020_test' || identity[0]?.role !== 'task020_test_user') throw new Error('Isolated database identity mismatch.');
-  const publicTables = await admin.$queryRaw`SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname='public' AND tablename !~ '^pg_'`;
-  const migrations = await admin.$queryRaw`SELECT to_regclass('public._prisma_migrations') IS NOT NULL AS present`;
-  if (publicTables.length || migrations[0]?.present) throw new Error('Public isolated test schema is not empty; refusing migration.');
-
   schemaName = `task023_${process.pid}_${randomBytes(6).toString('hex')}`;
   await admin.$executeRawUnsafe(`CREATE SCHEMA "${schemaName}"`);
   schemaCreated = true;

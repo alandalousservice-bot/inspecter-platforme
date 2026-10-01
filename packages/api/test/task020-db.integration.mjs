@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath, URL } from 'node:url';
+import { assertLiveTestDatabase, createOwnedTestSchema, dropOwnedTestSchema, generateTestSchema } from '../../../scripts/test-schema-safety.mjs';
 
 const require = createRequire(import.meta.url);
 const testDirectory = dirname(fileURLToPath(import.meta.url));
@@ -129,37 +130,13 @@ before(async () => {
   if (identity[0]?.database_name !== 'task020_test' || identity[0]?.role_name !== 'task020_test_user') {
     throw new Error('Database identity probe did not match the approved TASK-020 target.');
   }
+  const live = await adminClient.$queryRaw`SELECT inet_server_addr()::text AS address, inet_server_port() AS port`;
+  if (!/^127\.0\.0\.1(?:\/\d+)?$/u.test(live[0]?.address ?? '') || live[0]?.port !== 55432) throw new Error('Live database server identity mismatch.');
 
-  const existingTables = await adminClient.$queryRaw`
-    SELECT tablename
-    FROM pg_catalog.pg_tables
-    WHERE schemaname = 'public' AND tablename !~ '^pg_'
-    ORDER BY tablename
-  `;
-  if (existingTables.length !== 0) {
-    throw new Error('The approved test database public schema is not empty; refusing migration.');
-  }
-  const existingMigrationTable = await adminClient.$queryRaw`
-    SELECT to_regclass('public._prisma_migrations') IS NOT NULL AS present
-  `;
-  if (existingMigrationTable[0]?.present) {
-    throw new Error('The approved test database already has migration metadata; refusing migration.');
-  }
-
-  schemaName = `task020_${process.pid}_${randomBytes(6).toString('hex')}`;
+  schemaName = generateTestSchema('task020');
   assert.match(schemaName, /^task020_[0-9]+_[a-f0-9]+$/);
-  const priorSchema = await adminClient.$queryRaw`
-    SELECT schema_name FROM information_schema.schemata WHERE schema_name = ${schemaName}
-  `;
-  if (priorSchema.length !== 0) {
-    throw new Error('Generated isolated schema already exists; refusing to reuse it.');
-  }
-  await adminClient.$executeRawUnsafe(`CREATE SCHEMA "${schemaName}"`);
+  scopedDatabaseUrl = await createOwnedTestSchema(adminClient, testDatabaseUrl, schemaName);
   schemaCreated = true;
-
-  const scopedUrl = new URL(testDatabaseUrl);
-  scopedUrl.searchParams.set('schema', schemaName);
-  scopedDatabaseUrl = scopedUrl.toString();
 
   runPrisma(['validate'], scopedDatabaseUrl, 'Prisma schema validation');
   const beforeMigration = await adminClient.$queryRaw`
@@ -169,6 +146,7 @@ before(async () => {
     throw new Error('The isolated migration schema was not empty before deployment.');
   }
 
+  await assertLiveTestDatabase(adminClient);
   runPrisma(['migrate', 'deploy'], scopedDatabaseUrl, 'First migration deploy');
   migrationApplied = true;
   assertMigrationStatus(runPrisma(['migrate', 'status'], scopedDatabaseUrl, 'First migration status'), 'First migration status');
@@ -211,7 +189,7 @@ after(async () => {
   } finally {
     await prismaClient?.$disconnect();
     if (schemaCreated && adminClient) {
-      await adminClient.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${schemaName}" CASCADE`);
+      await dropOwnedTestSchema(adminClient, testDatabaseUrl, schemaName);
     }
     await adminClient?.$disconnect();
   }
