@@ -219,6 +219,34 @@ test('concurrent duplicate interval creation is serialized and only one succeeds
   assert.equal(await db.teacherSupplementaryWorkplace.count({ where: { teacherId: t.id, institutionId: c.id } }), 1);
 });
 
+test('home change and supplementary creation for one Institution serialize to one valid outcome', async () => {
+  const t = await db.teacher.create({ data: { districtId: district.id, institutionId: home.id, name: 'Invariant race', surname: 'Teacher', institutionAppointmentDate: new Date('2020-01-01T00:00:00Z'), institutionAppointmentNumber: 'RACE-1' } });
+  const [workplaceResponse, homeResponse] = await Promise.all([
+    request(collection(t.id), 'POST', { institutionId: b.id, validFrom: '2025-01-01' }),
+    request(`/api/v1/teachers/${t.id}/current-institution`, 'PUT', { expectedInstitutionId: home.id, institutionId: b.id }),
+  ]);
+  assert.ok(([workplaceResponse.status, homeResponse.status].join(',') === '201,409')
+    || ([workplaceResponse.status, homeResponse.status].join(',') === '409,200'));
+  const saved = await db.teacher.findUniqueOrThrow({ where: { id: t.id } });
+  const supplementaryCount = await db.teacherSupplementaryWorkplace.count({ where: { teacherId: t.id, institutionId: b.id } });
+  if (saved.institutionId === b.id) {
+    assert.equal(workplaceResponse.status, 409);
+    assert.equal(homeResponse.status, 200);
+    assert.equal(supplementaryCount, 0);
+    assert.equal(saved.institutionAppointmentNumber, null);
+    assert.equal(await db.auditLog.count({ where: { action: 'TEACHER_INSTITUTION_CHANGED', entityId: t.id, requestId: homeResponse.headers.get('x-request-id') } }), 1);
+    assert.equal(await db.auditLog.count({ where: { action: 'TEACHER_SUPPLEMENTARY_WORKPLACE_CREATED', entityType: 'TeacherSupplementaryWorkplace', requestId: workplaceResponse.headers.get('x-request-id') } }), 0);
+  } else {
+    assert.equal(saved.institutionId, home.id);
+    assert.equal(workplaceResponse.status, 201);
+    assert.equal(homeResponse.status, 409);
+    assert.equal(supplementaryCount, 1);
+    assert.equal(saved.institutionAppointmentNumber, 'RACE-1');
+    assert.equal(await db.auditLog.count({ where: { action: 'TEACHER_INSTITUTION_CHANGED', entityId: t.id, requestId: homeResponse.headers.get('x-request-id') } }), 0);
+    assert.equal(await db.auditLog.count({ where: { action: 'TEACHER_SUPPLEMENTARY_WORKPLACE_CREATED', entityType: 'TeacherSupplementaryWorkplace', requestId: workplaceResponse.headers.get('x-request-id') } }), 1);
+  }
+});
+
 test('DB constraints, archive behavior, close audit, and non-delete API are enforced', async () => {
   const t = await db.teacher.create({ data: { districtId: district.id, name: 'Second', surname: 'Teacher' } });
   const created = await db.teacherSupplementaryWorkplace.create({ data: { teacherId: t.id, districtId: district.id, institutionId: b.id, validFrom: new Date('2024-01-01T00:00:00Z') } });
