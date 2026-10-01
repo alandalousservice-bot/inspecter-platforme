@@ -28,6 +28,20 @@ export function cleanText(maximum: number, collapseWhitespace = false) {
   });
 }
 
+function declarationText(maximum: number, collapseWhitespace = true) {
+  return z.string().transform((raw, context) => {
+    if ([...raw].some((character) => controlCharacters.test(character))) {
+      context.addIssue({ code: 'custom', message: 'قيمة غير صالحة.' });
+    }
+    let value = raw.normalize('NFC').trim();
+    if (collapseWhitespace) value = value.replace(/\s+/gu, ' ');
+    if (!value || codePointLength(value) > maximum) {
+      context.addIssue({ code: 'custom', message: 'قيمة غير صالحة.' });
+    }
+    return value;
+  });
+}
+
 export function calendarDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/u.test(value)) return false;
   const [year, month, day] = value.split('-').map(Number);
@@ -39,6 +53,7 @@ export function calendarDate(value: string): boolean {
 }
 
 export const dateField = z.string().trim().refine(calendarDate, 'تاريخ غير صالح.');
+const declarationDateField = z.string().refine(calendarDate, 'تاريخ غير صالح.');
 
 export function normalizeAlgerianPhone(raw: string): string | null {
   const value = raw.trim();
@@ -89,6 +104,20 @@ const workplaceSchema = z.object({
   municipality: cleanText(150, true),
   institutionAddress: cleanText(300, true),
   directorPhone: directorPhoneField,
+  institutionEmail: emailField.optional(),
+}).strict();
+
+const qualificationDeclarationSchema = z.object({
+  name: declarationText(200),
+  issuingBody: declarationText(200).optional(),
+  qualificationDate: declarationDateField.optional(),
+}).strict();
+
+const supplementaryWorkplaceDeclarationSchema = z.object({
+  institutionName: declarationText(200),
+  municipality: declarationText(150).optional(),
+  institutionAddress: declarationText(300).optional(),
+  directorPhone: directorPhoneField.optional(),
 }).strict();
 
 export const teacherSubmissionSchema = z.object({
@@ -111,6 +140,21 @@ export const teacherSubmissionSchema = z.object({
     }
     return value;
   }).optional(),
+  birthProvince: declarationText(100).optional(),
+  professionalFramework: declarationText(120).optional(),
+  firstEducationAppointmentDate: declarationDateField.optional(),
+  firstEducationAppointmentDecisionNumber: declarationText(120).optional(),
+  firstInstallationDate: declarationDateField.optional(),
+  traineeshipDate: declarationDateField.optional(),
+  institutionAppointmentDate: declarationDateField.optional(),
+  institutionAppointmentNumber: declarationText(120).optional(),
+  administrativeCategory: declarationText(100).optional(),
+  administrativeSection: declarationText(100).optional(),
+  administrativeGrade: declarationText(100).optional(),
+  administrativeClassificationEffectiveDate: declarationDateField.optional(),
+  personalAddress: declarationText(300).optional(),
+  structuredQualifications: z.array(qualificationDeclarationSchema).max(5).optional(),
+  supplementaryWorkplaces: z.array(supplementaryWorkplaceDeclarationSchema).max(3).optional(),
   workplace: workplaceSchema,
 }).strict().superRefine((value, context) => {
   const today = new Date().toISOString().slice(0, 10);

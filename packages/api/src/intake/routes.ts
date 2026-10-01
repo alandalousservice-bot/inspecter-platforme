@@ -38,11 +38,50 @@ export function registerTeacherSubmissionRoutes(app: Express, database: IntakeDa
       }
 
       const input = request.body as z.output<typeof teacherSubmissionSchema>;
-      const profile = Object.fromEntries(
-        Object.entries(input).filter(([, value]) => value !== undefined),
-      ) as Prisma.InputJsonObject;
+      const {
+        birthProvince, professionalFramework, firstEducationAppointmentDate,
+        firstEducationAppointmentDecisionNumber, firstInstallationDate, traineeshipDate,
+        institutionAppointmentDate, institutionAppointmentNumber, administrativeCategory,
+        administrativeSection, administrativeGrade, administrativeClassificationEffectiveDate,
+        personalAddress, structuredQualifications, supplementaryWorkplaces, workplace, ...profileFields
+      } = input;
+      const { institutionEmail, ...legacyWorkplace } = workplace;
+      const profile = Object.fromEntries([
+        ...Object.entries(profileFields),
+        ['workplace', legacyWorkplace],
+      ].filter(([, value]) => value !== undefined)) as Prisma.InputJsonObject;
+      const asDatabaseDate = (value?: string) => value ? new Date(`${value}T00:00:00.000Z`) : null;
       const submission = await database.teacherSubmission.create({
-        data: { districtId, submittedProfile: profile },
+        data: {
+          districtId,
+          submittedProfile: profile,
+          birthProvince,
+          professionalFramework,
+          firstEducationAppointmentDate: asDatabaseDate(firstEducationAppointmentDate),
+          firstEducationAppointmentDecisionNumber,
+          firstInstallationDate: asDatabaseDate(firstInstallationDate),
+          traineeshipDate: asDatabaseDate(traineeshipDate),
+          institutionAppointmentDate: asDatabaseDate(institutionAppointmentDate),
+          institutionAppointmentNumber,
+          administrativeCategory,
+          administrativeSection,
+          administrativeGrade,
+          administrativeClassificationEffectiveDate: asDatabaseDate(administrativeClassificationEffectiveDate),
+          personalAddress,
+          declaredHomeInstitutionEmail: institutionEmail,
+          ...(structuredQualifications?.length ? {
+            qualificationDeclarations: { create: structuredQualifications.map((item, position) => ({
+              position, name: item.name, issuingBody: item.issuingBody,
+              qualificationDate: asDatabaseDate(item.qualificationDate),
+            })) },
+          } : {}),
+          ...(supplementaryWorkplaces?.length ? {
+            supplementaryWorkplaceDeclarations: { create: supplementaryWorkplaces.map((item, position) => ({
+              position, institutionName: item.institutionName, municipality: item.municipality,
+              institutionAddress: item.institutionAddress, directorPhone: item.directorPhone,
+            })) },
+          } : {}),
+        },
         select: { id: true },
       });
 

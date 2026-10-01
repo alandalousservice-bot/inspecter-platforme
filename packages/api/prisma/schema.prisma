@@ -84,26 +84,69 @@ model Institution {
   teachers                Teacher[]
   visits                  PedagogicalVisit[]
   supplementaryWorkplaces TeacherSupplementaryWorkplace[]
-  scheduleSlots          WeeklyScheduleSlot[]
+  scheduleSlots           WeeklyScheduleSlot[]
 
   @@unique([id, districtId])
   @@index([districtId, name])
 }
 
 model TeacherSubmission {
-  id                   String     @id @default(uuid()) @db.Uuid
-  districtId           String     @db.Uuid
-  submittedProfile     Json
-  status               String     @default("PENDING")
-  submittedAt          DateTime   @default(now())
-  decidedAt            DateTime?
-  decidedByInspectorId String?    @db.Uuid
-  acceptedTeacherId    String?    @unique @db.Uuid
-  district             District   @relation(fields: [districtId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  decidedByInspector   Inspector? @relation("TeacherSubmissionDecider", fields: [decidedByInspectorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  acceptedTeacher      Teacher?   @relation("AcceptedSubmission", fields: [acceptedTeacherId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  id                                        String                                               @id @default(uuid()) @db.Uuid
+  districtId                                String                                               @db.Uuid
+  submittedProfile                          Json
+  status                                    String                                               @default("PENDING")
+  submittedAt                               DateTime                                             @default(now())
+  decidedAt                                 DateTime?
+  decidedByInspectorId                      String?                                              @db.Uuid
+  acceptedTeacherId                         String?                                              @unique @db.Uuid
+  birthProvince                             String?                                              @db.VarChar(100)
+  professionalFramework                     String?                                              @db.VarChar(120)
+  firstEducationAppointmentDate             DateTime?                                            @db.Date
+  firstEducationAppointmentDecisionNumber   String?                                              @db.VarChar(120)
+  firstInstallationDate                     DateTime?                                            @db.Date
+  traineeshipDate                           DateTime?                                            @db.Date
+  institutionAppointmentDate                DateTime?                                            @db.Date
+  institutionAppointmentNumber              String?                                              @db.VarChar(120)
+  administrativeCategory                    String?                                              @db.VarChar(100)
+  administrativeSection                     String?                                              @db.VarChar(100)
+  administrativeGrade                       String?                                              @db.VarChar(100)
+  administrativeClassificationEffectiveDate DateTime?                                            @db.Date
+  personalAddress                           String?                                              @db.VarChar(300)
+  declaredHomeInstitutionEmail              String?                                              @db.VarChar(254)
+  district                                  District                                             @relation(fields: [districtId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  decidedByInspector                        Inspector?                                           @relation("TeacherSubmissionDecider", fields: [decidedByInspectorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  acceptedTeacher                           Teacher?                                             @relation("AcceptedSubmission", fields: [acceptedTeacherId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  qualificationDeclarations                 TeacherSubmissionQualificationDeclaration[]
+  supplementaryWorkplaceDeclarations        TeacherSubmissionSupplementaryWorkplaceDeclaration[]
 
   @@index([districtId, status, submittedAt])
+}
+
+model TeacherSubmissionQualificationDeclaration {
+  id                String            @id @default(uuid()) @db.Uuid
+  submissionId      String            @db.Uuid
+  position          Int               @db.SmallInt
+  name              String            @db.VarChar(200)
+  issuingBody       String?           @db.VarChar(200)
+  qualificationDate DateTime?         @db.Date
+  createdAt         DateTime          @default(now())
+  submission        TeacherSubmission @relation(fields: [submissionId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "tsq_submission_fk")
+
+  @@unique([submissionId, position], map: "tsq_submission_position_key")
+}
+
+model TeacherSubmissionSupplementaryWorkplaceDeclaration {
+  id                 String            @id @default(uuid()) @db.Uuid
+  submissionId       String            @db.Uuid
+  position           Int               @db.SmallInt
+  institutionName    String            @db.VarChar(200)
+  municipality       String?           @db.VarChar(150)
+  institutionAddress String?           @db.VarChar(300)
+  directorPhone      String?           @db.VarChar(20)
+  createdAt          DateTime          @default(now())
+  submission         TeacherSubmission @relation(fields: [submissionId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "tsw_submission_fk")
+
+  @@unique([submissionId, position], map: "tsw_submission_position_key")
 }
 
 model Teacher {
@@ -323,26 +366,26 @@ model FollowUp {
 }
 
 model WeeklyScheduleSlot {
-  id             String         @id @default(uuid()) @db.Uuid
-  scheduleId     String         @db.Uuid
-  teacherId      String?        @db.Uuid
-  districtId     String?        @db.Uuid
-  institutionId  String?        @db.Uuid
-  validFrom      DateTime?      @db.Date
-  validTo        DateTime?      @db.Date
+  id             String          @id @default(uuid()) @db.Uuid
+  scheduleId     String          @db.Uuid
+  teacherId      String?         @db.Uuid
+  districtId     String?         @db.Uuid
+  institutionId  String?         @db.Uuid
+  validFrom      DateTime?       @db.Date
+  validTo        DateTime?       @db.Date
   workplaceBasis String?
-  dayOfWeek   Int
-  startMinute Int
-  endMinute   Int
-  levelLabel  String?
-  groupLabel  String?
-  notes       String?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  schedule    WeeklySchedule @relation("ScheduleSlots", fields: [scheduleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  scheduleOwner WeeklySchedule? @relation("SlotScheduleOwner", fields: [scheduleId, teacherId], references: [id, teacherId], onDelete: Restrict, onUpdate: Cascade)
-  teacher       Teacher?       @relation(fields: [teacherId, districtId], references: [id, districtId], onDelete: Restrict, onUpdate: Cascade)
-  institution   Institution?   @relation(fields: [institutionId, districtId], references: [id, districtId], onDelete: Restrict, onUpdate: Cascade)
+  dayOfWeek      Int
+  startMinute    Int
+  endMinute      Int
+  levelLabel     String?
+  groupLabel     String?
+  notes          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  schedule       WeeklySchedule  @relation("ScheduleSlots", fields: [scheduleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  scheduleOwner  WeeklySchedule? @relation("SlotScheduleOwner", fields: [scheduleId, teacherId], references: [id, teacherId], onDelete: Restrict, onUpdate: Cascade)
+  teacher        Teacher?        @relation(fields: [teacherId, districtId], references: [id, districtId], onDelete: Restrict, onUpdate: Cascade)
+  institution    Institution?    @relation(fields: [institutionId, districtId], references: [id, districtId], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([scheduleId, dayOfWeek, startMinute, endMinute])
   @@index([institutionId])

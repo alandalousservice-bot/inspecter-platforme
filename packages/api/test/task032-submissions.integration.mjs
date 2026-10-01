@@ -244,7 +244,7 @@ test('detail returns authorized submitted profile and candidates with minimized 
   const body = await response.json();
   assert.equal(body.data.id, target.id);
   assert.equal(body.data.submittedProfile.email, 'Amina@example.dz');
-  assert.deepEqual(body.data.declaredWorkplace, { institutionName: 'ابتدائية النور', municipality: null, institutionAddress: null, directorPhone: null, legacyAdditionalInstitutionNames: ['مدرسة إضافية'] });
+  assert.deepEqual(body.data.declaredWorkplace, { institutionName: 'ابتدائية النور', municipality: null, institutionAddress: null, directorPhone: null, legacyAdditionalInstitutionNames: ['مدرسة إضافية'], institutionEmail: null });
   const matched = body.data.potentialDuplicates.find(({ id }) => id === duplicate.id);
   assert.deepEqual(matched.matchReasons, ['SAME_PHONE', 'SAME_EMAIL', 'SAME_NAME_AND_DOB']);
   assert.deepEqual(Object.keys(matched).sort(), ['id', 'firstName', 'lastName', 'dateOfBirth', 'placeOfBirth', 'status', 'submittedAt', 'matchReasons'].sort());

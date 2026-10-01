@@ -27,7 +27,7 @@ async function submitPublic(page: Page, teacher: typeof mainTeacher) {
   await page.getByLabel('تاريخ الميلاد').fill('1985-03-04');
   await page.getByLabel('مكان الميلاد').fill('وهران');
   await page.getByLabel('رقم الهاتف').fill(teacher.phone);
-  await page.getByLabel('البريد الإلكتروني').fill(teacher.email);
+  await page.locator('#email').fill(teacher.email);
   await page.getByLabel('الصفة المهنية').selectOption('PERMANENT');
   await page.getByLabel('تاريخ التوظيف').fill('2005-09-01');
   await page.getByLabel('تاريخ الترسيم أو التثبيت').fill('2007-09-01');

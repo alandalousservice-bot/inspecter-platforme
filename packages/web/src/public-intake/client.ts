@@ -10,11 +10,27 @@ export type TeacherSubmissionPayload = {
   confirmationDate?: string;
   qualifications?: string;
   notes?: string;
+  birthProvince?: string;
+  professionalFramework?: string;
+  firstEducationAppointmentDate?: string;
+  firstEducationAppointmentDecisionNumber?: string;
+  firstInstallationDate?: string;
+  traineeshipDate?: string;
+  institutionAppointmentDate?: string;
+  institutionAppointmentNumber?: string;
+  administrativeCategory?: string;
+  administrativeSection?: string;
+  administrativeGrade?: string;
+  administrativeClassificationEffectiveDate?: string;
+  personalAddress?: string;
+  structuredQualifications?: Array<{ name: string; issuingBody?: string; qualificationDate?: string }>;
+  supplementaryWorkplaces?: Array<{ institutionName: string; municipality?: string; institutionAddress?: string; directorPhone?: string }>;
   workplace: {
     institutionName: string;
     municipality: string;
     institutionAddress: string;
     directorPhone: string;
+    institutionEmail?: string;
   };
 };
 

@@ -96,8 +96,9 @@ before(async () => {
   const task081Migration = '20261001100000_task_081_structured_teacher_qualifications';
   const task082Migration = '20261001120000_task_082_teacher_supplementary_workplaces';
   const task083Migration = '20261002120000_task_083_workplace_aware_schedule_visits';
-  const cleanBundle = migrationBundle('clean', ['20260929070000_task_050_pedagogical_visit', '20260930010000_task_052a_inspector_professional_identity', reportMigration, followUpMigration, visitTypeMigration, task054Migration]);
-  const upgradeBundle = migrationBundle('upgrade', [migrationName, '20260929070000_task_050_pedagogical_visit', '20260930010000_task_052a_inspector_professional_identity', reportMigration, followUpMigration, visitTypeMigration, task054Migration, task083Migration]);
+  const task085Migration = '20261003100000_task_085_public_intake_evolution';
+  const cleanBundle = migrationBundle('clean', ['20260929070000_task_050_pedagogical_visit', '20260930010000_task_052a_inspector_professional_identity', reportMigration, followUpMigration, visitTypeMigration, task054Migration, task085Migration]);
+  const upgradeBundle = migrationBundle('upgrade', [migrationName, '20260929070000_task_050_pedagogical_visit', '20260930010000_task_052a_inspector_professional_identity', reportMigration, followUpMigration, visitTypeMigration, task054Migration, task083Migration, task085Migration]);
   const cleanUrl = schemaUrl(baseUrl, cleanSchema);
   runPrisma(['migrate', 'deploy'], cleanUrl, cleanBundle.schema);
   runPrisma(['migrate', 'status'], cleanUrl, cleanBundle.schema);

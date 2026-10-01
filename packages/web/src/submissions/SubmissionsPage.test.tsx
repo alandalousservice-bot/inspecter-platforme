@@ -23,7 +23,16 @@ const detail: SubmissionDetail = {
     phone: '+213555123456', email: 'amina@example.dz', professionalStatus: 'PERMANENT', employmentDate: '2005-09-01',
     confirmationDate: '2007-09-01', qualifications: 'شهادة جامعية', notes: 'ملاحظة من المرسل',
   },
-  declaredWorkplace: { institutionName: 'ابتدائية النور', municipality: 'وهران', institutionAddress: 'شارع النخيل', directorPhone: '+21321234567', legacyAdditionalInstitutionNames: [] },
+  declaredWorkplace: { institutionName: 'ابتدائية النور', municipality: 'وهران', institutionAddress: 'شارع النخيل', directorPhone: '+21321234567', institutionEmail: 'school@example.dz', legacyAdditionalInstitutionNames: [] },
+  declaredAdministrative: {
+    birthProvince: 'ولاية وهران', professionalFramework: 'إطار رياضي', firstEducationAppointmentDate: '2006-09-01',
+    firstEducationAppointmentDecisionNumber: 'قرار تصريح', firstInstallationDate: '2007-09-01', traineeshipDate: null,
+    institutionAppointmentDate: '2015-09-01', institutionAppointmentNumber: 'رقم تصريح', administrativeCategory: 'صنف 12',
+    administrativeSection: 'قسم 1', administrativeGrade: 'درجة 2', administrativeClassificationEffectiveDate: '2020-01-01',
+    personalAddress: 'عنوان خاص',
+  },
+  structuredQualifications: [{ name: 'ليسانس معلنة', issuingBody: 'جامعة', qualificationDate: '2010-01-01' }],
+  supplementaryWorkplaces: [{ institutionName: 'ابتدائية إضافية', municipality: 'بلدية', institutionAddress: null, directorPhone: null }],
   potentialDuplicates: [{
     id: 'candidate-2', firstName: 'أمينة', lastName: 'بن صالح', dateOfBirth: '1985-03-04', placeOfBirth: 'وهران',
     status: 'INTERNAL_REVIEW', submittedAt: '2026-09-20T09:00:00Z',
@@ -140,6 +149,13 @@ describe('TASK-032 submission detail UI', () => {
     expect(screen.getByText('ملاحظة من المرسل')).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'جهة العمل المصرح بها — غير معتمدة' })).toBeTruthy();
     expect(screen.getByText('شارع النخيل')).toBeTruthy();
+    expect(screen.getByText('school@example.dz')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'بيانات إدارية مصرح بها — غير معتمدة' })).toBeTruthy();
+    expect(screen.getByText('عنوان خاص')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /مؤسسات تكملة النصاب المصرح بها — غير معتمدة/ })).toBeTruthy();
+    expect(screen.getByText('ابتدائية إضافية')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /المؤهلات والشهادات المصرح بها — غير معتمدة/ })).toBeTruthy();
+    expect(screen.getByText('ليسانس معلنة')).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'طلبات مشابهة محتملة' })).toBeTruthy();
     expect(screen.getByText('تطابق رقم الهاتف')).toBeTruthy();
     expect(screen.getByText('تطابق البريد الإلكتروني')).toBeTruthy();

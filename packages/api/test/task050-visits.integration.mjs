@@ -87,7 +87,7 @@ before(async () => {
   runPrisma(['migrate', 'deploy'], cleanUrl);
   runPrisma(['migrate', 'status'], cleanUrl);
   const history = await admin.$queryRawUnsafe(`SELECT migration_name,finished_at FROM "${cleanSchema}"."_prisma_migrations" ORDER BY started_at`);
-  assert.equal(history.length, 18); assert.equal(history.at(-1)?.migration_name, '20261002120000_task_083_workplace_aware_schedule_visits');
+  assert.equal(history.length, 19); assert.equal(history.at(-1)?.migration_name, '20261003100000_task_085_public_intake_evolution');
   assert.ok(history.some((row) => row.migration_name === migrationName)); assert.ok(history.every((row) => row.finished_at));
 
   tempRoot = mkdtempSync(join(tmpdir(), 'task050-prisma-upgrade-'));
@@ -96,7 +96,8 @@ before(async () => {
   cpSync(join(migrationsDir, 'migration_lock.toml'), join(tempRoot, 'migration_lock.toml'));
   for (const entry of readdirSync(migrationsDir, { withFileTypes: true })) {
     if (entry.isDirectory() && entry.name !== '20260930120000_task_053a_visit_type'
-      && entry.name !== '20261002120000_task_083_workplace_aware_schedule_visits') cpSync(join(migrationsDir, entry.name), join(copiedMigrations, entry.name), { recursive: true });
+      && entry.name !== '20261002120000_task_083_workplace_aware_schedule_visits'
+      && entry.name !== '20261003100000_task_085_public_intake_evolution') cpSync(join(migrationsDir, entry.name), join(copiedMigrations, entry.name), { recursive: true });
   }
   cpSync(schemaPath, copiedSchema);
   const upgradeUrl = schemaUrl(rawUrl, upgradeSchema);
@@ -120,6 +121,7 @@ before(async () => {
   await baseDb.$disconnect();
   cpSync(join(migrationsDir, '20260930120000_task_053a_visit_type'), join(copiedMigrations, '20260930120000_task_053a_visit_type'), { recursive: true });
   cpSync(join(migrationsDir, '20261002120000_task_083_workplace_aware_schedule_visits'), join(copiedMigrations, '20261002120000_task_083_workplace_aware_schedule_visits'), { recursive: true });
+  cpSync(join(migrationsDir, '20261003100000_task_085_public_intake_evolution'), join(copiedMigrations, '20261003100000_task_085_public_intake_evolution'), { recursive: true });
   runPrisma(['migrate', 'deploy'], upgradeUrl, copiedSchema);
   const upgraded = new PrismaClient({ datasources: { db: { url: upgradeUrl } } });
   await upgraded.$connect();

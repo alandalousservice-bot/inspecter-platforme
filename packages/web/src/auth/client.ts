@@ -68,13 +68,31 @@ export type SubmissionProfile = {
   qualifications?: string;
   notes?: string;
 };
+export type DeclaredAdministrative = {
+  birthProvince: string | null;
+  professionalFramework: string | null;
+  firstEducationAppointmentDate: string | null;
+  firstEducationAppointmentDecisionNumber: string | null;
+  firstInstallationDate: string | null;
+  traineeshipDate: string | null;
+  institutionAppointmentDate: string | null;
+  institutionAppointmentNumber: string | null;
+  administrativeCategory: string | null;
+  administrativeSection: string | null;
+  administrativeGrade: string | null;
+  administrativeClassificationEffectiveDate: string | null;
+  personalAddress: string | null;
+};
 export type DeclaredWorkplace = {
   institutionName: string;
   municipality: string | null;
   institutionAddress: string | null;
   directorPhone: string | null;
+  institutionEmail?: string | null;
   legacyAdditionalInstitutionNames: string[];
 };
+export type QualificationDeclaration = { name: string; issuingBody: string | null; qualificationDate: string | null };
+export type SupplementaryWorkplaceDeclaration = { institutionName: string; municipality: string | null; institutionAddress: string | null; directorPhone: string | null };
 export type DuplicateReason = 'SAME_PHONE' | 'SAME_EMAIL' | 'SAME_NAME_AND_DOB';
 export type PotentialDuplicate = {
   id: string;
@@ -92,7 +110,10 @@ export type SubmissionDetail = {
   status: SubmissionStatus;
   submittedAt: string;
   submittedProfile: SubmissionProfile;
+  declaredAdministrative: DeclaredAdministrative;
   declaredWorkplace: DeclaredWorkplace | null;
+  structuredQualifications: QualificationDeclaration[];
+  supplementaryWorkplaces: SupplementaryWorkplaceDeclaration[];
   potentialDuplicates: PotentialDuplicate[];
   acceptedTeacherId: string | null;
 };

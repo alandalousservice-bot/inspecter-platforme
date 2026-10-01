@@ -91,3 +91,44 @@ test('strict schema rejects unknown keys, null optional values, and empty option
   assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, qualifications: null }).success, false);
   assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, notes: '  ' }).success, false);
 });
+
+test('TASK-085 optional declarations normalize NFC, keep dates exact, and enforce scalar bounds', () => {
+  const parsed = teacherSubmissionSchema.parse({
+    ...validSubmission,
+    birthProvince: '  ولاية   وهران  ',
+    professionalFramework: '  إطار e\u0301  ',
+    firstEducationAppointmentDate: '2005-09-01',
+    personalAddress: 'عنوان خاص',
+    workplace: { ...validSubmission.workplace, institutionEmail: ' School@EXAMPLE.DZ ' },
+  });
+  assert.equal(parsed.birthProvince, 'ولاية وهران');
+  assert.equal(parsed.professionalFramework, 'إطار é');
+  assert.equal(parsed.workplace.institutionEmail, 'School@example.dz');
+  for (const field of ['birthProvince', 'professionalFramework', 'firstEducationAppointmentDecisionNumber', 'institutionAppointmentNumber', 'administrativeCategory', 'administrativeSection', 'administrativeGrade', 'personalAddress']) {
+    assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, [field]: null }).success, false, `${field} rejects null`);
+  }
+  for (const value of ['2005-9-01', '2005-02-29', '2005-09-01T00:00:00Z', ' 2005-09-01 ']) {
+    assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, firstInstallationDate: value }).success, false, value);
+  }
+  assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, birthProvince: 'و'.repeat(101) }).success, false);
+  assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, personalAddress: `عنوان\u0000خاص` }).success, false);
+  assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, workplace: { ...validSubmission.workplace, institutionEmail: 'bad' } }).success, false);
+  assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, workplace: { ...validSubmission.workplace, institutionEmail: 'x'.repeat(250) + '@example.dz' } }).success, false);
+});
+
+test('TASK-085 structured declaration children are strict, bounded and optional', () => {
+  assert.equal(teacherSubmissionSchema.safeParse(validSubmission).success, true);
+  assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, structuredQualifications: [] }).success, true);
+  assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, supplementaryWorkplaces: [] }).success, true);
+  const qualification = { name: 'شهادة جامعية', issuingBody: 'جامعة', qualificationDate: '2020-01-01' };
+  const workplace = { institutionName: 'ابتدائية أخرى', municipality: 'بلدية', institutionAddress: 'عنوان', directorPhone: '021234567' };
+  assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, structuredQualifications: Array(5).fill(qualification) }).success, true);
+  assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, structuredQualifications: Array(6).fill(qualification) }).success, false);
+  assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, supplementaryWorkplaces: Array(3).fill(workplace) }).success, true);
+  assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, supplementaryWorkplaces: Array(4).fill(workplace) }).success, false);
+  assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, structuredQualifications: [{ ...qualification, unexpected: 'x' }] }).success, false);
+  assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, supplementaryWorkplaces: [{ ...workplace, institutionId: '00000000-0000-4000-8000-000000000000' }] }).success, false);
+  assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, supplementaryWorkplaces: [{ institutionName: 'مؤسسة', validFrom: '2020-01-01' }] }).success, false);
+  assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, structuredQualifications: [{ ...qualification, issuingBody: null }] }).success, false);
+  assert.equal(teacherSubmissionSchema.safeParse({ ...validSubmission, supplementaryWorkplaces: [{ ...workplace, directorPhone: 'not a phone' }] }).success, false);
+});

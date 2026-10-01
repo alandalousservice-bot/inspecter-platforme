@@ -152,6 +152,10 @@ test('clean migration creates the documented snapshot table, indexes and restric
   const columns = await db.$queryRaw`SELECT column_name, is_nullable, data_type, column_default FROM information_schema.columns WHERE table_schema=${schemaName} AND table_name='TeacherSubmission'`;
   assert.deepEqual(columns.map(({ column_name }) => column_name).sort(), [
     'id', 'districtId', 'submittedProfile', 'status', 'submittedAt', 'decidedAt', 'decidedByInspectorId', 'acceptedTeacherId',
+    'birthProvince', 'professionalFramework', 'firstEducationAppointmentDate', 'firstEducationAppointmentDecisionNumber',
+    'firstInstallationDate', 'traineeshipDate', 'institutionAppointmentDate', 'institutionAppointmentNumber',
+    'administrativeCategory', 'administrativeSection', 'administrativeGrade', 'administrativeClassificationEffectiveDate',
+    'personalAddress', 'declaredHomeInstitutionEmail',
   ].sort());
   assert.equal(columns.find(({ column_name }) => column_name === 'submittedProfile').data_type, 'jsonb');
   assert.match(columns.find(({ column_name }) => column_name === 'status').column_default, /PENDING/u);
@@ -164,7 +168,7 @@ test('clean migration creates the documented snapshot table, indexes and restric
   assert.equal(fks.length, 3);
   assert.ok(fks.every(({ confdeltype, confupdtype }) => confdeltype === 'r' && confupdtype === 'c'));
   const history = await db.$queryRawUnsafe(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL)::int AS applied FROM "${schemaName}"."_prisma_migrations"`);
-  assert.deepEqual(history[0], { total: 18, applied: 18 });
+  assert.deepEqual(history[0], { total: 19, applied: 19 });
   const forbiddenTables = await db.$queryRaw`SELECT table_name FROM information_schema.tables WHERE table_schema=${schemaName} AND table_name IN ('TeacherInstitutionAssignment')`;
   assert.deepEqual(forbiddenTables, []);
   assert.equal(await db.teacher.count(), 0);

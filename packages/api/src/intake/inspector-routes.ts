@@ -166,7 +166,19 @@ export function registerInspectorSubmissionRoutes(
     if (!idResult.success) throw new ApiError(400, 'VALIDATION_ERROR', 'تحقق من البيانات المدخلة.', { id: ['قيمة غير صالحة.'] });
     const submission = await database.teacherSubmission.findUnique({
       where: { id: idResult.data },
-      select: { id: true, districtId: true, status: true, submittedAt: true, submittedProfile: true, acceptedTeacherId: true },
+      select: {
+        id: true, districtId: true, status: true, submittedAt: true, submittedProfile: true, acceptedTeacherId: true,
+        birthProvince: true, professionalFramework: true, firstEducationAppointmentDate: true,
+        firstEducationAppointmentDecisionNumber: true, firstInstallationDate: true, traineeshipDate: true,
+        institutionAppointmentDate: true, institutionAppointmentNumber: true, administrativeCategory: true,
+        administrativeSection: true, administrativeGrade: true, administrativeClassificationEffectiveDate: true,
+        personalAddress: true, declaredHomeInstitutionEmail: true,
+        qualificationDeclarations: { orderBy: { position: 'asc' }, select: { name: true, issuingBody: true, qualificationDate: true } },
+        supplementaryWorkplaceDeclarations: {
+          orderBy: { position: 'asc' },
+          select: { institutionName: true, municipality: true, institutionAddress: true, directorPhone: true },
+        },
+      },
     });
     if (!submission) throw scopedNotFound();
 
@@ -181,6 +193,7 @@ export function registerInspectorSubmissionRoutes(
     const potentialDuplicates = findPotentialDuplicateCandidates(toSnapshot(submission), candidates.map(toSnapshot))
       .map(({ candidate, matchReasons }) => candidateSummary(candidate, matchReasons));
     const profile = submission.submittedProfile;
+    const declaredWorkplace = projectDeclaredWorkplace(profile);
     const submittedProfileFields = [
       'firstName', 'lastName', 'dateOfBirth', 'placeOfBirth', 'phone', 'email',
       'professionalStatus', 'employmentDate', 'confirmationDate', 'qualifications', 'notes',
@@ -199,7 +212,29 @@ export function registerInspectorSubmissionRoutes(
         submittedAt: submission.submittedAt,
         acceptedTeacherId: submission.status === 'ACCEPTED' ? submission.acceptedTeacherId : null,
         submittedProfile,
-        declaredWorkplace: projectDeclaredWorkplace(profile),
+        declaredAdministrative: {
+          birthProvince: submission.birthProvince,
+          professionalFramework: submission.professionalFramework,
+          firstEducationAppointmentDate: submission.firstEducationAppointmentDate?.toISOString().slice(0, 10) ?? null,
+          firstEducationAppointmentDecisionNumber: submission.firstEducationAppointmentDecisionNumber,
+          firstInstallationDate: submission.firstInstallationDate?.toISOString().slice(0, 10) ?? null,
+          traineeshipDate: submission.traineeshipDate?.toISOString().slice(0, 10) ?? null,
+          institutionAppointmentDate: submission.institutionAppointmentDate?.toISOString().slice(0, 10) ?? null,
+          institutionAppointmentNumber: submission.institutionAppointmentNumber,
+          administrativeCategory: submission.administrativeCategory,
+          administrativeSection: submission.administrativeSection,
+          administrativeGrade: submission.administrativeGrade,
+          administrativeClassificationEffectiveDate: submission.administrativeClassificationEffectiveDate?.toISOString().slice(0, 10) ?? null,
+          personalAddress: submission.personalAddress,
+        },
+        declaredWorkplace: declaredWorkplace
+          ? { ...declaredWorkplace, institutionEmail: submission.declaredHomeInstitutionEmail }
+          : null,
+        structuredQualifications: submission.qualificationDeclarations.map((item) => ({
+          name: item.name, issuingBody: item.issuingBody,
+          qualificationDate: item.qualificationDate?.toISOString().slice(0, 10) ?? null,
+        })),
+        supplementaryWorkplaces: submission.supplementaryWorkplaceDeclarations,
         potentialDuplicates,
       },
     });

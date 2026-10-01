@@ -93,10 +93,13 @@ before(async () => {
   const oldVisit = await oldDb.pedagogicalVisit.create({ data: { districtId: oldDistrict, inspectorId: oldInspector.id, teacherId: oldTeacher, institutionId: oldInstitution, institutionNameSnapshot: 'retained home', academicYear: '2026-2027', visitType: 'GUIDANCE', scheduledStartAt: new Date('2027-01-01T08:00:00Z'), scheduledEndAt: new Date('2027-01-01T09:00:00Z') } });
   const oldReport = await oldDb.inspectionReport.create({ data: { visitId: oldVisit.id } });
   const oldFollowUp = await oldDb.followUp.create({ data: { reportId: oldReport.id, ownerInspectorId: oldInspector.id, note: 'preserved follow-up', dueDate: new Date('2027-02-01T00:00:00.000Z') } });
-  const oldSubmission = await oldDb.teacherSubmission.create({ data: { districtId: oldDistrict, submittedProfile: { purpose: 'migration-preservation-test' } } });
+  const oldSubmissionId = randomUUID();
+  await oldDb.$executeRaw`INSERT INTO "TeacherSubmission" ("id","districtId","submittedProfile") VALUES (${oldSubmissionId}::uuid,${oldDistrict}::uuid,'{"purpose":"migration-preservation-test"}'::jsonb)`;
   const oldAudit = await oldDb.auditLog.create({ data: { actorInspectorId: oldInspector.id, districtId: oldDistrict, action: 'TASK082_UPGRADE_SENTINEL', entityType: 'Teacher', entityId: oldTeacher } });
   await oldDb.$disconnect();
   cpSync(join(migrationsDir, migrationName), join(tempMigrations, migrationName), { recursive: true });
+  runPrisma(['migrate', 'deploy'], upgradeUrl, tempSchema);
+  cpSync(join(migrationsDir, '20261003100000_task_085_public_intake_evolution'), join(tempMigrations, '20261003100000_task_085_public_intake_evolution'), { recursive: true });
   runPrisma(['migrate', 'deploy'], upgradeUrl, tempSchema);
   upgrade = new PrismaClient({ datasources: { db: { url: upgradeUrl } } }); await upgrade.$connect();
   assert.equal(await upgrade.teacher.count({ where: { id: oldTeacher, institutionId: oldInstitution } }), 1);
@@ -106,7 +109,7 @@ before(async () => {
   assert.equal(await upgrade.pedagogicalVisit.count({ where: { id: oldVisit.id, teacherId: oldTeacher, institutionId: oldInstitution, institutionNameSnapshot: 'retained home' } }), 1);
   assert.equal(await upgrade.inspectionReport.count({ where: { id: oldReport.id, visitId: oldVisit.id } }), 1);
   assert.equal(await upgrade.followUp.count({ where: { id: oldFollowUp.id, reportId: oldReport.id } }), 1);
-  assert.equal(await upgrade.teacherSubmission.count({ where: { id: oldSubmission.id, districtId: oldDistrict } }), 1);
+  assert.equal(await upgrade.teacherSubmission.count({ where: { id: oldSubmissionId, districtId: oldDistrict } }), 1);
   assert.equal(await upgrade.auditLog.count({ where: { id: oldAudit.id, actorInspectorId: oldInspector.id, districtId: oldDistrict } }), 1);
   assert.equal(await upgrade.teacherSupplementaryWorkplace.count(), 0);
 

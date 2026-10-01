@@ -106,6 +106,26 @@ export function SubmissionDetailPage() {
             </CardContent>
           </Card>
           <Card>
+            <CardHeader title="بيانات إدارية مصرح بها — غير معتمدة" description="تظهر هذه البيانات كما صرّح بها الأستاذ، وتخضع لمراجعة المفتش." />
+            <CardContent>
+              <dl className="submission-facts submission-facts--profile">
+                <Fact label="ولاية الميلاد">{submission.declaredAdministrative.birthProvince ?? 'غير مصرح به'}</Fact>
+                <Fact label="الإطار">{submission.declaredAdministrative.professionalFramework ?? 'غير مصرح به'}</Fact>
+                <Fact label="تاريخ أول تعيين في التعليم">{submission.declaredAdministrative.firstEducationAppointmentDate ? formatDate(submission.declaredAdministrative.firstEducationAppointmentDate) : 'غير مصرح به'}</Fact>
+                <Fact label="رقم قرار أول تعيين في التعليم">{submission.declaredAdministrative.firstEducationAppointmentDecisionNumber ?? 'غير مصرح به'}</Fact>
+                <Fact label="تاريخ أول تنصيب">{submission.declaredAdministrative.firstInstallationDate ? formatDate(submission.declaredAdministrative.firstInstallationDate) : 'غير مصرح به'}</Fact>
+                <Fact label="تاريخ التربص">{submission.declaredAdministrative.traineeshipDate ? formatDate(submission.declaredAdministrative.traineeshipDate) : 'غير مصرح به'}</Fact>
+                <Fact label="تاريخ التعيين بالمؤسسة المصرح بها">{submission.declaredAdministrative.institutionAppointmentDate ? formatDate(submission.declaredAdministrative.institutionAppointmentDate) : 'غير مصرح به'}</Fact>
+                <Fact label="رقم التعيين بالمؤسسة المصرح بها">{submission.declaredAdministrative.institutionAppointmentNumber ?? 'غير مصرح به'}</Fact>
+                <Fact label="الصنف">{submission.declaredAdministrative.administrativeCategory ?? 'غير مصرح به'}</Fact>
+                <Fact label="القسم الإداري">{submission.declaredAdministrative.administrativeSection ?? 'غير مصرح به'}</Fact>
+                <Fact label="الدرجة">{submission.declaredAdministrative.administrativeGrade ?? 'غير مصرح به'}</Fact>
+                <Fact label="تاريخ سريان التصنيف الإداري">{submission.declaredAdministrative.administrativeClassificationEffectiveDate ? formatDate(submission.declaredAdministrative.administrativeClassificationEffectiveDate) : 'غير مصرح به'}</Fact>
+                <Fact label="العنوان الشخصي">{submission.declaredAdministrative.personalAddress ?? 'غير مصرح به'}</Fact>
+              </dl>
+            </CardContent>
+          </Card>
+          <Card>
             <CardHeader title="جهة العمل المصرح بها — غير معتمدة" />
             <CardContent>
               <dl className="submission-facts submission-facts--profile">
@@ -113,8 +133,33 @@ export function SubmissionDetailPage() {
                 <Fact label="البلدية">{submission.declaredWorkplace?.municipality ?? 'غير متاحة'}</Fact>
                 <Fact label="عنوان المؤسسة">{submission.declaredWorkplace?.institutionAddress ?? 'غير متاحة'}</Fact>
                 <Fact label="هاتف المدير"><span dir="ltr">{submission.declaredWorkplace?.directorPhone ?? 'غير متاحة'}</span></Fact>
+                <Fact label="البريد الإلكتروني للمؤسسة"><span dir="ltr">{submission.declaredWorkplace?.institutionEmail ?? 'غير مصرح به'}</span></Fact>
                 {submission.declaredWorkplace?.legacyAdditionalInstitutionNames.length ? <Fact label="مؤسسات إضافية — تصريح تاريخي">{submission.declaredWorkplace.legacyAdditionalInstitutionNames.join('، ')}</Fact> : null}
               </dl>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader title="مؤسسات تكملة النصاب المصرح بها — غير معتمدة" description="أوصاف تاريخية للمراجعة فقط؛ لا تمثل ارتباطات مؤسسات معتمدة." />
+            <CardContent>
+              {submission.supplementaryWorkplaces.length ? <ul className="submission-declaration-list">
+                {submission.supplementaryWorkplaces.map((workplace, index) => <li key={index}>
+                  <h3>{workplace.institutionName}</h3>
+                  <dl className="submission-facts"><Fact label="البلدية">{workplace.municipality ?? 'غير مصرح به'}</Fact><Fact label="العنوان">{workplace.institutionAddress ?? 'غير مصرح به'}</Fact><Fact label="هاتف المدير"><span dir="ltr">{workplace.directorPhone ?? 'غير مصرح به'}</span></Fact></dl>
+                </li>)}
+              </ul> : <p>غير مصرح به</p>}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader title="المؤهلات والشهادات المصرح بها — غير معتمدة" description="تبقى تصريحات للمراجعة؛ لا تُعرض كمؤهلات معتمدة في ملف الأستاذ." />
+            <CardContent>
+              {submission.structuredQualifications.length ? <ul className="submission-declaration-list">
+                {submission.structuredQualifications.map((qualification, index) => <li key={index}>
+                  <h3>{qualification.name}</h3>
+                  <dl className="submission-facts"><Fact label="الجهة المانحة">{qualification.issuingBody ?? 'غير مصرح به'}</Fact><Fact label="التاريخ">{qualification.qualificationDate ? formatDate(qualification.qualificationDate) : 'غير مصرح به'}</Fact></dl>
+                </li>)}
+              </ul> : <p>غير مصرح به</p>}
             </CardContent>
           </Card>
 

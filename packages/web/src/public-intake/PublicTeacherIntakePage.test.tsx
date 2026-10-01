@@ -251,4 +251,47 @@ describe('TASK-031 public teacher intake', () => {
     expect(container.querySelector('fieldset[disabled]')).toBeNull();
     expect(screen.getByRole('button', { name: 'إرسال البيانات' })).toBeTruthy();
   });
+
+  it('offers optional Arabic declaration groups and sends only entered declarations in bounded order', async () => {
+    const { container } = renderPage();
+    expect(container.querySelector('main[dir="rtl"]')).toBeTruthy();
+    expect(screen.getByRole('group', { name: /بيانات التعيين والتنصيب/ })).toBeTruthy();
+    expect(screen.getByRole('group', { name: /التصنيف الإداري/ })).toBeTruthy();
+    expect(screen.getByRole('group', { name: /مؤسسات تكملة النصاب المصرح بها/ })).toBeTruthy();
+    expect(screen.getByRole('group', { name: /المؤهلات والشهادات المصرح بها/ })).toBeTruthy();
+    fillRequired();
+    fireEvent.change(screen.getByRole('textbox', { name: 'ولاية الميلاد' }), { target: { value: 'ولاية وهران' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'العنوان الشخصي' }), { target: { value: 'عنوان خاص' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'البريد الإلكتروني للمؤسسة' }), { target: { value: 'school@example.dz' } });
+    fireEvent.click(screen.getByRole('button', { name: 'إضافة مؤهل مصرح به' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'اسم الشهادة أو المؤهل' }), { target: { value: 'ليسانس' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'الجهة المانحة' }), { target: { value: 'جامعة' } });
+    fireEvent.click(screen.getByRole('button', { name: 'إضافة مؤسسة مصرح بها' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'اسم المؤسسة الإضافية' }), { target: { value: 'ابتدائية ثانية' } });
+    await submit();
+    await screen.findByRole('heading', { name: 'تم استلام بياناتك' });
+    const payload = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body)) as Record<string, unknown>;
+    expect(payload.birthProvince).toBe('ولاية وهران');
+    expect(payload.personalAddress).toBe('عنوان خاص');
+    expect((payload.workplace as Record<string, unknown>).institutionEmail).toBe('school@example.dz');
+    expect(payload.structuredQualifications).toEqual([{ name: 'ليسانس', issuingBody: 'جامعة' }]);
+    expect(payload.supplementaryWorkplaces).toEqual([{ institutionName: 'ابتدائية ثانية' }]);
+    expect(payload).not.toHaveProperty('financialControllerVisaNumber');
+    expect(payload).not.toHaveProperty('administrativeNote');
+    expect(payload).not.toHaveProperty('institutionId');
+  });
+
+  it('caps declaration controls at five qualifications and three supplementary workplaces', async () => {
+    renderPage();
+    for (let index = 0; index < 5; index++) fireEvent.click(screen.getByRole('button', { name: 'إضافة مؤهل مصرح به' }));
+    for (let index = 0; index < 3; index++) fireEvent.click(screen.getByRole('button', { name: 'إضافة مؤسسة مصرح بها' }));
+    expect(screen.queryByRole('button', { name: 'إضافة مؤهل مصرح به' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'إضافة مؤسسة مصرح بها' })).toBeNull();
+    expect(screen.getByText('بلغت الحد الأقصى: 5 مؤهلات.')).toBeTruthy();
+    expect(screen.getByText('بلغت الحد الأقصى: 3 مؤسسات.')).toBeTruthy();
+    await submit();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(screen.getAllByText('أدخل اسم الشهادة أو المؤهل.')).toHaveLength(5);
+    expect(screen.getAllByText('أدخل اسم المؤسسة الإضافية.')).toHaveLength(3);
+  });
 });
