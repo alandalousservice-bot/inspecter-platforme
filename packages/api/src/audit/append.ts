@@ -6,6 +6,9 @@ export const AuditAction = {
   TEACHER_SUBMISSION_REJECTED: 'TEACHER_SUBMISSION_REJECTED',
   TEACHER_SUBMISSION_INTERNAL_REVIEW: 'TEACHER_SUBMISSION_INTERNAL_REVIEW',
   TEACHER_PROFILE_UPDATED: 'TEACHER_PROFILE_UPDATED',
+  TEACHER_QUALIFICATION_CREATED: 'TEACHER_QUALIFICATION_CREATED',
+  TEACHER_QUALIFICATION_UPDATED: 'TEACHER_QUALIFICATION_UPDATED',
+  TEACHER_QUALIFICATION_DELETED: 'TEACHER_QUALIFICATION_DELETED',
   INSPECTOR_PROFESSIONAL_IDENTITY_UPDATED: 'INSPECTOR_PROFESSIONAL_IDENTITY_UPDATED',
   INSPECTION_REPORT_FINALIZED: 'INSPECTION_REPORT_FINALIZED',
   FOLLOW_UP_STATE_CHANGED: 'FOLLOW_UP_STATE_CHANGED',
@@ -42,6 +45,19 @@ const eventContracts = {
       'financialControllerVisaNumber', 'administrativeCategory', 'administrativeSection', 'administrativeGrade',
       'administrativeClassificationEffectiveDate', 'birthProvince', 'personalAddress', 'administrativeNote',
     ])).min(1) }).strict(),
+  },
+  [AuditAction.TEACHER_QUALIFICATION_CREATED]: {
+    entityType: 'TeacherQualification', metadata: z.object({ teacherId: z.string().uuid() }).strict(),
+  },
+  [AuditAction.TEACHER_QUALIFICATION_UPDATED]: {
+    entityType: 'TeacherQualification',
+    metadata: z.object({
+      teacherId: z.string().uuid(),
+      changedFields: z.array(z.enum(['name', 'issuingBody', 'qualificationDate'])).min(1).max(3),
+    }).strict(),
+  },
+  [AuditAction.TEACHER_QUALIFICATION_DELETED]: {
+    entityType: 'TeacherQualification', metadata: z.object({ teacherId: z.string().uuid() }).strict(),
   },
   [AuditAction.INSPECTOR_PROFESSIONAL_IDENTITY_UPDATED]: {
     entityType: 'Inspector',

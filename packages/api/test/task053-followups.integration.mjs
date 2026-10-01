@@ -89,7 +89,7 @@ before(async () => {
   await admin.$executeRawUnsafe(`CREATE SCHEMA "${cleanSchema}"`); await admin.$executeRawUnsafe(`CREATE SCHEMA "${upgradeSchema}"`);
   migrate(schemaUrl(raw, cleanSchema));
   const history = await admin.$queryRawUnsafe(`SELECT migration_name,finished_at FROM "${cleanSchema}"."_prisma_migrations" ORDER BY started_at`);
-  assert.equal(history.length, 15); assert.equal(history.at(-1).migration_name, '20261001090000_task_080_teacher_administrative_master_data'); assert.ok(history.every((row) => row.finished_at));
+  assert.equal(history.length, 16); assert.equal(history.at(-1).migration_name, '20261001100000_task_081_structured_teacher_qualifications'); assert.ok(history.every((row) => row.finished_at));
   tempRoot = mkdtempSync(join(tmpdir(), 'task053-migrations-')); const oldMigrations = join(tempRoot, 'migrations');
   cpSync(join(migrationsDir, 'migration_lock.toml'), join(tempRoot, 'migration_lock.toml'));
   for (const item of readdirSync(migrationsDir, { withFileTypes: true })) if (item.isDirectory() && item.name !== migrationName) cpSync(join(migrationsDir, item.name), join(oldMigrations, item.name), { recursive: true });

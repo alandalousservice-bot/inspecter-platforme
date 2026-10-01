@@ -93,6 +93,7 @@ before(async () => {
   const visitTypeMigration = '20260930120000_task_053a_visit_type';
   const task054Migration = '20260930150000_task_054_inspector_visit_report_v1';
   const task080Migration = '20261001090000_task_080_teacher_administrative_master_data';
+  const task081Migration = '20261001100000_task_081_structured_teacher_qualifications';
   const cleanBundle = migrationBundle('clean', ['20260929070000_task_050_pedagogical_visit', '20260930010000_task_052a_inspector_professional_identity', reportMigration, followUpMigration, visitTypeMigration, task054Migration]);
   const upgradeBundle = migrationBundle('upgrade', [migrationName, '20260929070000_task_050_pedagogical_visit', '20260930010000_task_052a_inspector_professional_identity', reportMigration, followUpMigration, visitTypeMigration, task054Migration]);
   const cleanUrl = schemaUrl(baseUrl, cleanSchema);
@@ -101,8 +102,8 @@ before(async () => {
   cleanDb = new PrismaClient({ datasources: { db: { url: cleanUrl } } });
   await cleanDb.$connect();
   const cleanHistory = await appliedMigrations(cleanDb);
-  assert.equal(cleanHistory.at(-1)?.migration_name, task080Migration);
-  assert.equal(cleanHistory.length, 9);
+  assert.equal(cleanHistory.at(-1)?.migration_name, task081Migration);
+  assert.equal(cleanHistory.length, 10);
   assert.ok(cleanHistory.every((row) => row.finished_at));
 
   const upgradeUrl = schemaUrl(baseUrl, upgradeSchema);
@@ -134,8 +135,8 @@ before(async () => {
     assert.equal(await legacy.institution.count({ where: { id: institutionId, districtId } }), 1);
     const upgradeHistory = await appliedMigrations(legacy);
     assert.ok(upgradeHistory.some((row) => row.migration_name === migrationName));
-    assert.ok(upgradeHistory.some((row) => row.migration_name === task080Migration));
-    assert.equal(upgradeHistory.length, 9);
+    assert.ok(upgradeHistory.some((row) => row.migration_name === task081Migration));
+    assert.equal(upgradeHistory.length, 10);
     assert.ok(upgradeHistory.every((row) => row.finished_at));
   } finally {
     await legacy.$disconnect();

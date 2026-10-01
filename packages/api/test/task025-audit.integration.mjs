@@ -108,7 +108,7 @@ test('clean migration creates exact AuditLog columns, FKs, index and complete hi
   assert.equal(fks.length, 2);
   assert.ok(fks.every(({ confdeltype, confupdtype }) => confdeltype === 'r' && confupdtype === 'c'));
   const history = await db.$queryRawUnsafe(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL)::int AS applied FROM "${schemaName}"."_prisma_migrations"`);
-  assert.deepEqual(history[0], { total: 15, applied: 15 });
+  assert.deepEqual(history[0], { total: 16, applied: 16 });
 });
 
 test('valid append generates UUID and occurrence time, links actor/district, and queries by district/time', async () => {

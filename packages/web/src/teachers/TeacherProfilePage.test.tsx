@@ -4,11 +4,13 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import { ApiRequestError, type Institution, type TeacherProfile } from '../auth/client';
 import { TeacherProfilePage } from './TeacherProfilePage';
 
-const { getTeacherProfile, patchTeacherProfile, listInstitutions, setTeacherCurrentInstitution } = vi.hoisted(() => ({
+const { getTeacherProfile, patchTeacherProfile, listInstitutions, setTeacherCurrentInstitution, listTeacherQualifications, createTeacherQualification, patchTeacherQualification, deleteTeacherQualification } = vi.hoisted(() => ({
   getTeacherProfile: vi.fn(), patchTeacherProfile: vi.fn(), listInstitutions: vi.fn(), setTeacherCurrentInstitution: vi.fn(),
+  listTeacherQualifications: vi.fn(), createTeacherQualification: vi.fn(), patchTeacherQualification: vi.fn(), deleteTeacherQualification: vi.fn(),
 }));
 vi.mock('../auth/client', async (importOriginal) => ({
   ...await importOriginal<typeof import('../auth/client')>(), getTeacherProfile, patchTeacherProfile, listInstitutions, setTeacherCurrentInstitution,
+  listTeacherQualifications, createTeacherQualification, patchTeacherQualification, deleteTeacherQualification,
 }));
 
 const profile: TeacherProfile = {
@@ -48,6 +50,7 @@ beforeEach(() => {
   patchTeacherProfile.mockResolvedValue({ data: { ...profile, surname: 'عماري' } });
   listInstitutions.mockResolvedValue({ data: [institution], page: { limit: 25, nextCursor: null, total: 1 } });
   setTeacherCurrentInstitution.mockResolvedValue({ data: { teacherId: profile.id, currentInstitution: institution } });
+  listTeacherQualifications.mockResolvedValue({ items: [] });
 });
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 

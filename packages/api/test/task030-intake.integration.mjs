@@ -164,7 +164,7 @@ test('clean migration creates the documented snapshot table, indexes and restric
   assert.equal(fks.length, 3);
   assert.ok(fks.every(({ confdeltype, confupdtype }) => confdeltype === 'r' && confupdtype === 'c'));
   const history = await db.$queryRawUnsafe(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL)::int AS applied FROM "${schemaName}"."_prisma_migrations"`);
-  assert.deepEqual(history[0], { total: 15, applied: 15 });
+  assert.deepEqual(history[0], { total: 16, applied: 16 });
   const forbiddenTables = await db.$queryRaw`SELECT table_name FROM information_schema.tables WHERE table_schema=${schemaName} AND table_name IN ('TeacherInstitutionAssignment')`;
   assert.deepEqual(forbiddenTables, []);
   assert.equal(await db.teacher.count(), 0);

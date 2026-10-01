@@ -9,6 +9,7 @@ import { registerTeacherSubmissionRoutes } from './intake/routes.js';
 import { registerInspectorSubmissionRoutes } from './intake/inspector-routes.js';
 import { registerSubmissionDecisionRoute } from './intake/decision-routes.js';
 import { registerTeacherProfileRoutes } from './teachers/routes.js';
+import { registerTeacherQualificationRoutes } from './teachers/qualification-routes.js';
 import { registerTeacherDirectoryRoutes } from './teachers/directory-routes.js';
 import { registerWeeklyScheduleRoutes } from './schedules/routes.js';
 import { registerPedagogicalVisitRoutes } from './visits/routes.js';
@@ -29,6 +30,7 @@ createApp((app) => {
   registerSubmissionDecisionRoute(app, prisma, requireInspector);
   registerTeacherDirectoryRoutes(app, prisma, requireInspector);
   registerTeacherProfileRoutes(app, prisma, requireInspector);
+  registerTeacherQualificationRoutes(app, prisma, requireInspector);
   registerWeeklyScheduleRoutes(app, prisma, requireInspector);
   registerPedagogicalVisitRoutes(app, prisma, requireInspector);
   registerInspectionReportRoutes(app, prisma, requireInspector);

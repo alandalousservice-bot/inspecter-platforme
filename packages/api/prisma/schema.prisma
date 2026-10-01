@@ -105,46 +105,60 @@ model TeacherSubmission {
 }
 
 model Teacher {
-  id                                        String             @id @default(uuid()) @db.Uuid
-  districtId                                String             @db.Uuid
-  institutionId                             String?            @db.Uuid
+  id                                        String                 @id @default(uuid()) @db.Uuid
+  districtId                                String                 @db.Uuid
+  institutionId                             String?                @db.Uuid
   name                                      String
   surname                                   String
-  birthDate                                 DateTime?          @db.Date
+  birthDate                                 DateTime?              @db.Date
   placeOfBirth                              String?
   phone                                     String?
   email                                     String?
   professionalStatus                        String?
-  employedAt                                DateTime?          @db.Date
-  confirmedAt                               DateTime?          @db.Date
+  employedAt                                DateTime?              @db.Date
+  confirmedAt                               DateTime?              @db.Date
   qualifications                            String?
-  professionalFramework                     String?            @db.VarChar(120)
-  firstEducationAppointmentDate             DateTime?          @db.Date
-  firstEducationAppointmentDecisionNumber   String?            @db.VarChar(120)
-  firstInstallationDate                     DateTime?          @db.Date
-  traineeshipDate                           DateTime?          @db.Date
-  institutionAppointmentDate                DateTime?          @db.Date
-  institutionAppointmentNumber              String?            @db.VarChar(120)
-  financialControllerVisaNumber             String?            @db.VarChar(120)
-  administrativeCategory                    String?            @db.VarChar(100)
-  administrativeSection                     String?            @db.VarChar(100)
-  administrativeGrade                       String?            @db.VarChar(100)
-  administrativeClassificationEffectiveDate DateTime?          @db.Date
-  birthProvince                             String?            @db.VarChar(100)
-  personalAddress                           String?            @db.VarChar(300)
-  administrativeNote                        String?            @db.VarChar(1000)
-  recordStatus                              String             @default("ACTIVE")
+  professionalFramework                     String?                @db.VarChar(120)
+  firstEducationAppointmentDate             DateTime?              @db.Date
+  firstEducationAppointmentDecisionNumber   String?                @db.VarChar(120)
+  firstInstallationDate                     DateTime?              @db.Date
+  traineeshipDate                           DateTime?              @db.Date
+  institutionAppointmentDate                DateTime?              @db.Date
+  institutionAppointmentNumber              String?                @db.VarChar(120)
+  financialControllerVisaNumber             String?                @db.VarChar(120)
+  administrativeCategory                    String?                @db.VarChar(100)
+  administrativeSection                     String?                @db.VarChar(100)
+  administrativeGrade                       String?                @db.VarChar(100)
+  administrativeClassificationEffectiveDate DateTime?              @db.Date
+  birthProvince                             String?                @db.VarChar(100)
+  personalAddress                           String?                @db.VarChar(300)
+  administrativeNote                        String?                @db.VarChar(1000)
+  recordStatus                              String                 @default("ACTIVE")
   archivedAt                                DateTime?
-  createdAt                                 DateTime           @default(now())
-  updatedAt                                 DateTime           @updatedAt
-  district                                  District           @relation(fields: [districtId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  institution                               Institution?       @relation(fields: [institutionId, districtId], references: [id, districtId], onDelete: Restrict, onUpdate: Cascade)
-  acceptedSubmission                        TeacherSubmission? @relation("AcceptedSubmission")
+  createdAt                                 DateTime               @default(now())
+  updatedAt                                 DateTime               @updatedAt
+  district                                  District               @relation(fields: [districtId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  institution                               Institution?           @relation(fields: [institutionId, districtId], references: [id, districtId], onDelete: Restrict, onUpdate: Cascade)
+  acceptedSubmission                        TeacherSubmission?     @relation("AcceptedSubmission")
   weeklySchedules                           WeeklySchedule[]
   visits                                    PedagogicalVisit[]
+  qualificationsStructured                  TeacherQualification[]
 
   @@index([institutionId])
   @@index([districtId, surname, name, recordStatus])
+}
+
+model TeacherQualification {
+  id                String    @id @default(uuid()) @db.Uuid
+  teacherId         String    @db.Uuid
+  name              String    @db.VarChar(200)
+  issuingBody       String?   @db.VarChar(200)
+  qualificationDate DateTime? @db.Date
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  teacher           Teacher   @relation(fields: [teacherId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([teacherId, qualificationDate(sort: Desc, nulls: Last), createdAt(sort: Desc), id(sort: Desc)])
 }
 
 model WeeklySchedule {

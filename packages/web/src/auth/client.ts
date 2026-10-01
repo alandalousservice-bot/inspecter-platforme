@@ -123,6 +123,20 @@ export type TeacherProfilePatch = Partial<Pick<TeacherProfile,
   | 'financialControllerVisaNumber' | 'administrativeCategory' | 'administrativeSection' | 'administrativeGrade'
   | 'administrativeClassificationEffectiveDate' | 'birthProvince' | 'personalAddress' | 'administrativeNote'>>;
 
+export type TeacherQualification = {
+  id: string;
+  name: string;
+  issuingBody: string | null;
+  qualificationDate: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+export type TeacherQualificationInput = {
+  name: string;
+  issuingBody?: string | null;
+  qualificationDate?: string | null;
+};
+
 export type TeacherDirectoryItem = {
   id: string;
   districtId: string;
@@ -533,6 +547,43 @@ export async function patchTeacherProfile(id: string, patch: TeacherProfilePatch
   });
   if (!response.ok) return readFailure(response);
   return response.json() as Promise<{ data: TeacherProfile }>;
+}
+
+export async function listTeacherQualifications(teacherId: string): Promise<{ items: TeacherQualification[] }> {
+  const response = await fetch(`/api/v1/teachers/${encodeURIComponent(teacherId)}/qualifications`, { credentials: 'same-origin', cache: 'no-store' });
+  if (!response.ok) return readFailure(response);
+  return response.json() as Promise<{ items: TeacherQualification[] }>;
+}
+
+export async function createTeacherQualification(teacherId: string, input: TeacherQualificationInput): Promise<{ data: TeacherQualification }> {
+  const csrfToken = csrfCookie();
+  if (!csrfToken) throw new ApiRequestError('تعذر التحقق من الطلب. أعد تحميل الصفحة ثم حاول مجددًا.');
+  const response = await fetch(`/api/v1/teachers/${encodeURIComponent(teacherId)}/qualifications`, {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'content-type': 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify(input),
+  });
+  if (!response.ok) return readFailure(response);
+  return response.json() as Promise<{ data: TeacherQualification }>;
+}
+
+export async function patchTeacherQualification(teacherId: string, qualificationId: string, patch: Partial<TeacherQualificationInput>): Promise<{ data: TeacherQualification }> {
+  const csrfToken = csrfCookie();
+  if (!csrfToken) throw new ApiRequestError('تعذر التحقق من الطلب. أعد تحميل الصفحة ثم حاول مجددًا.');
+  const response = await fetch(`/api/v1/teachers/${encodeURIComponent(teacherId)}/qualifications/${encodeURIComponent(qualificationId)}`, {
+    method: 'PATCH', credentials: 'same-origin',
+    headers: { 'content-type': 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify(patch),
+  });
+  if (!response.ok) return readFailure(response);
+  return response.json() as Promise<{ data: TeacherQualification }>;
+}
+
+export async function deleteTeacherQualification(teacherId: string, qualificationId: string): Promise<void> {
+  const csrfToken = csrfCookie();
+  if (!csrfToken) throw new ApiRequestError('تعذر التحقق من الطلب. أعد تحميل الصفحة ثم حاول مجددًا.');
+  const response = await fetch(`/api/v1/teachers/${encodeURIComponent(teacherId)}/qualifications/${encodeURIComponent(qualificationId)}`, {
+    method: 'DELETE', credentials: 'same-origin', headers: { 'x-csrf-token': csrfToken },
+  });
+  if (!response.ok) return readFailure(response);
 }
 
 export type TeacherCurrentInstitutionInput =

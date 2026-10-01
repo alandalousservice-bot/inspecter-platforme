@@ -5,12 +5,13 @@ import {
   type Institution, type TeacherCurrentInstitutionInput, type TeacherProfile, type TeacherProfilePatch,
 } from '../auth/client';
 import { Button, Card, CardContent, CardHeader, Dialog, EmptyState, ErrorState, Input, LoadingState, SuccessState } from '../ui';
+import { TeacherQualificationsSection } from './TeacherQualificationsSection';
 import './teacher-profile.css';
 
 const labels: Record<keyof TeacherProfilePatch, string> = {
   name: 'الاسم', surname: 'اللقب', birthDate: 'تاريخ الميلاد', placeOfBirth: 'مكان الميلاد',
   phone: 'رقم الهاتف', email: 'البريد الإلكتروني', professionalStatus: 'الصفة المهنية',
-  employedAt: 'تاريخ التوظيف', confirmedAt: 'تاريخ الترسيم/التثبيت', qualifications: 'المؤهلات',
+  employedAt: 'تاريخ التوظيف', confirmedAt: 'تاريخ الترسيم/التثبيت', qualifications: 'مؤهلات سابقة غير مفصلة',
   professionalFramework: 'الإطار المهني', firstEducationAppointmentDate: 'تاريخ أول تعيين في التعليم',
   firstEducationAppointmentDecisionNumber: 'رقم مقرر أول تعيين في التعليم', firstInstallationDate: 'تاريخ أول تنصيب',
   traineeshipDate: 'تاريخ التربص', institutionAppointmentDate: 'تاريخ التعيين بالمؤسسة الحالية',
@@ -349,8 +350,9 @@ export function TeacherProfilePage() {
           <Field label="الصفة المهنية" value={profile.professionalStatus ? statusLabels[profile.professionalStatus] ?? 'غير محددة' : null} />
           <Field label="الإطار المهني" value={profile.professionalFramework} />
           <Field label="تاريخ التوظيف" value={profile.employedAt} /><Field label="تاريخ الترسيم/التثبيت" value={profile.confirmedAt} />
-          <Field label="المؤهلات" value={profile.qualifications} />
+          <Field label="مؤهلات سابقة غير مفصلة" value={profile.qualifications} />
         </dl></CardContent></Card>
+        <TeacherQualificationsSection teacherId={profile.id} legacyQualifications={profile.qualifications} />
         <Card><CardHeader title="بيانات التعيين" /><CardContent><dl className="teacher-profile__facts">
           {editSections.find((section) => section.title === 'بيانات التعيين')?.fields.map((field) => <Field key={field} label={labels[field]} value={profile[field] as string | null} />)}
         </dl></CardContent></Card>
