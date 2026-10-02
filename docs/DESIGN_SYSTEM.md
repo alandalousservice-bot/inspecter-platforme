@@ -100,7 +100,7 @@ Stack محلي بلا تنزيل أو dependency: `"Segoe UI", Tahoma, Arial, sa
 
 `Pagination` عرض موحد لعقد المؤشر/الصفحة الذي يمرره المستهلك: اسم تنقل، السابق/التالي، حدود disabled، ورقم/مدى مع total حين يوفره المصدر. الأزرار دلالية وموسومة بالعربية، واتجاه RTL يجعل السابق على inline-start الطبيعي دون تغيير معنى المؤشر. لا حجم صفحة أو sorting أو تعاقد خلفي جديد.
 
-اعتماد G6-04/G6-05: دليل الأساتذة يستخدم PageHeader وFilterBar وDataTable وPagination مع بقاء بحث `q` والمرشحات وcursor و`page.total` خادمية؛ وملف الأستاذ يستخدم PageHeader/Breadcrumbs/DetailList وFormSection/FormGrid مع إبقاء الحقول والحفظ وسلوك الاعتماد كما هي. اكتمل تطبيق النظام على بقية الشاشات المصادق عليها الموجودة: المؤسسات؛ الطلبات وتفاصيلها؛ بطاقة معلومات الأستاذ في التطبيق؛ محرر الجدول؛ الزيارات (القائمة والإنشاء والتفصيل والتقرير)؛ المتابعات؛ والهوية المهنية. تستعمل القوائم الجدول/المرشحات/الترقيم المشترك حيث يناسبها، وتستخدم صفحات الحقائق DetailList، مع إبقاء النصوص السردية والتفاعلات الخاصة بمجالها دون إنشاء نظام موازٍ. مسار الطباعة المستقل لا يرث قشرة أو أنماط صفحة التطبيق. لم تتغير عقود البيانات أو السلوك. الدخول والاستمارة العامة مؤجلان إلى G6-06، والتحقق الشامل الختامي إلى G6-07. راجع [UI Map](UI_MAP.md) لخريطة المستهلكين وحدود الطباعة.
+اعتماد G6-04/G6-05: دليل الأساتذة يستخدم PageHeader وFilterBar وDataTable وPagination مع بقاء بحث `q` والمرشحات وcursor و`page.total` خادمية؛ وملف الأستاذ يستخدم PageHeader/Breadcrumbs/DetailList وFormSection/FormGrid مع إبقاء الحقول والحفظ وسلوك الاعتماد كما هي. اكتمل تطبيق النظام على بقية الشاشات المصادق عليها الموجودة: المؤسسات؛ الطلبات وتفاصيلها؛ بطاقة معلومات الأستاذ في التطبيق؛ محرر الجدول؛ الزيارات (القائمة والإنشاء والتفصيل والتقرير)؛ المتابعات؛ والهوية المهنية. تستعمل القوائم الجدول/المرشحات/الترقيم المشترك حيث يناسبها، وتستخدم صفحات الحقائق DetailList، مع إبقاء النصوص السردية والتفاعلات الخاصة بمجالها دون إنشاء نظام موازٍ. مسار الطباعة المستقل لا يرث قشرة أو أنماط صفحة التطبيق. لم تتغير عقود البيانات أو السلوك. اكتمل G6-06 للدخول والاستمارة العامة، واكتملت بوابة G6-07 الختامية؛ راجع [UI Map](UI_MAP.md) لخريطة المسارات وحدود الطباعة.
 
 ## RTL وCSS
 
@@ -118,6 +118,10 @@ Stack محلي بلا تنزيل أو dependency: `"Segoe UI", Tahoma, Arial, sa
 4. G6-04 — Page Template وFilterBar والنماذج والجداول.
 5. G6-05 — ترحيل صفحات المفتش المصادق عليها الموجودة (مكتمل).
 6. G6-06 — اكتمل نقل login والاستمارة العامة إلى tokens ومكونات G6: السطح العام خارج AppShell، حقول Select/Textarea مشتركة، حالة SuccessState، ورسالة توضح معنى الحقول المطلوبة. لم تتغير عقود المصادقة أو الإرسال والتحقق؛ راجع [UI Map](UI_MAP.md).
-7. G6-07 — visual/responsive/accessibility/print regression.
+7. G6-07 — visual/responsive/accessibility/print regression (**COMPLETED**).
 
-هذه تسمية **G6-UI** لمرحلة التصميم، وليست G6 البيداغوجية الموجودة في خطة المرجع والمقترحات. لا Dashboard أو TASK-070 قبل اكتمال بوابة التصميم وموافقة ADR-016 المطلوبة للهوية النهائية.
+## G6 closure — final QA
+
+G6 is **COMPLETE** for every currently implemented route. The final gate verified public/authenticated/print isolation, RTL/Bidi, shared tokens, keyboard focus, responsive widths 1440/768/390 and representative 200% zoom, application state/table/form consistency, and the TASK-086 A4 grayscale-safe print contract. Automated and connected regression gates passed; no code fix or dead-code removal was justified. Intentional exceptions are limited to monochrome literal colors in the independent print document, the neutral responsive drawer scrim, and domain-specific layouts/states that preserve existing meaning. No final branding or palette is implied: ADR-016 remains OPEN. Dashboard/TASK-070 and reference-content/TASK-060 remain outside G6.
+
+هذه تسمية **G6-UI** لمرحلة التصميم، وليست G6 البيداغوجية الموجودة في خطة المرجع والمقترحات. لم تنشئ G6 Dashboard أو تبدأ TASK-070؛ لهما بوابة منتج/عقد مستقلة. ADR-016 يبقى OPEN للهوية النهائية ولا تعني G6-07 اعتماد Branding.
