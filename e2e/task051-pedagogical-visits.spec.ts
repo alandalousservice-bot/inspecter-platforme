@@ -119,9 +119,11 @@ test('TASK-051 connected list, create/advisory, reschedule, concurrency, complet
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator('.visit-mobile-list')).toBeVisible();
   await expect(page.locator('.visit-desktop-list')).toBeHidden();
-  await expect(page.getByRole('link', { name: 'الزيارات التربوية' })).toBeVisible();
-  await page.setViewportSize({ width: 768, height: 1000 });
-  await page.evaluate(() => { document.documentElement.style.zoom = '2'; });
+  await page.getByRole('button', { name: 'فتح قائمة التنقل' }).click();
+  await expect(page.getByRole('link', { name: 'الزيارات' })).toBeVisible();
+  await page.getByRole('button', { name: 'إغلاق القائمة' }).click();
+  // A 384×500 CSS viewport models 200% zoom from the preceding 768×1000 viewport.
+  await page.setViewportSize({ width: 384, height: 500 });
   await expect(page.locator('.visit-mobile-list')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   void teacherOutsideId;

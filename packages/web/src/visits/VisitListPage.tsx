@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { ApiRequestError, getCurrentDistricts, listPedagogicalVisits, type DistrictOption, type Institution, type PedagogicalVisit, type PedagogicalVisitStatus, type PedagogicalVisitType, type TeacherDirectoryItem, type VisitFilters } from '../auth/client';
+import { ApiRequestError, getCurrentDistricts, listPedagogicalVisits, type DistrictOption, type Institution, type PedagogicalVisit, type PedagogicalVisitType, type TeacherDirectoryItem, type VisitFilters } from '../auth/client';
 import { Button, Card, CardContent, CardHeader, DataTable, EmptyState, ErrorState, Input, LoadingState, type DataTableColumn } from '../ui';
 import { InstitutionPicker, TeacherPicker } from './VisitPickers';
+import { VisitStatusBadge } from './VisitStatusBadge';
 import { formatAlgiers, localDateTimeToOffset, nextLocalDate } from './time';
 import './visits.css';
 
 const PAGE_SIZE = 25;
-const statusLabels: Record<PedagogicalVisitStatus, string> = { PLANNED: 'مخططة', COMPLETED: 'مكتملة', CANCELLED: 'ملغاة' };
 const allowedKeys = ['districtId', 'teacherId', 'institutionId', 'status', 'visitType', 'fromDate', 'toDate'] as const;
 const visitTypeLabels: Record<PedagogicalVisitType, string> = {
   GUIDANCE: 'زيارة توجيهية / تكوينية', TENURE_CONFIRMATION: 'زيارة التثبيت / الترسيم',
@@ -91,7 +91,7 @@ export function VisitListPage() {
     { id: 'institution', header: 'مؤسسة الزيارة وقت التخطيط', render: (visit) => visit.institution.name },
     { id: 'visitType', header: 'نوع الزيارة', render: (visit) => visitTypeLabel(visit.visitType) },
     { id: 'time', header: 'الفترة', render: (visit) => <><small>{visit.intervalKind === 'ACTUAL_RETROSPECTIVE' ? 'الفترة الفعلية للزيارة' : 'الموعد المخطط'}</small><span dir="auto">{intervalLabel(visit)}</span></> },
-    { id: 'status', header: 'الحالة', render: (visit) => <span className={`visit-status visit-status--${visit.status.toLowerCase()}`}>{statusLabels[visit.status]}</span> },
+    { id: 'status', header: 'الحالة', render: (visit) => <VisitStatusBadge status={visit.status} /> },
   ], [districts, filterKey]);
 
   function applyDateFilter(event: React.FormEvent<HTMLFormElement>) {
@@ -137,7 +137,7 @@ export function VisitListPage() {
             <p><strong>مؤسسة الزيارة وقت التخطيط:</strong> {visit.institution.name}</p>
             <p><strong>نوع الزيارة:</strong> {visitTypeLabel(visit.visitType)}</p>
             <p><strong>{visit.intervalKind === 'ACTUAL_RETROSPECTIVE' ? 'الفترة الفعلية للزيارة:' : 'الموعد المخطط:'}</strong> <span dir="auto">{intervalLabel(visit)}</span></p>
-            <p><strong>الحالة:</strong> <span className={`visit-status visit-status--${visit.status.toLowerCase()}`}>{statusLabels[visit.status]}</span></p>
+            <p><strong>الحالة:</strong> <VisitStatusBadge status={visit.status} /></p>
           </article>)}</div>
           <nav className="visit-pagination" aria-label="صفحات الزيارات"><span>صفحة {pageIndex + 1} — إجمالي النتائج: {total}</span>
             <Button variant="secondary" disabled={pageIndex === 0 || loading} onClick={() => setPageIndex((index) => Math.max(0, index - 1))}>السابق</Button>

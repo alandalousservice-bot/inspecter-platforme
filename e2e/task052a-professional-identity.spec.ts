@@ -34,11 +34,14 @@ test('existing Inspector completes and edits professional identity without losin
   await page.getByRole('link', { name: 'المؤسسات' }).click();
   await expect(page).toHaveURL(/\/app\/institutions$/u);
   await page.setViewportSize({ width: 390, height: 800 });
+  await page.getByRole('button', { name: 'فتح قائمة التنقل' }).click();
+  await expect(page.getByRole('link', { name: 'هويتي المهنية' })).toBeVisible();
   await page.getByRole('link', { name: 'هويتي المهنية' }).click();
   const mobileOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(mobileOverflow).toBe(false);
-  await page.setViewportSize({ width: 800, height: 800 });
-  await page.evaluate(() => { document.documentElement.style.zoom = '2'; });
+  // A 400×400 CSS viewport models the available space at 200% browser zoom
+  // from the preceding 800×800 viewport and activates the responsive shell.
+  await page.setViewportSize({ width: 400, height: 400 });
   await expect(page.getByLabel('الاسم')).toBeVisible();
   const horizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(horizontalOverflow).toBe(false);

@@ -21,11 +21,6 @@
 .visit-pagination { margin-block-start: var(--space-4); }
 .visit-page__district-note, .visit-inline-note { color: var(--color-text-muted); }
 .visit-error { color: var(--color-danger); }
-.visit-status { display: inline-flex; align-items: center; gap: var(--space-2); font-weight: 600; }
-.visit-status::before { content: ''; width: .65rem; height: .65rem; flex: none; border: 2px solid currentColor; border-radius: 50%; }
-.visit-status--planned { color: var(--color-info); }
-.visit-status--completed { color: var(--color-success); }
-.visit-status--cancelled { color: var(--color-text-muted); }
 .visit-desktop-list { display: block; }
 .visit-mobile-list { display: none; }
 .visit-mobile-card { display: grid; gap: var(--space-2); padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface); }

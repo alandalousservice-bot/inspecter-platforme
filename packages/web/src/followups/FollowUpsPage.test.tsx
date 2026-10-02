@@ -45,10 +45,10 @@ describe('TASK-053 operational follow-up UI', () => {
   });
   it('validates the 1000-character limit by Unicode code point', async () => {
     renderPage(); await screen.findByText('متابعة إجراء'); fireEvent.click(screen.getByRole('button', { name: 'تعديل الإجراء' }));
-    const note = screen.getByLabelText('الإجراء المطلوب'); fireEvent.change(note, { target: { value: '😀'.repeat(1001) } });
+    const note = screen.getByRole('textbox', { name: /الإجراء المطلوب/u }); fireEvent.change(note, { target: { value: '😀'.repeat(1001) } });
     fireEvent.click(screen.getByRole('button', { name: 'حفظ التعديل' }));
     expect(await screen.findByText('يجب ألا يتجاوز النص 1000 حرف.')).toBeTruthy(); expect(mocks.patchFollowUp).not.toHaveBeenCalled();
-    fireEvent.change(note, { target: { value: '😀'.repeat(1000) } }); fireEvent.click(screen.getByRole('button', { name: 'حفظ التعديل' }));
+    fireEvent.change(note, { target: { value: '😀'.repeat(1000) } }); fireEvent.click(screen.getByRole('button', { name: /حفظ التعديل/u }));
     await waitFor(() => expect(mocks.patchFollowUp).toHaveBeenCalledWith(item.id, { operation: 'EDIT', expectedRevision: 1, note: '😀'.repeat(1000), dueDate: item.dueDate }));
   });
   it('completes with optional result and makes completed items read only', async () => {

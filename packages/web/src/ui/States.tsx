@@ -13,14 +13,16 @@ export function EmptyState({
   title,
   description,
   action,
+  kind = 'no-data',
 }: {
   title: string;
   description?: string;
   action?: ReactNode;
+  kind?: 'no-data' | 'no-results';
 }) {
   const titleId = useId();
   return (
-    <section className="ui-state ui-state--empty" aria-labelledby={titleId}>
+    <section className={`ui-state ui-state--empty ui-state--empty--${kind}`} aria-labelledby={titleId} data-kind={kind}>
       <h2 id={titleId}>{title}</h2>
       {description ? <p>{description}</p> : null}
       {action ? <div className="ui-state__action">{action}</div> : null}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { ApiRequestError, getCurrentDistricts, getCurrentInspector, listFollowUps, patchFollowUp, type DistrictOption, type FollowUp } from '../auth/client';
-import { Button, Card, CardContent, CardHeader, Dialog, EmptyState, ErrorState, Input, LoadingState, SuccessState } from '../ui';
+import { Button, Card, CardContent, CardHeader, Dialog, EmptyState, ErrorState, Input, LoadingState, StatusBadge, SuccessState, Textarea, type StatusTone } from '../ui';
 import './followups.css';
 
 type ActionMode = 'EDIT' | 'COMPLETE';
@@ -65,7 +65,8 @@ export function FollowUpsPage() {
         <ul className="followup-list">{rows.map((row) => {
           const canMutate = row.status === 'OPEN' && row.ownerInspectorId === inspectorId;
           const attention = row.alertState === 'OVERDUE' ? 'متأخرة' : row.alertState === 'DUE_TODAY' ? 'مستحقة اليوم' : 'غير مستحقة اليوم';
-          return <li key={row.id}><Card><CardHeader title={`${row.context.teacher.name} ${row.context.teacher.surname}`} description={`${row.context.institution.name} · ${row.note}`} action={<span className={`followup-badge followup-badge--${row.alertState.toLowerCase()}`}>{row.status === 'COMPLETED' ? 'مكتملة' : attention}</span>} />
+          const followupTone: StatusTone = row.status === 'COMPLETED' ? 'success' : row.alertState === 'OVERDUE' ? 'danger' : row.alertState === 'DUE_TODAY' ? 'warning' : 'neutral';
+          return <li key={row.id}><Card><CardHeader title={`${row.context.teacher.name} ${row.context.teacher.surname}`} description={`${row.context.institution.name} · ${row.note}`} action={<StatusBadge tone={followupTone}>{row.status === 'COMPLETED' ? 'مكتملة' : attention}</StatusBadge>} />
             <CardContent><dl className="followup-context"><div><dt>الإجراء</dt><dd>{row.note}</dd></div><div><dt>تاريخ الاستحقاق</dt><dd><time dateTime={row.dueDate}>{row.dueDate}</time></dd></div><div><dt>حالة المتابعة</dt><dd>{row.status === 'OPEN' ? 'مفتوحة' : 'مكتملة'}</dd></div><div><dt>المؤسسة وقت الزيارة</dt><dd>{row.context.institution.name}</dd></div>{row.completionNote ? <div><dt>نتيجة المتابعة</dt><dd>{row.completionNote}</dd></div> : null}</dl>
               {canMutate ? <div className="followup-actions"><Button variant="secondary" onClick={() => openAction(row, 'EDIT')}>تعديل الإجراء</Button><Button onClick={() => openAction(row, 'COMPLETE')}>إكمال الإجراء</Button></div> : <p className="followup-readonly">{row.status === 'COMPLETED' ? 'هذه المتابعة مكتملة وللقراءة فقط.' : 'للقراءة فقط؛ التعديل متاح لمالك المتابعة.'}</p>}
             </CardContent></Card></li>;
@@ -76,7 +77,7 @@ export function FollowUpsPage() {
     </Card>
     <Dialog open={mode !== null} title={mode === 'EDIT' ? 'تعديل إجراء المتابعة' : 'إكمال إجراء المتابعة'} description={mode === 'COMPLETE' ? 'بعد الإكمال تصبح المتابعة للقراءة فقط.' : undefined} onClose={() => { if (!busy) { setMode(null); setSelected(null); } }}>
       <form className="followup-form" onSubmit={(event) => void submit(event)} aria-busy={busy}>
-        {mode === 'EDIT' ? <><label className="followup-form__field">الإجراء المطلوب<textarea className="ui-input" required value={note} onChange={(event) => setNote(event.currentTarget.value)} /></label><Input id="followup-due" label="تاريخ الاستحقاق" type="date" required value={dueDate} onChange={(event) => setDueDate(event.currentTarget.value)} /></> : <label className="followup-form__field">نتيجة المتابعة<textarea className="ui-input" value={completionNote} onChange={(event) => setCompletionNote(event.currentTarget.value)} /></label>}
+        {mode === 'EDIT' ? <><Textarea id="followup-action-note" label="الإجراء المطلوب" className="followup-form__note" required value={note} onChange={(event) => setNote(event.currentTarget.value)} /><Input id="followup-due" label="تاريخ الاستحقاق" type="date" required value={dueDate} onChange={(event) => setDueDate(event.currentTarget.value)} /></> : <Textarea id="followup-completion-note" label="نتيجة المتابعة" className="followup-form__note" value={completionNote} onChange={(event) => setCompletionNote(event.currentTarget.value)} />}
         <div className="followup-actions"><Button type="button" variant="secondary" disabled={busy} onClick={() => { setMode(null); setSelected(null); }}>إلغاء</Button><Button type="submit" disabled={busy}>{busy ? 'جارٍ الحفظ…' : mode === 'EDIT' ? 'حفظ التعديل' : 'تأكيد الإكمال'}</Button></div>
       </form>
     </Dialog>

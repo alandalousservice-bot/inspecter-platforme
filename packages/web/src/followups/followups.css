@@ -4,18 +4,16 @@
 .followups-page__header p { color: var(--color-text-muted); }
 .followups-page__eyebrow { margin-block-end: var(--space-1); }
 .followups-filters { display: grid; grid-template-columns: repeat(3, minmax(10rem, 1fr)); gap: var(--space-3); margin-block-end: var(--space-4); }
-.followups-filters label, .followup-form__field { display: grid; gap: var(--space-2); font-weight: 600; }
+.followups-filters label { display: grid; gap: var(--space-2); font-weight: 600; }
 .followup-list { display: grid; gap: var(--space-4); padding: 0; margin: 0; list-style: none; }
 .followup-context { display: grid; gap: var(--space-2); margin: 0; }
 .followup-context > div { display: grid; grid-template-columns: minmax(9rem, .35fr) 1fr; gap: var(--space-3); padding-block: var(--space-2); border-block-end: 1px solid var(--color-border); }
 .followup-context dt, .followup-readonly { color: var(--color-text-muted); }
 .followup-context dd { margin: 0; overflow-wrap: anywhere; }
-.followup-badge { display: inline-flex; align-items: center; padding: var(--space-1) var(--space-2); border: 1px solid var(--color-border); border-radius: var(--radius-control); white-space: nowrap; }
-.followup-badge--overdue, .followup-badge--due_today { font-weight: 700; }
 .followup-actions, .followup-pagination { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); margin-block-start: var(--space-4); }
 .followup-pagination { justify-content: space-between; }
 .followup-form { display: grid; gap: var(--space-4); }
-.followup-form textarea { min-height: 7rem; resize: vertical; line-height: var(--line-height-body); }
+.followup-form textarea { min-height: 7rem; }
 @media (max-width: 42rem) {
   .followups-filters { grid-template-columns: 1fr; }
   .followup-context > div { grid-template-columns: 1fr; gap: var(--space-1); }

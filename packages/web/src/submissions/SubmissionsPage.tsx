@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { Button, Card, CardContent, CardHeader, EmptyState, ErrorState, Input, LoadingState } from '../ui';
+import { Button, Card, CardContent, CardHeader, EmptyState, ErrorState, Input, LoadingState, StatusBadge, type StatusTone } from '../ui';
 import { listSubmissions, type SubmissionListItem, type SubmissionStatus } from '../auth/client';
 import './submissions.css';
 
@@ -11,6 +11,9 @@ const statusOptions: { value: SubmissionStatus; label: string }[] = [
   { value: 'ACCEPTED', label: 'مقبول' },
   { value: 'REJECTED', label: 'مرفوض' },
 ];
+const statusTones: Record<SubmissionStatus, StatusTone> = {
+  PENDING: 'warning', INTERNAL_REVIEW: 'info', ACCEPTED: 'success', REJECTED: 'danger',
+};
 
 function formatDate(value: string): string {
   const parsed = new Date(value);
@@ -125,7 +128,7 @@ export function SubmissionsPage() {
                         <div><dt>تاريخ الميلاد</dt><dd>{formatDate(row.dateOfBirth)}</dd></div>
                         <div><dt>جهة العمل المصرح بها</dt><dd>{row.primaryInstitutionName}</dd></div>
                         <div><dt>تاريخ الإرسال</dt><dd>{formatDateTime(row.submittedAt)}</dd></div>
-                        <div><dt>الحالة</dt><dd>{statusLabels.get(row.status) ?? 'غير محددة'}</dd></div>
+                        <div><dt>الحالة</dt><dd><StatusBadge tone={statusTones[row.status]}>{statusLabels.get(row.status) ?? 'غير محددة'}</StatusBadge></dd></div>
                       </dl>
                     </CardContent>
                   </Card>

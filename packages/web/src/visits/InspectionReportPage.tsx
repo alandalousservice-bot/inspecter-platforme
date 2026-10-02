@@ -4,6 +4,7 @@ import { ApiRequestError, createFollowUp, finalizeInspectionReport, getInspectio
 import { Button, Card, CardContent, CardHeader, Dialog, EmptyState, ErrorState, LoadingState, SuccessState } from '../ui';
 import { formatAlgiers } from './time';
 import { InspectorVisitReportV1Page } from './InspectorVisitReportV1Page';
+import { VisitStatusBadge } from './VisitStatusBadge';
 import type { InspectionReportReadModel, InspectorVisitReport } from '../auth/client';
 import './inspection-report.css';
 
@@ -17,7 +18,6 @@ const fields: Array<{ key: keyof InspectionReportContent; label: string; max: nu
   { key: 'inspectorConclusion', label: 'خلاصة المفتش', max: 4000, prose: true, required: true },
 ];
 const blank: InspectionReportContent = { levelClass: null, lessonTopic: null, pedagogicalObservations: null, strengths: null, improvementAreas: null, guidanceRecommendations: null, inspectorConclusion: null };
-const statusLabels = { PLANNED: 'مخططة', COMPLETED: 'مكتملة', CANCELLED: 'ملغاة' } as const;
 const codePoints = (value: string) => Array.from(value).length;
 
 export function InspectionReportPage() {
@@ -147,7 +147,7 @@ function LegacyInspectionReportPage() {
       {notice ? <SuccessState title={notice} /> : null}
       {error ? <ErrorState title={error} /> : null}
       {revisionConflict ? <section className="report-conflict" role="alert"><p>توجد نسخة أحدث محفوظة. بقيت كتابتك الحالية كما هي؛ راجع النسخة الأحدث صراحة قبل تقرير ما ستحتفظ به.</p><Button variant="secondary" onClick={() => setConfirmRefresh(true)}>مراجعة النسخة الأحدث</Button></section> : null}
-      <Card><CardHeader title="سياق الزيارة" description={`السنة الدراسية ${visit.academicYear}`} action={<span className={`visit-status visit-status--${visit.status.toLowerCase()}`}>{statusLabels[visit.status]}</span>} />
+      <Card><CardHeader title="سياق الزيارة" description={`السنة الدراسية ${visit.academicYear}`} action={<VisitStatusBadge status={visit.status} />} />
         <CardContent><dl className="report-context"><div><dt>الأستاذ</dt><dd>{report?.displayIdentity.teacher.name ?? visit.teacher.name} {report?.displayIdentity.teacher.surname ?? visit.teacher.surname}</dd></div><div><dt>المؤسسة وقت الزيارة</dt><dd>{visit.institution.name}</dd></div><div><dt>{visit.intervalKind === 'ACTUAL_RETROSPECTIVE' ? 'الفترة الفعلية للزيارة' : 'موعد الزيارة'}</dt><dd dir="auto">{visit.actualStartAt && visit.actualEndAt ? `${formatAlgiers(visit.actualStartAt)} — ${formatAlgiers(visit.actualEndAt)}` : visit.scheduledStartAt && visit.scheduledEndAt ? `${formatAlgiers(visit.scheduledStartAt)} — ${formatAlgiers(visit.scheduledEndAt)}` : 'الفترة غير متاحة'}</dd></div>{visit.occurredAt ? <div><dt>وقت الإنجاز</dt><dd dir="auto">{formatAlgiers(visit.occurredAt)}</dd></div> : null}</dl></CardContent>
       </Card>
       {visit.status === 'CANCELLED' ? <p role="status" className="report-cancelled">الزيارة ملغاة. تبقى المسودة المحفوظة للقراءة فقط.</p> : null}

@@ -43,8 +43,8 @@ test('TASK-053 connected Visit→FINAL Report→FollowUp lifecycle and immutable
   await page.getByRole('button', { name: 'حفظ الإجراء' }).click(); await expect(page.getByText('التحقق من تنفيذ التوجيه').first()).toBeVisible();
   expect(await db.inspectionReport.findUniqueOrThrow({ where: { id: reportId } })).toEqual(finalSnapshot);
 
-  await page.getByRole('link', { name: 'إجراءات المتابعة', exact: true }).click(); await expect(page.getByRole('heading', { name: 'إجراءات المتابعة' })).toBeVisible();
-  await expect(page.locator('.followup-badge--overdue')).toBeVisible(); await expect(page.locator('.followup-badge--due_today')).toBeVisible();
+  await page.getByRole('link', { name: 'عرض جميع إجراءات المتابعة' }).click(); await expect(page.getByRole('heading', { name: 'إجراءات المتابعة' })).toBeVisible();
+  await expect(page.locator('.ui-status-badge--danger')).toBeVisible(); await expect(page.locator('.ui-status-badge--warning')).toBeVisible();
   await page.getByLabel('الاستحقاق').selectOption('OVERDUE'); await expect(page.getByText('مراجعة تطبيق الإحماء').first()).toBeVisible();
   await page.getByLabel('الاستحقاق').selectOption('DUE_TODAY'); await expect(page.getByText('التحقق من تنفيذ التوجيه').first()).toBeVisible();
   await page.getByLabel('الاستحقاق').selectOption(''); await expect(page.getByText('مراجعة تطبيق الإحماء').first()).toBeVisible();
@@ -87,6 +87,7 @@ test('TASK-053 connected Visit→FINAL Report→FollowUp lifecycle and immutable
   expect(await db.auditLog.count({ where: { action: 'FOLLOW_UP_STATE_CHANGED', entityId: followUps[0].id } })).toBe(1);
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
-  await page.setViewportSize({ width: 768, height: 1000 }); await page.evaluate(() => { document.documentElement.style.zoom = '2'; });
+  // A 384×500 CSS viewport models 200% zoom from the preceding 768×1000 viewport.
+  await page.setViewportSize({ width: 384, height: 500 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 });

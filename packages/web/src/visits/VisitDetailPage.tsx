@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
-import { ApiRequestError, getPedagogicalVisit, getValidWorkplaces, patchPedagogicalVisit, type PedagogicalVisit, type PedagogicalVisitPatch, type PedagogicalVisitStatus, type PedagogicalVisitType, type ScheduleWarningCode, type ValidWorkplaceOption } from '../auth/client';
+import { ApiRequestError, getPedagogicalVisit, getValidWorkplaces, patchPedagogicalVisit, type PedagogicalVisit, type PedagogicalVisitPatch, type PedagogicalVisitType, type ScheduleWarningCode, type ValidWorkplaceOption } from '../auth/client';
 import { Button, Card, CardContent, CardHeader, Dialog, ErrorState, Input, LoadingState, SuccessState } from '../ui';
 import { formatAlgiers, localDateTimeToOffset, utcToLocalDateTime } from './time';
+import { VisitStatusBadge } from './VisitStatusBadge';
 import './visits.css';
 
 type WarningState = { code: ScheduleWarningCode; payload: Extract<PedagogicalVisitPatch, { operation: 'RESCHEDULE' }> } | { stale: true; payload: Extract<PedagogicalVisitPatch, { operation: 'RESCHEDULE' }> };
 type DialogAction = 'complete' | 'cancel' | null;
-const statusLabels: Record<PedagogicalVisitStatus, string> = { PLANNED: 'مخططة', COMPLETED: 'مكتملة', CANCELLED: 'ملغاة' };
 const warningText: Record<ScheduleWarningCode, string> = {
   VISIT_WEEKLY_SCHEDULE_MISSING: 'لا يوجد توزيع أسبوعي مسجل لهذا الأستاذ والسنة الدراسية.',
   VISIT_OUTSIDE_WEEKLY_SCHEDULE: 'الموعد لا يقع بالكامل ضمن التوزيع الأسبوعي المسجل.',
@@ -138,7 +138,7 @@ export function VisitDetailPage() {
     {!loading && visit ? <>
       {notice ? <SuccessState title={notice} /> : null}
       {operationError ? <ErrorState title={operationError} action={operationError.includes('تغيّرت الزيارة') ? <Button variant="secondary" onClick={() => { setOperationError(''); setRefresh((value) => value + 1); }}>تحديث البيانات</Button> : undefined} /> : null}
-      <Card><CardHeader title="معلومات الزيارة" description={`السنة الدراسية ${visit.academicYear}`} action={<span className={`visit-status visit-status--${visit.status.toLowerCase()}`}>{statusLabels[visit.status]}</span>} />
+      <Card><CardHeader title="معلومات الزيارة" description={`السنة الدراسية ${visit.academicYear}`} action={<VisitStatusBadge status={visit.status} />} />
         <CardContent><dl className="visit-facts">
           <div><dt>نوع الزيارة</dt><dd>{visit.visitType ? visitTypeLabels[visit.visitType] : 'نوع الزيارة غير موثق (سجل سابق)'}</dd></div>
           <div><dt>{visit.intervalKind === 'ACTUAL_RETROSPECTIVE' ? 'الفترة الفعلية للزيارة' : 'الموعد المخطط'}</dt><dd>{visit.actualStartAt && visit.actualEndAt ? <><span dir="auto">{formatAlgiers(visit.actualStartAt)}</span> — <span dir="auto">{formatAlgiers(visit.actualEndAt)}</span></> : visit.scheduledStartAt && visit.scheduledEndAt ? <><span dir="auto">{formatAlgiers(visit.scheduledStartAt)}</span> — <span dir="auto">{formatAlgiers(visit.scheduledEndAt)}</span></> : 'الفترة غير متاحة'}</dd></div>

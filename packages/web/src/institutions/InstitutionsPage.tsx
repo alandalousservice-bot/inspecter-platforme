@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router';
-import { Button, Card, CardContent, CardHeader, DataTable, Dialog, EmptyState, ErrorState, Input, LoadingState, SuccessState, type DataTableColumn } from '../ui';
+import { Button, Card, CardContent, CardHeader, DataTable, Dialog, EmptyState, ErrorState, Input, LoadingState, Select, SuccessState, type DataTableColumn } from '../ui';
 import { ApiRequestError, createInstitution, getCurrentDistricts, listInstitutions, updateInstitution, type DistrictOption, type Institution } from '../auth/client';
 import './institutions.css';
 
@@ -236,14 +236,10 @@ export function InstitutionsPage() {
             <div className="institution-district-summary"><span>المقاطعة</span><strong>{districts[0].name}</strong></div>
           ) : null}
           {!districtsLoading && !districtsError && districts.length > 1 ? (
-            <div className="ui-field">
-              <label className="ui-field__label" htmlFor="institution-district">المقاطعة <span aria-hidden="true">*</span></label>
-              <select id="institution-district" className="ui-input" required value={selectedDistrictId} aria-invalid={formErrors.districtId ? true : undefined} aria-describedby={formErrors.districtId ? 'institution-district-error' : undefined} onChange={(event) => setSelectedDistrictId(event.currentTarget.value)}>
-                <option value="">اختر المقاطعة</option>
-                {districts.map((district) => <option key={district.id} value={district.id}>{district.name}</option>)}
-              </select>
-              {formErrors.districtId ? <p className="ui-field__error" id="institution-district-error" role="alert">{formErrors.districtId}</p> : null}
-            </div>
+            <Select id="institution-district" label="المقاطعة" required error={formErrors.districtId} value={selectedDistrictId} onChange={(event) => setSelectedDistrictId(event.currentTarget.value)}>
+              <option value="">اختر المقاطعة</option>
+              {districts.map((district) => <option key={district.id} value={district.id}>{district.name}</option>)}
+            </Select>
           ) : null}
           <Input id="institution-name" label="اسم المؤسسة" required maxLength={200} value={name} error={formErrors.name} onChange={(event) => setName(event.currentTarget.value)} />
           <Input id="institution-code" label="الرمز الخارجي" hint="اختياري" maxLength={100} value={externalCode} error={formErrors.externalCode} onChange={(event) => setExternalCode(event.currentTarget.value)} />

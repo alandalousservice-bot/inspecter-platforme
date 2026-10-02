@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { ApiRequestError, getCurrentDistricts, listInstitutions, listTeachers, type DistrictOption, type Institution, type TeacherDirectoryFilters, type TeacherDirectoryItem } from '../auth/client';
-import { Button, Card, CardContent, CardHeader, DataTable, ErrorState, Input, LoadingState, type DataTableColumn } from '../ui';
+import { Button, Card, CardContent, CardHeader, DataTable, ErrorState, Input, LoadingState, StatusBadge, type DataTableColumn } from '../ui';
 import './teacher-directory.css';
 
 const LIMIT = 25;
@@ -155,7 +155,7 @@ export function TeacherDirectoryPage() {
     ...(districts.length > 1 ? [{ id: 'district', header: 'المقاطعة', render: (row: TeacherDirectoryItem) => districts.find((district) => district.id === row.districtId)?.name ?? 'غير متاحة' }] : []),
     { id: 'professional', header: 'الصفة المهنية', render: (row) => row.professionalStatus ? PROFESSIONAL_LABELS[row.professionalStatus] : 'غير محددة' },
     { id: 'institution', header: 'المؤسسة الحالية المعتمدة', render: (row) => row.currentInstitution ? <span>{row.currentInstitution.name}{row.currentInstitution.municipality ? <small className="teacher-directory__municipality">{row.currentInstitution.municipality}</small> : null}</span> : 'لم تُعتمد مؤسسة حالية' },
-    { id: 'status', header: 'حالة السجل', render: (row) => <span className="teacher-directory__status">{displayStatus(row.recordStatus)}</span> },
+    { id: 'status', header: 'حالة السجل', render: (row) => <StatusBadge tone={row.recordStatus === 'ACTIVE' ? 'success' : 'neutral'}>{displayStatus(row.recordStatus)}</StatusBadge> },
     { id: 'actions', header: 'الإجراءات', render: (row) => <span className="teacher-directory__actions"><Link className="teacher-directory__schedule-link" to={`/app/teachers/${encodeURIComponent(row.id)}/information-card`}>بطاقة معلومات الأستاذ</Link><Link className="teacher-directory__schedule-link" to={`/app/teachers/${encodeURIComponent(row.id)}/schedules`}>التوزيع الأسبوعي</Link></span> },
   ], [districts]);
 
