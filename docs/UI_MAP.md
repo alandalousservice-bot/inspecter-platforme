@@ -2,6 +2,8 @@
 
 جميع شاشات المفتش authenticated وباتجاه RTL وفق [DESIGN_SYSTEM](DESIGN_SYSTEM.md). paths مقترحة ثابتة للـMVP؛ تغييرها قرار عقد. كل شاشة بيانات لها loading skeleton، empty مع إجراء مناسب، error مع retry، success feedback بعد mutation. Query filters في URL حيث يفيد الرجوع والمشاركة الداخلية، دون بيانات حساسة فيه.
 
+ضمن G6-04، `AppShell` يحتفظ بـmain والحشو الرأسي فقط، ويملك `PageContainer` عرض الشاشة الأقصى والـgutters الأفقية. مسار `/app/teachers/:id/information-card/print` استثناء مقصود خارج shell/page container. الترحيل التمثيلي المنجز حتى الآن محدود إلى `/app/teachers` (PageHeader/FilterBar/cursor Pagination) و`/app/teachers/:id` (PageHeader/Breadcrumbs/DetailList وFormSection في وضع التحرير). باقي الشاشات أدناه جرد للمستهلكين وخطة ترحيل G6-05؛ لا يفترض أنها استعملت primitives الجديدة بالفعل.
+
 | Route | الشاشة والغرض | API الأساسي |
 |---|---|---|
 | `/public/d/:districtId/register` | نموذج تقديم الأستاذ؛ من TASK-041 تصريح جهة عمل واحدة بأربعة حقول مطلوبة: اسم المؤسسة، بلدية العمل، عنوان المؤسسة، رقم هاتف مدير المؤسسة؛ تحقق وإيصال محايد. لا اختيار مؤسسة معتمدة أو مؤسسات إضافية في النموذج الجديد | POST public submissions |

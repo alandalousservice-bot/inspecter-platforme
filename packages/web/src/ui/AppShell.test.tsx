@@ -32,9 +32,18 @@ describe('G6-02 professional application shell', () => {
     const { unmount } = renderShell('/app/teachers/teacher-1/information-card');
     expect(screen.getByRole('link', { name: 'دليل الأساتذة' }).getAttribute('aria-current')).toBe('page');
     expect(screen.getAllByRole('main')).toHaveLength(1);
+    expect(document.querySelector('#main-content .ui-page')).toBeTruthy();
     unmount();
     renderShell('/app/visits/visit-1/report');
     expect(screen.getByRole('link', { name: 'الزيارات' }).getAttribute('aria-current')).toBe('page');
+  });
+
+  it('keeps the authenticated print route outside the page system and screen shell', () => {
+    renderShell('/app/teachers/teacher-1/information-card/print');
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+    expect(document.querySelector('.ui-page')).toBeNull();
+    expect(document.querySelector('.app-sidebar')).toBeNull();
+    expect(document.querySelector('.app-topbar')).toBeNull();
   });
 
   it('collapses and expands desktop navigation without losing accessible link names', () => {

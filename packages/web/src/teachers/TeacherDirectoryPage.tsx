@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { ApiRequestError, getCurrentDistricts, listInstitutions, listTeachers, type DistrictOption, type Institution, type TeacherDirectoryFilters, type TeacherDirectoryItem } from '../auth/client';
-import { Button, Card, CardContent, CardHeader, DataTable, ErrorState, Input, LoadingState, StatusBadge, type DataTableColumn } from '../ui';
+import { Button, Card, CardContent, CardHeader, DataTable, ErrorState, FilterBar, Input, LoadingState, PageHeader, Pagination, StatusBadge, type DataTableColumn } from '../ui';
 import './teacher-directory.css';
 
 const LIMIT = 25;
@@ -198,13 +198,12 @@ export function TeacherDirectoryPage() {
   const timeIsAvailable = yearIsValid && !!params.get('dayOfWeek');
 
   return <section className="teacher-directory" dir="rtl">
-    <header className="teacher-directory__heading">
-      <div><p className="teacher-directory__eyebrow">إدارة ملفات الأستاذ</p><h1>دليل الأساتذة</h1><p>ابحث وتصفح سجلات الأساتذة ضمن نطاق المقاطعات المتاحة لك.</p></div>
-    </header>
+    <PageHeader eyebrow="إدارة ملفات الأستاذ" title="دليل الأساتذة" description="ابحث وتصفح سجلات الأساتذة ضمن نطاق المقاطعات المتاحة لك." />
 
     <Card className="teacher-directory__filters-card">
-      <CardHeader title="البحث والمرشحات" description="تُطبّق المرشحات على النتائج في الخادم." />
       <CardContent>
+        <FilterBar title="البحث والمرشحات" description="تُطبّق المرشحات على النتائج في الخادم."
+          actions={filtered ? <><Button variant="secondary" onClick={resetFilters}>مسح المرشحات</Button><span>تتغير النتائج وفق المرشحات المحددة.</span></> : null}>
         <div className="teacher-directory__filters">
           <Input id="teacher-directory-search" label="البحث عن أستاذ" placeholder="الاسم أو اللقب أو بيانات البحث المتاحة" value={searchDraft} onChange={(event) => setSearchDraft(event.currentTarget.value)} autoComplete="off" />
           {districts.length > 1 ? <div className="ui-field"><label className="ui-field__label" htmlFor="teacher-district-filter">المقاطعة</label><select id="teacher-district-filter" className="ui-input" value={params.get('districtId') ?? ''} onChange={(event) => applyChanges({ districtId: event.currentTarget.value || undefined, institutionId: undefined })}><option value="">كل المقاطعات المتاحة</option>{districts.map((district) => <option key={district.id} value={district.id}>{district.name}</option>)}</select></div> : null}
@@ -229,7 +228,7 @@ export function TeacherDirectoryPage() {
             <label className="teacher-directory__check"><input type="checkbox" checked={params.get('worksNow') === 'true'} disabled={!yearIsValid} onChange={(event) => applyChanges({ worksNow: event.currentTarget.checked ? 'true' : undefined })} /> يعمل الآن</label>
           </div>
         </fieldset>
-        {filtered ? <div className="teacher-directory__filter-actions"><Button variant="secondary" onClick={resetFilters}>مسح المرشحات</Button><span>تتغير النتائج وفق المرشحات المحددة.</span></div> : null}
+        </FilterBar>
       </CardContent>
     </Card>
 
@@ -242,11 +241,9 @@ export function TeacherDirectoryPage() {
         {!loading && loadError ? <ErrorState title="تعذر تحميل دليل الأساتذة" description="حدثت مشكلة أثناء جلب النتائج. أعد المحاولة." action={<Button variant="secondary" onClick={() => setRefreshKey((value) => value + 1)}>إعادة المحاولة</Button>} /> : null}
         {!loading && !loadError && rows.length === 0 ? <div className="teacher-directory__empty"><h2>{filtered ? 'لا توجد نتائج مطابقة' : 'لا توجد سجلات أساتذة ظاهرة'}</h2><p>{filtered ? 'غيّر البحث أو المرشحات ثم حاول مجددًا.' : 'ستظهر هنا السجلات النشطة ضمن المقاطعات المصرح بها.'}</p>{filtered ? <Button variant="secondary" onClick={resetFilters}>مسح المرشحات</Button> : null}</div> : null}
         {!loading && !loadError && rows.length > 0 ? <DataTable caption="دليل الأساتذة" columns={columns} rows={rows} rowKey={(row) => row.id} /> : null}
-        {!loading && !loadError ? <nav className="teacher-directory__pagination" aria-label="التنقل بين نتائج الأساتذة">
-          <Button variant="secondary" disabled={pageIndex === 0} onClick={handlePrevious}>السابق</Button>
-          <span aria-live="polite">النتائج {rows.length ? pageIndex * LIMIT + 1 : 0}–{pageIndex * LIMIT + rows.length} من {total}</span>
-          <Button variant="secondary" disabled={!nextCursor} onClick={handleNext}>النتائج التالية</Button>
-        </nav> : null}
+        {!loading && !loadError ? <Pagination label="التنقل بين نتائج الأساتذة" currentPage={pageIndex + 1}
+          rangeStart={rows.length ? pageIndex * LIMIT + 1 : 0} rangeEnd={pageIndex * LIMIT + rows.length} total={total}
+          hasPrevious={pageIndex > 0} hasNext={Boolean(nextCursor)} onPrevious={handlePrevious} onNext={handleNext} nextLabel="النتائج التالية" /> : null}
       </CardContent>
     </Card>
   </section>;

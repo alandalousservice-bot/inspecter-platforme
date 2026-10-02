@@ -125,8 +125,7 @@
 .app-topbar__menu-button:hover { background: var(--color-surface-subtle); }
 .app-topbar__menu-button svg { width: 1.25rem; height: 1.25rem; }
 .app-topbar__menu-button--mobile { display: none; }
-.app-main { min-width: 0; padding: var(--space-6) var(--page-gutter); }
-.app-main__content { width: 100%; max-width: var(--content-max-width); min-width: 0; margin-inline: auto; }
+.app-main { min-width: 0; padding-block: var(--space-6); }
 .app-main h1 { margin-block-start: 0; font-size: var(--font-size-page); font-weight: var(--font-weight-semibold); line-height: var(--line-height-heading); }
 .app-main--print { padding: 0; }
 .app-shell__backdrop { display: none; }
@@ -178,7 +177,6 @@
   .app-topbar__menu-button--mobile { display: inline-flex; }
   .app-topbar__menu-button--desktop { display: none; }
   .app-topbar__email { max-width: min(38vw, 15rem); }
-  .app-main { padding: var(--space-6) var(--page-gutter-mobile); }
 }
 
 @media (max-width: 35rem) {

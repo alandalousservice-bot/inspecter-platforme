@@ -4,7 +4,7 @@ import {
   ApiRequestError, getTeacherProfile, listInstitutions, patchTeacherProfile, setTeacherCurrentInstitution,
   type Institution, type TeacherCurrentInstitutionInput, type TeacherProfile, type TeacherProfilePatch,
 } from '../auth/client';
-import { Button, Card, CardContent, CardHeader, Dialog, EmptyState, ErrorState, Input, LoadingState, SuccessState } from '../ui';
+import { Button, Card, CardContent, CardHeader, DetailList, Dialog, EmptyState, ErrorState, FormGrid, FormSection, Input, LoadingState, PageHeader, SuccessState } from '../ui';
 import { TeacherQualificationsSection } from './TeacherQualificationsSection';
 import { TeacherSupplementaryWorkplacesSection } from './TeacherSupplementaryWorkplacesSection';
 import './teacher-profile.css';
@@ -333,20 +333,20 @@ export function TeacherProfilePage() {
         : 'اعتماد المؤسسة الحالية';
 
   return <div className="teacher-profile" dir="rtl">
-    <nav aria-label="مسار التنقل"><Link to="/app/submissions">طلبات الأساتذة</Link><span aria-hidden="true"> / </span>ملف الأستاذ</nav>
-    <h1>ملف الأستاذ</h1>
+    <PageHeader title="ملف الأستاذ" description={editing ? 'تعديل الملف المهني' : undefined}
+      breadcrumbs={[{ label: 'دليل الأساتذة', to: '/app/teachers' }, { label: 'ملف الأستاذ' }]}
+      primaryAction={profile && !editing ? <Button onClick={beginEdit}>تعديل الملف</Button> : undefined}
+      secondaryActions={profile && !editing ? <><Link to={`/app/teachers/${encodeURIComponent(profile.id)}/information-card`}>بطاقة معلومات الأستاذ</Link><Link to={`/app/teachers/${encodeURIComponent(profile.id)}/schedules`}>التوزيع الأسبوعي</Link></> : undefined} />
     {loading ? <LoadingState label="جارٍ تحميل ملف الأستاذ…" /> : null}
     {!loading && loadError ? <ErrorState title="تعذر عرض ملف الأستاذ" description="الملف غير متاح ضمن نطاق الوصول أو تعذر تحميله." action={<Button variant="secondary" onClick={() => setProfileRefreshKey((value) => value + 1)}>إعادة المحاولة</Button>} /> : null}
     {!loading && profile ? <>
       {successMessage ? <SuccessState title={successMessage} /> : null}
       {!editing ? <>
-        <div className="teacher-profile__actions"><Button onClick={beginEdit}>تعديل الملف</Button><Link to={`/app/teachers/${encodeURIComponent(profile.id)}/information-card`}>بطاقة معلومات الأستاذ</Link><Link to={`/app/teachers/${encodeURIComponent(profile.id)}/schedules`}>التوزيع الأسبوعي</Link></div>
-        <Card><CardHeader title="المعلومات الشخصية" /><CardContent><dl className="teacher-profile__facts">
-          <Field label="الاسم" value={profile.name} /><Field label="اللقب" value={profile.surname} />
-          <Field label="تاريخ الميلاد" value={profile.birthDate} /><Field label="مكان الميلاد" value={profile.placeOfBirth} />
-          <Field label="ولاية الميلاد" value={profile.birthProvince} />
-          <Field label="حالة السجل" value={statusLabels[profile.recordStatus] ?? 'غير محددة'} />
-        </dl></CardContent></Card>
+        <Card><CardHeader title="المعلومات الشخصية" /><CardContent><DetailList className="teacher-profile__facts" items={[
+          { label: 'الاسم', value: profile.name, emptyText: '—' }, { label: 'اللقب', value: profile.surname, emptyText: '—' },
+          { label: 'تاريخ الميلاد', value: profile.birthDate }, { label: 'مكان الميلاد', value: profile.placeOfBirth },
+          { label: 'ولاية الميلاد', value: profile.birthProvince }, { label: 'حالة السجل', value: statusLabels[profile.recordStatus] ?? 'غير محددة' },
+        ]} /></CardContent></Card>
         <Card><CardHeader title="الوضعية المهنية" /><CardContent><dl className="teacher-profile__facts">
           <Field label="الصفة المهنية" value={profile.professionalStatus ? statusLabels[profile.professionalStatus] ?? 'غير محددة' : null} />
           <Field label="الإطار المهني" value={profile.professionalFramework} />
@@ -389,12 +389,10 @@ export function TeacherProfilePage() {
           </dl> : <p className="teacher-profile__unassigned">لم تُعتمد مؤسسة حالية</p>}</CardContent>
         </Card>
         <TeacherSupplementaryWorkplacesSection teacherId={profile.id} districtId={profile.districtId} homeInstitutionId={profile.currentInstitution?.id ?? null} />
-      </> : <form onSubmit={(event) => { void saveProfile(event); }} noValidate aria-busy={savingProfile}>
-        <h2>تعديل الملف المهني</h2>
+      </> : <form className="teacher-profile__edit-form" onSubmit={(event) => { void saveProfile(event); }} noValidate aria-busy={savingProfile}>
         {successMessage && !success ? <p role="alert">{successMessage}</p> : null}
-        {editSections.map((section) => <section key={section.title} aria-labelledby={`teacher-section-${section.title}`}>
-          <h3 id={`teacher-section-${section.title}`}>{section.title}</h3>
-          <div className="teacher-profile__form">
+        {editSections.map((section) => <FormSection key={section.title} title={section.title}>
+          <FormGrid className="teacher-profile__form">
           {section.fields.map((field) => <div key={field} className="teacher-profile__field">
             {field === 'professionalStatus' ? <div className="ui-field">
               <label className="ui-field__label" htmlFor={`teacher-${field}`}>{labels[field]}</label>
@@ -420,8 +418,8 @@ export function TeacherProfilePage() {
               aria-label={`مسح ${labels[field]}`}>مسح {labels[field]}</Button> : null}
             {cleared.has(field) ? <span role="status">سيُمسح هذا الحقل عند الحفظ.</span> : null}
           </div>)}
-          </div>
-        </section>)}
+          </FormGrid>
+        </FormSection>)}
         <div className="teacher-profile__actions"><Button type="submit" disabled={savingProfile}>{savingProfile ? 'جارٍ الحفظ…' : 'حفظ التغييرات'}</Button>
           <Button variant="secondary" disabled={savingProfile} onClick={() => { setEditing(false); setDraft(undefined); setErrors({}); setSuccessMessage(''); }}>إلغاء</Button>
         </div>

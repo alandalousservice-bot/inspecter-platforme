@@ -1,5 +1,7 @@
 .teacher-profile { display: grid; gap: var(--space-4); min-width: 0; }
 .teacher-profile__facts, .teacher-profile__form { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: var(--space-4); }
+.teacher-profile .teacher-profile__form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.teacher-profile__edit-form { display: grid; gap: var(--space-4); min-width: 0; }
 .teacher-fact { min-width: 0; overflow-wrap: anywhere; }
 .teacher-fact dt { color: var(--color-text-muted); }
 .teacher-fact dd { margin: 0; }
@@ -32,6 +34,7 @@
 .teacher-supplementary__editor { display: grid; gap: var(--space-4); margin-block-start: var(--space-4); padding-block-start: var(--space-4); border-block-start: 1px solid var(--color-border); }
 .teacher-supplementary__dates { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); align-items: end; gap: var(--space-3); }
 @media (max-width: 48rem) {
+  .teacher-profile .teacher-profile__form { grid-template-columns: minmax(0, 1fr); }
   .teacher-workplace__search { grid-template-columns: 1fr; }
   .teacher-workplace__choice-list { grid-template-columns: 1fr; }
   .teacher-workplace__institution-option { min-height: 3.25rem; }

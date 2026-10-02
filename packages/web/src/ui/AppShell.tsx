@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router';
 import type { InspectorIdentity } from '../auth/client';
 import { ShellIcon, type ShellIconName } from './ShellIcon';
+import { PageContainer } from './PageSystem';
 import './app-shell.css';
 
 type AppShellProps = {
@@ -191,7 +192,7 @@ export function AppShell({ children, inspector, headerAction }: AppShellProps) {
             </div>
           </header>
           <main id="main-content" className="app-main" tabIndex={-1}>
-            <div className="app-main__content">{children}</div>
+            <PageContainer>{children}</PageContainer>
           </main>
         </div>
       </div>
