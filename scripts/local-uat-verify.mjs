@@ -35,7 +35,7 @@ try {
   await page.getByLabel('البريد الإلكتروني').fill(UAT_INSPECTOR.email);
   await page.getByLabel('كلمة المرور').fill(secret);
   await page.getByRole('button', { name: 'تسجيل الدخول' }).click();
-  await page.waitForURL('**/app/**');
+  await page.waitForURL((url) => url.pathname === '/app' || url.pathname.startsWith('/app/'));
   const year = new Date().getUTCMonth() >= 8 ? new Date().getUTCFullYear() : new Date().getUTCFullYear() - 1;
   const routes = [
     '/app', '/app/institutions', '/app/submissions', '/app/teachers', '/app/visits', '/app/follow-ups',

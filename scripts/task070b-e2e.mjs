@@ -155,16 +155,28 @@ try {
       ] },
     },
     upcomingVisits: [1, 2, 3].map((n) => ({
-      id: `visit-${n}`, scheduledStartAt: `2026-10-0${n + 2}T08:00:00.000Z`, scheduledEndAt: `2026-10-0${n + 2}T09:00:00.000Z`,
-      visitType: n === 2 ? null : 'GUIDANCE', institutionName: 'ابتدائية محلية ذات اسم عربي طويل لاختبار التفاف المحتوى دون اقتطاع المعنى',
+      id: `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`, scheduledStartAt: `2026-10-0${n + 2}T08:00:00.000Z`, scheduledEndAt: `2026-10-0${n + 2}T09:00:00.000Z`,
+      visitType: n === 2 ? null : 'GUIDANCE', institutionName: 'ابتدائية محلية ذات اسم عربي طويل لاختبار الالتفاف — School-ABC 2026-2027',
     })),
   };
 
   await page.route('**/api/v1/dashboard/summary', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: denseSummary }) }));
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('http://127.0.0.1:5173/app');
-  await page.getByText('ابتدائية محلية ذات اسم عربي طويل لاختبار التفاف المحتوى دون اقتطاع المعنى').first().waitFor();
+  await page.getByText('ابتدائية محلية ذات اسم عربي طويل لاختبار الالتفاف — School-ABC 2026-2027').first().waitFor();
   assert(await page.locator('.dashboard-visit').count() === 3, 'Dense Dashboard did not render all bounded upcoming visits.');
+  for (const label of ['المتابعات المتأخرة', 'المتابعات المستحقة اليوم', 'طلبات الأساتذة المعلقة', 'مسودات التقارير', 'زيارات مكتملة بلا تقرير']) {
+    assert(await page.getByRole('heading', { name: label }).count() === 1, `Missing or merged attention category: ${label}.`);
+  }
+  assert(await page.getByText('نوع الزيارة غير موثق (سجل سابق)').count() === 1, 'Null legacy visit type is not presented neutrally.');
+  assert(await page.locator('.dashboard-count a[href="/app/visits/visit-draft-1/report"]').count() === 1, 'Draft report destination is incorrect.');
+  assert(await page.locator('.dashboard-count a[href="/app/visits/visit-no-report-1"]').count() === 1, 'No-report destination is incorrect.');
+  const firstUpcomingLink = page.locator('.dashboard-visit').first().getByRole('link', { name: 'عرض تفاصيل الزيارة' });
+  await firstUpcomingLink.click();
+  await page.waitForURL('**/app/visits/00000000-0000-4000-8000-000000000001');
+  evidence.upcomingVisit = true;
+  await page.goto('http://127.0.0.1:5173/app');
+  await page.getByRole('heading', { name: 'لوحة المتابعة', level: 1 }).waitFor();
   const denseWidth = await page.evaluate(() => ({ client: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
   assert(denseWidth.scroll <= denseWidth.client, 'Dense Arabic content caused document overflow.');
   await page.screenshot({ path: join(screenshotDir, 'dashboard-dense-390.png'), fullPage: true });
@@ -191,6 +203,28 @@ try {
   assert(!(await page.locator('body').innerText()).includes('INTERNAL_ERROR'), 'Internal API error details were exposed.');
   await page.screenshot({ path: join(screenshotDir, 'dashboard-error-390.png'), fullPage: true });
   evidence.modes.push('ERROR:PASS');
+
+  stage = 'retry after aggregate error';
+  let retryAllowed = false;
+  let failedBeforeRetry = 0;
+  let successfulRetryRequests = 0;
+  await page.unroute('**/api/v1/dashboard/summary');
+  await page.route('**/api/v1/dashboard/summary', (route) => {
+    if (!retryAllowed) {
+      failedBeforeRetry += 1;
+      return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: { code: 'INTERNAL_ERROR', message: 'تعذر إكمال العملية.' } }) });
+    }
+    successfulRetryRequests += 1;
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: emptySummary }) });
+  });
+  await page.goto('http://127.0.0.1:5173/app');
+  await page.getByRole('alert').waitFor();
+  assert(failedBeforeRetry > 0, 'The first connected request did not exercise the error state.');
+  retryAllowed = true;
+  await page.getByRole('button', { name: 'إعادة المحاولة' }).click();
+  await page.getByText('لا توجد عناصر تحتاج انتباهك حاليًا.').waitFor();
+  assert(successfulRetryRequests > 0, 'Retry did not issue a new dashboard summary request.');
+  evidence.modes.push('RETRY:PASS');
 
   stage = 'public intake isolation';
   await page.unroute('**/api/v1/dashboard/summary');
