@@ -100,6 +100,14 @@ test('TASK-086 connected authorized print flow, privacy, native action and rende
     await expect(page.getByRole('heading', { name: 'بطاقة معلومات الأستاذ' })).toBeVisible();
     await expect(page.getByText('ملاحظة داخلية يجب ألا تطبع', { exact: false })).toHaveCount(0);
     const pdfPath = resolve(process.cwd(), 'test-results', `task086-${visual}.pdf`);
+    const pageRule = await page.evaluate(() => [...document.styleSheets]
+      .flatMap((sheet) => {
+        try { return [...sheet.cssRules]; } catch { return []; }
+      })
+      .map((rule) => rule.cssText)
+      .find((text) => text.startsWith('@page')) ?? '');
+    expect(pageRule.toLowerCase()).toContain('size: a4');
+    expect(pageRule).toContain('margin: 12mm');
     const pdf = await page.pdf({ path: pdfPath, preferCSSPageSize: true, printBackground: true });
     expect(pdf.byteLength).toBeGreaterThan(1000);
     const pdfText = pdf.toString('latin1');
@@ -110,7 +118,8 @@ test('TASK-086 connected authorized print flow, privacy, native action and rende
       expect(Number(box[2]) * 25.4 / 72).toBeCloseTo(297, 0);
     }
     const pageCount = (pdfText.match(/\/Type\s*\/Page\b/gu) ?? []).length;
-    expect(pageCount).toBeGreaterThan(0);
+    const expectedPageCount = { minimal: 1, normal: 2, stress: 3 }[visual];
+    expect(pageCount).toBe(expectedPageCount);
     console.log(`TASK086_PRINT_QA case=${visual} pageCount=${pageCount} pdfBytes=${pdf.byteLength}`);
   }
 });

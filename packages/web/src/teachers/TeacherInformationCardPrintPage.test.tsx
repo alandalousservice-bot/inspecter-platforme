@@ -83,6 +83,11 @@ describe('TASK-086 information-card print view', () => {
     renderPrint('/app/teachers/teacher-1/information-card/print?academicYear=2026-2028');
     expect((screen.getByRole('button', { name: 'طباعة' }) as HTMLButtonElement).disabled).toBe(true);
     expect(getTeacherInformationCard).not.toHaveBeenCalled();
+    cleanup();
+    renderPrint('/app/teachers/teacher-1/information-card/print?academicYear=2026-2027&academicYear=2026-2027');
+    expect(screen.getByRole('alert').textContent).toContain('السنة الدراسية غير صالحة');
+    expect((screen.getByRole('button', { name: 'طباعة' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(getTeacherInformationCard).not.toHaveBeenCalled();
   });
 
   it('shows generic safe failure and never renders printable card content on API error', async () => {

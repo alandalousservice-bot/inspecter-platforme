@@ -145,6 +145,11 @@ try {
           clientWidth: element.clientWidth, scrollWidth: element.scrollWidth,
         };
       }),
+      bidiText: [...document.querySelectorAll('.dashboard-visit__institution bdi')].map((element) => ({
+        text: element.textContent?.trim(), dir: element.getAttribute('dir'),
+        unicodeBidi: getComputedStyle(element).unicodeBidi,
+        direction: getComputedStyle(element).direction,
+      })),
       counts: [...document.querySelectorAll('.dashboard-count')].map((element) => {
         const box = element.getBoundingClientRect();
         return { left: box.left, right: box.right, top: box.top, bottom: box.bottom };
@@ -170,6 +175,8 @@ try {
   assert(at200.scrollWidth <= at200.clientWidth, 'Horizontal overflow at actual 200% browser zoom.');
   assert(at200.scrollX === 0, 'Dashboard is horizontally scrolled at actual 200% browser zoom.');
   assert(at200.direction === 'rtl' && at200.mainCount === 1 && at200.h1Count === 1, '200% RTL landmarks failed.');
+  const mixedBidi = at200.bidiText.find((item) => item.text?.includes('School-ABC 2026-2027'));
+  assert(mixedBidi?.dir === 'auto' && mixedBidi.unicodeBidi === 'isolate' && mixedBidi.direction === 'rtl', 'Mixed Arabic/Latin content is not isolated with correct RTL context.');
   for (const item of at200.requiredText) {
     assert(item.left >= -1 && item.right <= at200.clientWidth + 1, `Required text is clipped horizontally at 200%: ${item.text}.`);
     assert(item.scrollWidth <= item.clientWidth + 1, `Required text overflows its element at 200%: ${item.text}.`);
@@ -218,6 +225,18 @@ try {
   await drawer.waitFor({ state: 'detached' });
   assert(await page.getByRole('button', { name: 'فتح قائمة التنقل' }).getAttribute('aria-expanded') === 'false', 'Drawer did not close and restore its state.');
 
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const reducedMotion = await page.evaluate(() => ({
+    active: matchMedia('(prefers-reduced-motion: reduce)').matches,
+    layoutTransition: getComputedStyle(document.querySelector('.app-shell__layout')).transitionDuration,
+    sidebarTransition: getComputedStyle(document.querySelector('.app-sidebar')).transitionDuration,
+    buttonAnimation: getComputedStyle(document.querySelector('.app-topbar__actions .ui-button')).animationName,
+    scrollBehavior: getComputedStyle(document.documentElement).scrollBehavior,
+  }));
+  assert(reducedMotion.active && reducedMotion.layoutTransition === '0s' && reducedMotion.sidebarTransition === '0s'
+    && reducedMotion.buttonAnimation === 'none' && reducedMotion.scrollBehavior === 'auto', 'Reduced-motion preferences were not respected.');
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+
   await page.screenshot({ path: screenshotPath, fullPage: true });
   const quickAction = page.locator('.dashboard-actions').getByRole('link', { name: 'جدولة زيارة' });
   await quickAction.focus();
@@ -231,7 +250,7 @@ try {
   const after = await businessCounts();
   assert(JSON.stringify(before) === JSON.stringify(after), 'Persistent LOCAL UAT business records changed during zoom verification.');
 
-  console.log(`TASK-070C real Chrome zoom PASS; 100pct_dpr=${at100.dpr.toFixed(2)}; 200pct_dpr=${at200.dpr.toFixed(2)}; css_width=${at100.innerWidth}->${at200.innerWidth}; overflow=none; keyboard_drawer=PASS; keyboard_quick_action=PASS; business_data_preserved=true; geometry=${JSON.stringify({ scrollX: at200.scrollX, appMain: at200.appMain, pageContainer: at200.pageContainer, dashboardSections: at200.dashboardSections })}; screenshot=${screenshotPath}`);
+  console.log(`TASK-070C real Chrome zoom PASS; 100pct_dpr=${at100.dpr.toFixed(2)}; 200pct_dpr=${at200.dpr.toFixed(2)}; css_width=${at100.innerWidth}->${at200.innerWidth}; overflow=none; bidi=PASS; reduced_motion=PASS; keyboard_drawer=PASS; keyboard_quick_action=PASS; business_data_preserved=true; geometry=${JSON.stringify({ scrollX: at200.scrollX, appMain: at200.appMain, pageContainer: at200.pageContainer, dashboardSections: at200.dashboardSections })}; screenshot=${screenshotPath}`);
 } finally {
   await context?.close();
   await db.$disconnect();
