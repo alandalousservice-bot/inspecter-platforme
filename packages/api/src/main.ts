@@ -17,6 +17,7 @@ import { registerWeeklyScheduleRoutes } from './schedules/routes.js';
 import { registerPedagogicalVisitRoutes } from './visits/routes.js';
 import { registerInspectionReportRoutes } from './reports/routes.js';
 import { registerFollowUpRoutes } from './followups/routes.js';
+import { registerDashboardRoutes } from './dashboard/routes.js';
 
 const port = Number(process.env.PORT ?? 3001);
 const prisma = new PrismaClient();
@@ -39,4 +40,5 @@ createApp((app) => {
   registerPedagogicalVisitRoutes(app, prisma, requireInspector);
   registerInspectionReportRoutes(app, prisma, requireInspector);
   registerFollowUpRoutes(app, prisma, requireInspector);
+  registerDashboardRoutes(app, prisma, requireInspector);
 }).listen(port);
