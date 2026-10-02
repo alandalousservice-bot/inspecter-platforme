@@ -1,6 +1,6 @@
 .ui-button {
   display: inline-flex;
-  min-height: 2.75rem;
+  min-height: var(--control-height);
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
@@ -16,8 +16,6 @@
     transform var(--motion-short) ease;
 }
 
-.ui-button:focus-visible,
-.ui-input:focus-visible,
 .ui-table-wrap:focus-visible,
 .ui-dialog button:focus-visible {
   outline: 3px solid var(--color-focus-ring);
@@ -44,7 +42,7 @@
 }
 
 .ui-button--secondary {
-  border-color: var(--color-border);
+  border-color: var(--color-border-strong);
   background: var(--color-surface);
   color: var(--color-text);
 }
@@ -78,9 +76,9 @@
 
 .ui-input {
   width: 100%;
-  min-height: 2.75rem;
+  min-height: var(--control-height);
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text);
@@ -107,7 +105,7 @@
 
 .ui-card {
   min-width: 0;
-  padding: var(--space-6);
+  padding: var(--card-padding);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
@@ -157,7 +155,7 @@
 }
 
 .ui-dialog::backdrop {
-  background: color-mix(in srgb, CanvasText 45%, transparent);
+  background: color-mix(in srgb, var(--color-text-primary) 45%, transparent);
 }
 
 .ui-dialog__body {
@@ -240,7 +238,8 @@
 
 .ui-table th,
 .ui-table td {
-  padding: var(--space-3) var(--space-4);
+  min-height: var(--table-row-min-height);
+  padding: var(--table-cell-padding-block) var(--space-4);
   border-block-start: 1px solid var(--color-border);
   vertical-align: top;
 }
@@ -261,6 +260,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
   .ui-button,
   .ui-state__indicator {
     animation: none;

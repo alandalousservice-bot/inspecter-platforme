@@ -1,6 +1,6 @@
-.v1-report-page > form { display: grid; gap: var(--space-5); }
+.v1-report-page > form { display: grid; gap: var(--space-6); }
 .v1-report-sections { display: grid; gap: var(--space-4); }
-.v1-report-section { scroll-margin-block-start: var(--space-5); }
+.v1-report-section { scroll-margin-block-start: var(--space-6); }
 .v1-report-section__content { display: grid; gap: var(--space-4); }
 .v1-report-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr)); gap: var(--space-4); align-items: start; }
 .v1-report-readonly { display: grid; gap: var(--space-2); min-width: 0; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-surface-raised); }

@@ -11,7 +11,7 @@
 .weekly-schedule__slot dt { color: var(--color-text-muted); font-size: var(--font-size-small); }
 .weekly-schedule__slot dd { margin: 0; overflow-wrap: anywhere; }
 .weekly-schedule__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.weekly-schedule__form { display: grid; gap: var(--space-4); margin-block-start: var(--space-5); padding-block-start: var(--space-4); border-block-start: 1px solid var(--color-border); }
+.weekly-schedule__form { display: grid; gap: var(--space-4); margin-block-start: var(--space-6); padding-block-start: var(--space-4); border-block-start: 1px solid var(--color-border); }
 .weekly-schedule__form h2 { margin: 0; }
 .weekly-schedule__fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: var(--space-3); }
 .weekly-schedule__error { display: grid; gap: var(--space-2); color: var(--color-danger); }

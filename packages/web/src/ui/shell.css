@@ -4,6 +4,8 @@
 
 html {
   direction: rtl;
+  color-scheme: light;
+  scroll-behavior: smooth;
 }
 
 body {
@@ -14,15 +16,50 @@ body {
   font-family: var(--font-sans);
   font-size: var(--font-size-body);
   line-height: var(--line-height-body);
+  font-variant-numeric: lining-nums;
 }
 
 a {
-  color: inherit;
+  color: var(--color-primary);
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.15em;
 }
 
-a:focus-visible {
+a:hover {
+  color: var(--color-primary-hover);
+}
+
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: 3px solid var(--color-focus-ring);
-  outline-offset: 3px;
+  outline-offset: 2px;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+bdi,
+.bidi-isolate {
+  unicode-bidi: isolate;
+}
+
+.bidi-ltr {
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: start;
+}
+
+.numeric-value {
+  font-variant-numeric: tabular-nums lining-nums;
+  unicode-bidi: isolate;
+}
+
+::selection {
+  background: var(--color-primary-subtle);
+  color: var(--color-text-primary);
 }
 
 .skip-link {
@@ -97,6 +134,8 @@ a:focus-visible {
 .app-main h1 {
   margin-block-start: 0;
   font-size: var(--font-size-page);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-heading);
 }
 
 @media (max-width: 48rem) {

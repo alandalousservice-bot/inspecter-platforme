@@ -1,7 +1,7 @@
 .professional-identity-page {
   inline-size: min(100%, 44rem);
   margin-inline: auto;
-  padding: var(--space-5);
+  padding: var(--space-6);
 }
 
 .professional-identity-page form {
