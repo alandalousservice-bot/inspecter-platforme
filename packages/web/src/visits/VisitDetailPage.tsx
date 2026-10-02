@@ -4,6 +4,7 @@ import { ApiRequestError, getPedagogicalVisit, getValidWorkplaces, patchPedagogi
 import { Button, Card, CardContent, CardHeader, DetailList, Dialog, ErrorState, Input, LoadingState, PageHeader, SuccessState } from '../ui';
 import { formatAlgiers, localDateTimeToOffset, utcToLocalDateTime } from './time';
 import { VisitStatusBadge } from './VisitStatusBadge';
+import { visitTypeLabel, visitTypeLabels } from './visit-type-labels';
 import './visits.css';
 
 type WarningState = { code: ScheduleWarningCode; payload: Extract<PedagogicalVisitPatch, { operation: 'RESCHEDULE' }> } | { stale: true; payload: Extract<PedagogicalVisitPatch, { operation: 'RESCHEDULE' }> };
@@ -11,10 +12,6 @@ type DialogAction = 'complete' | 'cancel' | null;
 const warningText: Record<ScheduleWarningCode, string> = {
   VISIT_WEEKLY_SCHEDULE_MISSING: 'لا يوجد توزيع أسبوعي مسجل لهذا الأستاذ والسنة الدراسية.',
   VISIT_OUTSIDE_WEEKLY_SCHEDULE: 'الموعد لا يقع بالكامل ضمن التوزيع الأسبوعي المسجل.',
-};
-const visitTypeLabels: Record<PedagogicalVisitType, string> = {
-  GUIDANCE: 'زيارة توجيهية / تكوينية', TENURE_CONFIRMATION: 'زيارة التثبيت / الترسيم',
-  PROMOTION_EVALUATION: 'زيارة الترقية / التقييم', MONITORING_FOLLOW_UP: 'زيارة المراقبة والمتابعة', EXCEPTIONAL: 'زيارة استثنائية',
 };
 
 function friendlyError(error: unknown) {
@@ -142,7 +139,7 @@ export function VisitDetailPage() {
       {operationError ? <ErrorState title={operationError} action={operationError.includes('تغيّرت الزيارة') ? <Button variant="secondary" onClick={() => { setOperationError(''); setRefresh((value) => value + 1); }}>تحديث البيانات</Button> : undefined} /> : null}
       <Card><CardHeader title="معلومات الزيارة" description={`السنة الدراسية ${visit.academicYear}`} action={<VisitStatusBadge status={visit.status} />} />
         <CardContent><DetailList className="visit-facts" items={[
-          { label: 'نوع الزيارة', value: visit.visitType ? visitTypeLabels[visit.visitType] : 'نوع الزيارة غير موثق (سجل سابق)' },
+          { label: 'نوع الزيارة', value: visitTypeLabel(visit.visitType) },
           { label: visit.intervalKind === 'ACTUAL_RETROSPECTIVE' ? 'الفترة الفعلية للزيارة' : 'الموعد المخطط', value: visit.actualStartAt && visit.actualEndAt
             ? `${formatAlgiers(visit.actualStartAt)} — ${formatAlgiers(visit.actualEndAt)}`
             : visit.scheduledStartAt && visit.scheduledEndAt ? `${formatAlgiers(visit.scheduledStartAt)} — ${formatAlgiers(visit.scheduledEndAt)}` : 'الفترة غير متاحة' },

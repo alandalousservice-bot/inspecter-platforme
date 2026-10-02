@@ -39,7 +39,7 @@ HTTP JSON `/api/v1`. هذه عقود الموارد والسلوك؛ schemas ا�
 | `/proposals` | GET/POST | kind, status، inspector owner، title، content validated by kind |
 | `/proposals/:id` | GET/PATCH/POST clone/POST archive | owner/district guard؛ تعديل ينتج ProposalRevision جديدًا |
 | `/proposals/:id/revisions` | GET | history metadata/immutable content للمصرح |
-| `/dashboard/summary` | GET — TASK-070A COMPLETED | مجمّع عمل المفتش الحالي حسب ADR-037؛ بلا query؛ تفاصيل الرد أدناه؛ Dashboard UI لم تنفذ بعد |
+| `/dashboard/summary` | GET — TASK-070A COMPLETED | مجمّع عمل المفتش الحالي حسب ADR-037؛ بلا query؛ تفاصيل الرد أدناه؛ واجهة TASK-070B تستهلكه |
 | `/audit-events` | GET | inspector-authorized, filtered; redacted; no public route |
 | `/me/districts` | GET | authenticated Inspector's current District context only; no client-supplied scope |
 | `/me/professional-identity` | GET/PUT — TASK-052A | الاسم واللقب المهنيان للمفتش المصادق عليه فقط؛ لا تحرير مستخدم آخر |
@@ -84,7 +84,7 @@ HTTP JSON `/api/v1`. هذه عقود الموارد والسلوك؛ schemas ا�
 
 `reports`: Visit يملكها المفتش ومقاطعتها مصرح بها حاليًا. `DRAFT_REPORT` يعني تقريرًا موجودًا `DRAFT`، و`reportId` معرّف ذلك التقرير و`referenceAt=report.updatedAt`. `NO_REPORT` يعني Visit `COMPLETED` دون أي تقرير، و`reportId=null` و`referenceAt=visit.occurredAt`. عدد مستقل لكل فئة قبل الحد؛ القائمة المركبة 3 إجمالًا: `DRAFT_REPORT` قبل `NO_REPORT`، ثم `referenceAt DESC,visitId DESC` داخل كل فئة. لا تقارير `FINAL` أو Visit `CANCELLED`، ولا يفترض `NO_REPORT` وجوبًا قانونيًا للتقرير. `upcomingVisits`: Visit يملكها المفتش ضمن نطاقه الحالي، `status=PLANNED`, `scheduledStartAt >= now`، `scheduledStartAt ASC,id ASC`، حتى 3؛ العنصر الأول الزيارة التالية. اسم المؤسسة `institutionNameSnapshot` لا Institution/Teacher الحالية؛ `visitType=NULL` التاريخية تبقى NULL، ولا تدخل الاستثنائية الماضية غير المجدولة.
 
-الرد كله يفشل إذا فشل استعلام قسم؛ لا أصفار مختلقة أو partial-error. يُحسب عند الطلب؛ لا cache أو background job. لا `submittedProfile` أو Teacher PII أو note متابعة أو report prose/mark أو AuditLog أو أسرار في الرد. counts وقوائم محدودة بإسقاطات دنيا واستعلامات خادمية، لا تحميل شامل أو N+1. تفاصيل التنقل والواجهة في [UI_MAP](UI_MAP.md). Backend endpoint مكتمل في TASK-070A؛ صفحة `/app` وSidebar ما زالتا غير منفذتين حتى TASK-070B.
+الرد كله يفشل إذا فشل استعلام قسم؛ لا أصفار مختلقة أو partial-error. يُحسب عند الطلب؛ لا cache أو background job. لا `submittedProfile` أو Teacher PII أو note متابعة أو report prose/mark أو AuditLog أو أسرار في الرد. counts وقوائم محدودة بإسقاطات دنيا واستعلامات خادمية، لا تحميل شامل أو N+1. تفاصيل التنقل والواجهة في [UI_MAP](UI_MAP.md). Backend endpoint مكتمل في TASK-070A؛ واجهة `/app` وSidebar مكتملتان في TASK-070B، وتبقى بوابة regression الشاملة TASK-070C.
 
 ### Pedagogical FollowUp (ADR-033 / TASK-053)
 

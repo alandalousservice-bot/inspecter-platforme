@@ -298,6 +298,37 @@ export type ValidWorkplaceOption = { id: string; name: string; municipality: str
 
 export type PedagogicalVisitStatus = 'PLANNED' | 'COMPLETED' | 'CANCELLED';
 export type PedagogicalVisitType = 'GUIDANCE' | 'TENURE_CONFIRMATION' | 'PROMOTION_EVALUATION' | 'MONITORING_FOLLOW_UP' | 'EXCEPTIONAL';
+export type DashboardSummary = {
+  asOf: string;
+  today: string;
+  attention: {
+    pendingSubmissions: { total: number; items: Array<{ id: string; submittedAt: string }> };
+    ownedFollowUps: {
+      overdueTotal: number;
+      dueTodayTotal: number;
+      items: Array<{ id: string; dueDate: string; alertState: 'OVERDUE' | 'DUE_TODAY' }>;
+    };
+    reports: {
+      draftTotal: number;
+      completedVisitWithoutReportTotal: number;
+      items: Array<{ visitId: string; reportId: string | null; kind: 'DRAFT_REPORT' | 'NO_REPORT'; referenceAt: string }>;
+    };
+  };
+  upcomingVisits: Array<{
+    id: string;
+    scheduledStartAt: string;
+    scheduledEndAt: string;
+    visitType: PedagogicalVisitType | null;
+    institutionName: string;
+  }>;
+};
+
+export async function getDashboardSummary(): Promise<{ data: DashboardSummary }> {
+  const response = await fetch('/api/v1/dashboard/summary', { credentials: 'same-origin', cache: 'no-store' });
+  if (!response.ok) return readFailure(response);
+  return response.json() as Promise<{ data: DashboardSummary }>;
+}
+
 export type PedagogicalVisit = {
   id: string;
   districtId: string;

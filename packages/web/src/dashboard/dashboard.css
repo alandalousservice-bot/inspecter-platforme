@@ -1,0 +1,45 @@
+.dashboard-page { display: grid; min-width: 0; gap: var(--space-6); }
+.dashboard-section { display: grid; min-width: 0; gap: var(--space-4); }
+.dashboard-section__heading { display: grid; gap: var(--space-1); }
+.dashboard-section__heading h2 { margin: 0; font-size: var(--font-size-section); font-weight: var(--font-weight-semibold); line-height: var(--line-height-heading); }
+.dashboard-section__heading p,
+.dashboard-muted { margin: 0; color: var(--color-text-muted); }
+.dashboard-count-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
+.dashboard-count { display: grid; min-width: 0; align-content: start; gap: var(--space-2); padding: var(--space-4); }
+.dashboard-count__title { margin: 0; color: var(--color-text-secondary); font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); line-height: var(--line-height-body); overflow-wrap: anywhere; }
+.dashboard-count__value { margin: 0; color: var(--color-text-primary); font-size: 1.75rem; font-weight: var(--font-weight-semibold); line-height: 1.2; font-variant-numeric: tabular-nums; }
+.dashboard-count__link { width: fit-content; font-size: var(--font-size-small); }
+.dashboard-count__items { display: grid; gap: var(--space-2); min-width: 0; margin: var(--space-1) 0 0; padding: var(--space-3) 0 0; border-block-start: 1px solid var(--color-border); list-style: none; }
+.dashboard-count__items li { display: grid; min-width: 0; justify-items: start; gap: var(--space-1); font-size: var(--font-size-small); overflow-wrap: anywhere; }
+.dashboard-count__items time { color: var(--color-text-muted); font-size: var(--font-size-meta); }
+.dashboard-neutral-empty { margin: 0; padding: var(--space-3) var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-card); color: var(--color-text-secondary); background: var(--color-surface); }
+.dashboard-visits { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
+.dashboard-visit { display: grid; min-width: 0; align-content: start; gap: var(--space-3); }
+.dashboard-visit--next { border-color: var(--color-border-strong); }
+.dashboard-visit__topline { display: grid; justify-items: start; gap: var(--space-2); min-width: 0; }
+.dashboard-visit__topline h3 { margin: 0; font-size: var(--font-size-body); }
+.dashboard-visit__institution,
+.dashboard-visit__time { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.dashboard-visit__time { color: var(--color-text-secondary); font-size: var(--font-size-small); font-variant-numeric: tabular-nums; }
+.dashboard-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); }
+.dashboard-action { display: flex; min-width: 0; min-height: 3rem; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-3) var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface); font-weight: var(--font-weight-medium); text-decoration: none; overflow-wrap: anywhere; }
+.dashboard-action:hover { border-color: var(--color-border-strong); background: var(--color-surface-subtle); }
+.dashboard-action span { flex: 0 0 auto; unicode-bidi: isolate; }
+.dashboard-freshness { margin: 0; color: var(--color-text-muted); font-size: var(--font-size-small); }
+
+@media (max-width: 64rem) {
+  .dashboard-count-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dashboard-visits { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dashboard-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 48rem) {
+  .dashboard-count-grid { grid-template-columns: minmax(0, 1fr); }
+  .dashboard-visits { grid-template-columns: minmax(0, 1fr); }
+  .dashboard-actions { grid-template-columns: minmax(0, 1fr); }
+  .dashboard-count { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+  .dashboard-count__title { grid-column: 1; }
+  .dashboard-count__value { grid-column: 2; grid-row: 1 / span 2; }
+  .dashboard-count__link,
+  .dashboard-count__items { grid-column: 1 / -1; }
+}

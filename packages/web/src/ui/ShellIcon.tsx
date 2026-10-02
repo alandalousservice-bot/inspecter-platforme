@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 
 export type ShellIconName =
   | 'institutions'
+  | 'dashboard'
   | 'teachers'
   | 'submissions'
   | 'visits'
@@ -13,6 +14,7 @@ export type ShellIconName =
   | 'expand';
 
 const shapes: Record<ShellIconName, ReactNode> = {
+  dashboard: <><rect x="3.5" y="3.5" width="7" height="7" rx="1.5" /><rect x="13.5" y="3.5" width="7" height="5" rx="1.5" /><rect x="13.5" y="12" width="7" height="8.5" rx="1.5" /><rect x="3.5" y="13" width="7" height="7.5" rx="1.5" /></>,
   institutions: <><path d="M3.5 20.5h17" /><path d="M5.5 20.5V7.5l6.5-4 6.5 4v13" /><path d="M9 10h.01M15 10h.01M9 13.5h.01M15 13.5h.01M10 20.5v-4h4v4" /></>,
   teachers: <><circle cx="9" cy="8" r="3.25" /><path d="M3.5 20v-1.4A5.1 5.1 0 0 1 8.6 13.5h.8a5.1 5.1 0 0 1 5.1 5.1V20" /><path d="M15.5 4.9a3.25 3.25 0 0 1 0 6.2M17 14a4.4 4.4 0 0 1 3.5 4.3V20" /></>,
   submissions: <><path d="M6 3.5h8l4 4v13H6z" /><path d="M14 3.5v4h4M9 12h6M9 15.5h6" /></>,

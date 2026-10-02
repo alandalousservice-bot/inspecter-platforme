@@ -12,6 +12,7 @@ type AppShellProps = {
 };
 
 const navigation: Array<{ to: string; label: string; icon: ShellIconName }> = [
+  { to: '/app', label: 'لوحة المتابعة', icon: 'dashboard' },
   { to: '/app/institutions', label: 'المؤسسات', icon: 'institutions' },
   { to: '/app/teachers', label: 'دليل الأساتذة', icon: 'teachers' },
   { to: '/app/submissions', label: 'طلبات الأساتذة', icon: 'submissions' },
@@ -133,6 +134,7 @@ export function AppShell({ children, inspector, headerAction }: AppShellProps) {
                 <NavLink
                   key={to}
                   to={to}
+                  end={to === '/app'}
                   className={({ isActive }) => `app-sidebar__link${isActive ? ' is-active' : ''}`}
                   data-label={label}
                   aria-label={label}

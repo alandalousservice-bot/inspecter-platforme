@@ -20,12 +20,35 @@ describe('G6-02 professional application shell', () => {
     renderShell();
     const primary = screen.getByRole('navigation', { name: 'مساحات العمل' });
     expect([...primary.querySelectorAll('a')].map((link) => link.getAttribute('aria-label'))).toEqual([
-      'المؤسسات', 'دليل الأساتذة', 'طلبات الأساتذة', 'الزيارات', 'المتابعات',
+      'لوحة المتابعة', 'المؤسسات', 'دليل الأساتذة', 'طلبات الأساتذة', 'الزيارات', 'المتابعات',
     ]);
     expect(screen.queryByRole('link', { name: 'الرئيسية' })).toBeNull();
     expect(screen.queryByRole('link', { name: /المرجع|المقترحات|النشاط/u })).toBeNull();
     expect(screen.getByRole('link', { name: 'هويتي المهنية' })).toBeTruthy();
     expect(screen.getByText('inspector@example.invalid').getAttribute('dir')).toBe('ltr');
+  });
+
+  it('activates the Dashboard only at /app and keeps existing module matching', () => {
+    const { unmount } = renderShell('/app');
+    expect(screen.getByRole('link', { name: 'لوحة المتابعة' }).getAttribute('aria-current')).toBe('page');
+    expect(screen.getByRole('link', { name: 'المؤسسات' }).hasAttribute('aria-current')).toBe(false);
+    unmount();
+    renderShell('/app/institutions');
+    expect(screen.getByRole('link', { name: 'لوحة المتابعة' }).hasAttribute('aria-current')).toBe(false);
+    expect(screen.getByRole('link', { name: 'المؤسسات' }).getAttribute('aria-current')).toBe('page');
+  });
+
+  it.each([
+    ['/app/institutions', 'المؤسسات'],
+    ['/app/submissions/submission-1', 'طلبات الأساتذة'],
+    ['/app/teachers/teacher-1/information-card', 'دليل الأساتذة'],
+    ['/app/visits/new', 'الزيارات'],
+    ['/app/visits/visit-1/report', 'الزيارات'],
+    ['/app/follow-ups', 'المتابعات'],
+  ])('preserves the existing active navigation for %s', (path, activeLabel) => {
+    renderShell(path);
+    expect(screen.getByRole('link', { name: 'لوحة المتابعة' }).hasAttribute('aria-current')).toBe(false);
+    expect(screen.getByRole('link', { name: activeLabel }).getAttribute('aria-current')).toBe('page');
   });
 
   it('marks top-level and nested Teacher/Visit routes active and exposes one main landmark', () => {

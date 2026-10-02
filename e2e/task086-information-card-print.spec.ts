@@ -17,7 +17,8 @@ async function login(page: Page) {
   await page.getByLabel('البريد الإلكتروني').fill(email!);
   await page.getByLabel('كلمة المرور').fill(password!);
   await page.getByRole('button', { name: 'تسجيل الدخول' }).click();
-  await expect(page).toHaveURL(/\/app\/institutions$/u);
+  await expect(page).toHaveURL(/\/app$/u);
+  await expect(page.getByRole('heading', { name: 'لوحة المتابعة', level: 1 })).toBeVisible();
 }
 
 test.beforeAll(async () => {

@@ -1,19 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { ApiRequestError, getCurrentDistricts, listPedagogicalVisits, type DistrictOption, type Institution, type PedagogicalVisit, type PedagogicalVisitType, type TeacherDirectoryItem, type VisitFilters } from '../auth/client';
+import { ApiRequestError, getCurrentDistricts, listPedagogicalVisits, type DistrictOption, type Institution, type PedagogicalVisit, type TeacherDirectoryItem, type VisitFilters } from '../auth/client';
 import { Button, Card, CardContent, CardHeader, DataTable, EmptyState, ErrorState, FilterBar, Input, LoadingState, PageHeader, type DataTableColumn } from '../ui';
 import { InstitutionPicker, TeacherPicker } from './VisitPickers';
 import { VisitStatusBadge } from './VisitStatusBadge';
+import { visitTypeLabel, visitTypeLabels } from './visit-type-labels';
 import { formatAlgiers, localDateTimeToOffset, nextLocalDate } from './time';
 import './visits.css';
 
 const PAGE_SIZE = 25;
 const allowedKeys = ['districtId', 'teacherId', 'institutionId', 'status', 'visitType', 'fromDate', 'toDate'] as const;
-const visitTypeLabels: Record<PedagogicalVisitType, string> = {
-  GUIDANCE: 'زيارة توجيهية / تكوينية', TENURE_CONFIRMATION: 'زيارة التثبيت / الترسيم',
-  PROMOTION_EVALUATION: 'زيارة الترقية / التقييم', MONITORING_FOLLOW_UP: 'زيارة المراقبة والمتابعة', EXCEPTIONAL: 'زيارة استثنائية',
-};
-function visitTypeLabel(type: PedagogicalVisitType | null) { return type ? visitTypeLabels[type] : 'نوع الزيارة غير موثق (سجل سابق)'; }
 function intervalLabel(visit: PedagogicalVisit) {
   const start = visit.actualStartAt ?? visit.scheduledStartAt; const end = visit.actualEndAt ?? visit.scheduledEndAt;
   return start && end ? `${formatAlgiers(start)} — ${formatAlgiers(end)}` : 'الفترة غير متاحة';

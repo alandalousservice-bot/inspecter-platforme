@@ -7,6 +7,7 @@ import {
 } from '../auth/client';
 import { Button, Card, CardContent, CardHeader, Dialog, ErrorState, LoadingState, PageHeader, SuccessState } from '../ui';
 import { formatAlgiers } from './time';
+import { visitTypeLabels } from './visit-type-labels';
 import './inspection-report.css';
 import './inspector-visit-report.css';
 
@@ -14,10 +15,6 @@ type Props = { visit: PedagogicalVisit; initialReport: InspectorVisitReport | nu
 type FormInput = Omit<InspectorVisitReportInput, 'expectedRevision'>;
 type TextKey = keyof InspectorVisitV1Fields;
 
-const visitTypeLabels: Record<NonNullable<PedagogicalVisit['visitType']>, string> = {
-  GUIDANCE: 'زيارة توجيهية / تكوينية', TENURE_CONFIRMATION: 'زيارة التثبيت / الترسيم',
-  PROMOTION_EVALUATION: 'زيارة الترقية / التقييم', MONITORING_FOLLOW_UP: 'زيارة المراقبة والمتابعة', EXCEPTIONAL: 'زيارة استثنائية',
-};
 const shortFields: Array<{ key: TextKey; label: string; max: number }> = [
   { key: 'educationDirectorateText', label: 'مديرية التربية للولاية', max: 150 },
   { key: 'administrativeDivisionText', label: 'الدائرة', max: 150 },

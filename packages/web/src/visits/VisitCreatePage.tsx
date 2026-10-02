@@ -3,15 +3,12 @@ import { Link, useLocation, useNavigate } from 'react-router';
 import { ApiRequestError, createPedagogicalVisit, getCurrentDistricts, getValidWorkplaces, type DistrictOption, type PedagogicalVisitType, type ScheduleWarningCode, type TeacherDirectoryItem, type ValidWorkplaceOption } from '../auth/client';
 import { Button, Card, CardContent, CardHeader, Dialog, ErrorState, FormSection, Input, LoadingState, PageHeader } from '../ui';
 import { TeacherPicker } from './VisitPickers';
+import { visitTypeLabels } from './visit-type-labels';
 import { localDateTimeToOffset } from './time';
 import './visits.css';
 
 type CreatePayload = { teacherId: string; institutionId: string; academicYear: string; visitType: PedagogicalVisitType; scheduledStartAt: string; scheduledEndAt: string };
 type WarningState = { code: ScheduleWarningCode; payload: CreatePayload } | { stale: true; payload: CreatePayload };
-const visitTypeLabels: Record<PedagogicalVisitType, string> = {
-  GUIDANCE: 'زيارة توجيهية / تكوينية', TENURE_CONFIRMATION: 'زيارة التثبيت / الترسيم',
-  PROMOTION_EVALUATION: 'زيارة الترقية / التقييم', MONITORING_FOLLOW_UP: 'زيارة المراقبة والمتابعة', EXCEPTIONAL: 'زيارة استثنائية',
-};
 const warningText: Record<ScheduleWarningCode, string> = {
   VISIT_WEEKLY_SCHEDULE_MISSING: 'لا يوجد توزيع أسبوعي مسجل لهذا الأستاذ والسنة الدراسية.',
   VISIT_OUTSIDE_WEEKLY_SCHEDULE: 'الموعد لا يقع بالكامل ضمن التوزيع الأسبوعي المسجل.',
