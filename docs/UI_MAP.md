@@ -8,7 +8,7 @@
 |---|---|---|
 | `/public/d/:districtId/register` | نموذج تقديم بيانات الأستاذ RTL ضمن G6-06؛ حقول TASK-085 الإلزامية والاختيارية، وتصريحات المؤهلات ومؤسسات تكملة النصاب اختيارية. الإرسال ينتج إيصالًا محايدًا ولا ينشئ حسابًا أو اعتمادًا؛ التصريحات لا تنشئ روابط معتمدة | POST public submissions |
 | `/login` | دخول المفتش RTL ضمن G6-06؛ حقول ذات labels وautocomplete، تحميل وفشل آمن وفق عقد المصادقة | auth |
-| `/app` | يحول حاليًا إلى `/app/institutions`؛ Dashboard مستقبلية عبر TASK-070/071 وليست منفذة | redirect فقط |
+| `/app` | **حاليًا** يحول إلى `/app/institutions`؛ **بعد TASK-070B فقط** يصبح «لوحة المتابعة» المصادقة وفق ADR-037، مع بقاء login منتقلاً إلى `/app` | حاليًا redirect؛ مستقبلًا `GET /api/v1/dashboard/summary` بعد TASK-070A |
 | `/app/submissions` | قائمة قراءة للمفتش مع فلترة الحالة والبحث ومؤشر تشابه محتمل وتصفح | submissions (TASK-032) |
 | `/app/submissions/:id` | عرض تصريح جهة العمل الجديد أو لقطة G3 القديمة كما هي، مع وسم «غير معتمد» وبيانات ناقصة «غير متاحة»؛ الأسماء الإضافية القديمة تاريخية فقط. ملخص المرشحات والقرار؛ بعد القبول رابط Teacher المصرح | submission detail (TASK-032); decision UI (TASK-033/034); compatibility (TASK-041) |
 | `/app/teachers` | دليل عملي عربي RTL لـ180+ أستاذ؛ بحث/مرشحات/مؤسسة/سنة-يوم-وقت وترقيم خادمي بـTASK-044، وحفظ المرشحات في URL، تنقل للملف والجدول | `GET /teachers`؛ `/me/districts` لسياق المقاطعات؛ بحث مؤسسات محدود عند مرشح المؤسسة |
@@ -34,6 +34,10 @@
 التنقل الرئيسي يعرض فقط المساحات المسجلة والمنفذة: `/app/institutions` «المؤسسات»، `/app/teachers` «دليل الأساتذة»، `/app/submissions` «طلبات الأساتذة»، `/app/visits` «الزيارات»، و`/app/follow-ups` «المتابعات». مسار التفاصيل/الأبناء يبقي رابط المساحة الأم نشطًا: Teacher profile/card/schedule تحت دليل الأساتذة؛ submission detail تحت الطلبات؛ visit create/detail/report تحت الزيارات. «هويتي المهنية» رابط حساب منفصل وليس مساحة تشغيل رئيسية.
 
 `/app` يحول إلى المؤسسات كما كان؛ لا «الرئيسية» أو Dashboard وهمية. `/login` والفورم العام خارج AppShell. مسار `/app/teachers/:id/information-card/print` يحتفظ بحارس Session لكنه يعرض وثيقة الطباعة دون AppShell. `/app/reference` و`/app/proposals*` و`/app/activity` مخططات مستقبلية فقط وليست routes أو روابط قابلة للوصول حاليًا.
+
+**عقد لوحة المتابعة المستقبلية — ADR-037، NOT IMPLEMENTED:** في TASK-070B يحل Dashboard محل redirect `/app`، ويضاف «لوحة المتابعة» أول رابط في Sidebar المصادق، نشط عند `/app` فقط بأيقونة SVG محلية. يستمر نجاح login في الانتقال إلى `/app`. ترتيب الشاشة: PageHeader، «يحتاج انتباهك» (متابعات المالك المتأخرة/اليوم، طلبات `PENDING`، مسودات تقارير وزيارات مكتملة بلا تقرير كفئتين منفصلتين)، «الزيارات القادمة» (أول 3 وأولها التالية)، ثم «إجراءات سريعة». لا charts أو recent AuditLog feed أو إحصاءات أداء Teacher؛ الأعداد التشغيلية فقط في بطاقة خاصة باللوحة، لا primitive عام. تُستعمل مكونات G6 وحالات loading/empty/error/retry، ويظل الرد الفاشل خطأ لا أصفارًا زائفة. على 1440/768/390 و200% zoom لا تختفي فئة الانتباه ولا يحدث overflow؛ عنوان `h1` واحد وأقسام دلالية وتركيز ولوحة مفاتيح وRTL/Bidi.
+
+روابط اللوحة المعتمدة فقط: عنصر الطلب `/app/submissions/:id` وعدده `/app/submissions`؛ متابعة `/app/follow-ups` (لا route تفصيل)؛ مسودة التقرير `/app/visits/:visitId/report`؛ زيارة بلا تقرير `/app/visits/:visitId`؛ زيارة قادمة `/app/visits/:id`. الإجراءات السريعة: جدولة `/app/visits/new`، دليل `/app/teachers`، طلبات `/app/submissions`، متابعات `/app/follow-ups`. لا تفويض من إظهار الرابط؛ الخادم يتحقق من العضوية والأهلية. `/login` والفورم العام والطباعة تبقى خارج AppShell؛ لا تغير بصري أو وظيفي قبل TASK-070B.
 
 **G6 final verification:** كل المسارات الفعلية المعرّفة في router، بما فيها صفحات detail/report وinformation-card app/print، اجتازت مراجعة RTL/landmarks/overflow عند 1440/768/390. مسارات `/` و`*` redirects إلى login وليست شاشات إضافية؛ حالات التحميل/التحقق/النجاح/الخطأ child states داخل الصفحات لا routes مستقلة. TASK-086 print remains isolated and verified at A4 1/2/3-page fixtures. G6 visual migration and regression gate are complete.
 

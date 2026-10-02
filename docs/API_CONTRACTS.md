@@ -39,10 +39,52 @@ HTTP JSON `/api/v1`. هذه عقود الموارد والسلوك؛ schemas ا�
 | `/proposals` | GET/POST | kind, status، inspector owner، title، content validated by kind |
 | `/proposals/:id` | GET/PATCH/POST clone/POST archive | owner/district guard؛ تعديل ينتج ProposalRevision جديدًا |
 | `/proposals/:id/revisions` | GET | history metadata/immutable content للمصرح |
-| `/dashboard/summary` | GET | counts/period مع تعريف وtimestamp؛ no unscoped aggregate |
+| `/dashboard/summary` | GET — TASK-070A NOT_STARTED | مجمّع عمل المفتش الحالي حسب ADR-037؛ بلا query؛ تفاصيل الرد أدناه، وليس endpoint منفذًا بعد |
 | `/audit-events` | GET | inspector-authorized, filtered; redacted; no public route |
 | `/me/districts` | GET | authenticated Inspector's current District context only; no client-supplied scope |
 | `/me/professional-identity` | GET/PUT — TASK-052A | الاسم واللقب المهنيان للمفتش المصادق عليه فقط؛ لا تحرير مستخدم آخر |
+
+### Dashboard summary (ADR-037 / TASK-070)
+
+`GET /api/v1/dashboard/summary` قراءة مصادقة للمفتش `ACTIVE`، `Cache-Control: no-store`، بلا معاملات query في V1؛ أي مفتاح query يعيد `400 VALIDATION_ERROR` دون صدى مدخلات. تستخدم غلاف الخطأ و`x-request-id` المعتادين، و`500` عامة لفشل داخلي. يلتقط الخادم `now` مرة واحدة، ويعيد `asOf` ISO 8601 UTC و`today` بصيغة `YYYY-MM-DD` ليوم `Africa/Algiers`. يحل اتحاد المقاطعات ذات عضوية المفتش السارية `[validFrom,validTo)` وقت الطلب. لا `districtId` من العميل؛ لا عضوية حالية تعني أعداد صفر وقوائم فارغة صحيحة، لا رجوع لعضوية تاريخية.
+
+النجاح `200` بالإسقاط المحدد؛ `uuid` معرّف UUID و`utc` نص ISO 8601 UTC و`date` نص `YYYY-MM-DD`، ولا حقول إضافية في V1:
+
+```ts
+{
+  data: {
+    asOf: utc,
+    today: date,
+    attention: {
+      pendingSubmissions: { total: number, items: Array<{ id: uuid, submittedAt: utc }> },
+      ownedFollowUps: {
+        overdueTotal: number,
+        dueTodayTotal: number,
+        items: Array<{ id: uuid, dueDate: date, alertState: 'OVERDUE' | 'DUE_TODAY' }>
+      },
+      reports: {
+        draftTotal: number,
+        completedVisitWithoutReportTotal: number,
+        items: Array<{
+          visitId: uuid, reportId: uuid | null,
+          kind: 'DRAFT_REPORT' | 'NO_REPORT', referenceAt: utc
+        }>
+      }
+    },
+    upcomingVisits: Array<{
+      id: uuid, scheduledStartAt: utc, scheduledEndAt: utc,
+      visitType: 'GUIDANCE' | 'TENURE_CONFIRMATION' | 'PROMOTION_EVALUATION' | 'MONITORING_FOLLOW_UP' | 'EXCEPTIONAL' | null,
+      institutionName: string
+    }>
+  }
+}
+```
+
+`pendingSubmissions`: `status=PENDING` ومقاطعة ضمن العضويات الحالية، العدد قبل الحد، ثم 3 عناصر كحد أقصى بترتيب `submittedAt DESC,id DESC`؛ `INTERNAL_REVIEW` لا تدخل. `ownedFollowUps`: `status=OPEN`, `ownerInspectorId=actor.id`، مقاطعة Visit عبر تقريرها ضمن العضويات الحالية؛ `dueDate < today` متأخرة و`= today` مستحقة اليوم فقط. العددان قبل الحد؛ 3 عناصر إجمالًا، المتأخرة أولًا ثم اليوم، `dueDate ASC,id ASC` داخل كل فئة. لا due-soon أو متابعات مكتملة أو مملوكة لغير المفتش.
+
+`reports`: Visit يملكها المفتش ومقاطعتها مصرح بها حاليًا. `DRAFT_REPORT` يعني تقريرًا موجودًا `DRAFT`، و`reportId` معرّف ذلك التقرير و`referenceAt=report.updatedAt`. `NO_REPORT` يعني Visit `COMPLETED` دون أي تقرير، و`reportId=null` و`referenceAt=visit.occurredAt`. عدد مستقل لكل فئة قبل الحد؛ القائمة المركبة 3 إجمالًا: `DRAFT_REPORT` قبل `NO_REPORT`، ثم `referenceAt DESC,visitId DESC` داخل كل فئة. لا تقارير `FINAL` أو Visit `CANCELLED`، ولا يفترض `NO_REPORT` وجوبًا قانونيًا للتقرير. `upcomingVisits`: Visit يملكها المفتش ضمن نطاقه الحالي، `status=PLANNED`, `scheduledStartAt >= now`، `scheduledStartAt ASC,id ASC`، حتى 3؛ العنصر الأول الزيارة التالية. اسم المؤسسة `institutionNameSnapshot` لا Institution/Teacher الحالية؛ `visitType=NULL` التاريخية تبقى NULL، ولا تدخل الاستثنائية الماضية غير المجدولة.
+
+الرد كله يفشل إذا فشل استعلام قسم؛ لا أصفار مختلقة أو partial-error. يُحسب عند الطلب؛ لا cache أو background job. لا `submittedProfile` أو Teacher PII أو note متابعة أو report prose/mark أو AuditLog أو أسرار في الرد. counts وقوائم محدودة بإسقاطات دنيا واستعلامات خادمية، لا تحميل شامل أو N+1. تفاصيل التنقل والواجهة في [UI_MAP](UI_MAP.md)؛ هذا العقد **NOT IMPLEMENTED** حتى TASK-070A.
 
 ### Pedagogical FollowUp (ADR-033 / TASK-053)
 
