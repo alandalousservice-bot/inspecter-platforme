@@ -23,6 +23,16 @@ function renderLogin() {
 }
 
 describe('inspector login page', () => {
+  it('uses the public RTL surface with one heading and accessible login controls', () => {
+    const { container } = renderLogin();
+    expect(container.querySelector('main[dir="rtl"]')).toBeTruthy();
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole('textbox', { name: 'البريد الإلكتروني' }).getAttribute('autocomplete')).toBe('username');
+    expect(screen.getByLabelText(/كلمة المرور/).getAttribute('autocomplete')).toBe('current-password');
+    expect(screen.queryByRole('navigation')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'تسجيل الخروج' })).toBeNull();
+  });
+
   it('submits credentials and navigates after success', async () => {
     login.mockResolvedValueOnce({ id: 'inspector-id', email: 'inspector@example.invalid' });
     renderLogin();
@@ -44,6 +54,7 @@ describe('inspector login page', () => {
 
     const pendingButton = screen.getByRole('button', { name: 'جارٍ التحقق…' }) as HTMLButtonElement;
     expect(pendingButton.disabled).toBe(true);
+    expect(pendingButton.getAttribute('aria-busy')).toBe('true');
     finishLogin?.(undefined);
     expect(await screen.findByRole('heading', { name: 'مساحة العمل' })).toBeTruthy();
   });
@@ -54,6 +65,6 @@ describe('inspector login page', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'البريد الإلكتروني' }), { target: { value: 'inspector@example.invalid' } });
     fireEvent.change(screen.getByLabelText(/كلمة المرور/), { target: { value: 'synthetic-password' } });
     fireEvent.click(screen.getByRole('button', { name: 'تسجيل الدخول' }));
-    expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'تعذر تسجيل الدخول بهذه البيانات.');
+    expect((await screen.findByRole('alert')).textContent).toContain('تعذر تسجيل الدخول بهذه البيانات.');
   });
 });

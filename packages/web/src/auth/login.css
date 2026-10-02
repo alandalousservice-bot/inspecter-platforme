@@ -1,9 +1,13 @@
+body:has(.login-page) {
+  min-width: 0;
+}
+
 .login-page {
   display: grid;
   min-height: 100vh;
   place-items: center;
   padding: var(--space-4);
-  background: var(--color-canvas);
+  background: var(--color-background);
 }
 
 .login-card {
@@ -27,18 +31,13 @@
 
 .login-card__eyebrow,
 .login-card__description {
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
 }
 
 .login-form {
   display: grid;
   gap: var(--space-4);
   margin-block-start: var(--space-6);
-}
-
-.login-form__error {
-  margin: 0;
-  color: var(--color-danger);
 }
 
 .login-form__submit {

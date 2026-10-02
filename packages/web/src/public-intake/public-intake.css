@@ -1,7 +1,11 @@
+body:has(.public-intake-page) {
+  min-width: 0;
+}
+
 .public-intake-page {
   min-height: 100vh;
   padding: var(--space-6) var(--space-4);
-  background: var(--color-canvas);
+  background: var(--color-background);
 }
 
 .public-intake-card {
@@ -13,6 +17,8 @@
   display: grid;
   gap: var(--space-2);
   margin-block-end: var(--space-6);
+  padding-block-end: var(--space-4);
+  border-block-end: 1px solid var(--color-border);
 }
 
 .public-intake-heading h1,
@@ -30,7 +36,7 @@
 .public-intake-heading p,
 .public-intake-fieldset-hint,
 .public-intake-eyebrow {
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
 }
 
 .public-intake-eyebrow {
@@ -98,19 +104,10 @@
   overflow-wrap: anywhere;
 }
 
-.public-intake-error {
-  padding: var(--space-3);
-  border-inline-start: 0.25rem solid var(--color-danger);
-  border-radius: var(--radius-control);
-  background: var(--color-surface);
-  color: var(--color-danger);
-}
-
-.public-intake-success {
-  display: grid;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border-inline-start: 0.25rem solid var(--color-success);
+.public-intake-required-note {
+  margin: calc(var(--space-4) * -1) 0 var(--space-4);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
 }
 
 @media (max-width: 42rem) {

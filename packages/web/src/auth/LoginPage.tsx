@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
-import { Button, Card, Input } from '../ui/index';
+import { Button, Card, ErrorState, Input } from '../ui/index';
 import { login } from './client';
 import './login.css';
 
@@ -26,14 +26,14 @@ export function LoginPage() {
   }
 
   return (
-    <main className="login-page" id="main-content">
+    <main className="login-page" dir="rtl" id="main-content">
       <Card className="login-card" aria-labelledby="login-title">
         <div className="login-card__heading">
           <p className="login-card__eyebrow">منصة مفتش التربية البدنية والرياضية</p>
           <h1 id="login-title">دخول المفتش</h1>
           <p className="login-card__description">أدخل بيانات حساب المفتش للمتابعة.</p>
         </div>
-        <form className="login-form" onSubmit={handleSubmit}>
+        <form className="login-form" onSubmit={handleSubmit} aria-busy={submitting}>
           <Input
             id="inspector-email"
             label="البريد الإلكتروني"
@@ -56,8 +56,8 @@ export function LoginPage() {
             value={password}
             onChange={(event) => setPassword(event.currentTarget.value)}
           />
-          {error ? <p className="login-form__error" role="alert">{error}</p> : null}
-          <Button className="login-form__submit" type="submit" disabled={submitting}>
+          {error ? <ErrorState title="تعذر تسجيل الدخول" description={error} /> : null}
+          <Button className="login-form__submit" type="submit" loading={submitting}>
             {submitting ? 'جارٍ التحقق…' : 'تسجيل الدخول'}
           </Button>
         </form>

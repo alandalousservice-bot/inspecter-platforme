@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useParams } from 'react-router';
-import { Button, Card, Input } from '../ui';
+import { Button, Card, ErrorState, Input, Select, SuccessState, Textarea } from '../ui';
 import { PublicSubmissionError, submitTeacherIntake, type TeacherSubmissionPayload } from './client';
 import './public-intake.css';
 
@@ -297,10 +297,13 @@ export function PublicTeacherIntakePage() {
     return (
       <main className="public-intake-page" dir="rtl" id="main-content">
         <Card className="public-intake-card">
-          <section className="public-intake-success" role="status" aria-live="polite">
-            <h1>تم استلام بياناتك</h1>
+          <header className="public-intake-heading">
+            <p className="public-intake-eyebrow">منصة مفتش التربية البدنية والرياضية</p>
+            <h1>تأكيد استلام البيانات</h1>
+          </header>
+          <SuccessState title="تم استلام بياناتك">
             <p>أُرسلت البيانات إلى مفتش المقاطعة للمراجعة. الإرسال لا يعني اعتماد التسجيل تلقائيًا.</p>
-          </section>
+          </SuccessState>
         </Card>
       </main>
     );
@@ -311,7 +314,7 @@ export function PublicTeacherIntakePage() {
       <main className="public-intake-page" dir="rtl" id="main-content">
         <Card className="public-intake-card">
           <h1>نموذج تقديم بيانات الأستاذ</h1>
-          <p className="public-intake-error" role="alert">تعذر فتح نموذج الإرسال. استخدم الرابط الذي زودك به المفتش.</p>
+          <ErrorState title="تعذر فتح نموذج الإرسال" description="استخدم الرابط الذي زودك به المفتش." />
         </Card>
       </main>
     );
@@ -327,7 +330,9 @@ export function PublicTeacherIntakePage() {
           <p>تُرسل البيانات إلى مفتش المقاطعة للمراجعة. إرسال النموذج لا يعني اعتماد التسجيل تلقائيًا.</p>
         </header>
 
-        {errorMessage ? <p className="public-intake-error" role="alert" tabIndex={-1}>{errorMessage}</p> : null}
+        {errorMessage ? <ErrorState title="راجع البيانات قبل الإرسال" description={errorMessage} /> : null}
+
+        <p className="public-intake-required-note">الحقول المشار إليها بنجمة مطلوبة. بقية الحقول اختيارية.</p>
 
         <form className="public-intake-form" onSubmit={(event) => void handleSubmit(event)} noValidate aria-busy={submitting}>
           <fieldset disabled={submitting}>
@@ -345,20 +350,14 @@ export function PublicTeacherIntakePage() {
             <div className="public-intake-grid">
               <Input id="phone" label="رقم الهاتف" required type="tel" inputMode="tel" autoComplete="tel" dir="ltr" hint="يمكن إدخال الرقم محليًا أو بصيغة ‎+213. لا يعني إدخاله التحقق من ملكيته." value={values.phone} error={errors.phone} onChange={(event) => change('phone', event.currentTarget.value)} />
               <Input id="email" label="البريد الإلكتروني" required type="email" inputMode="email" autoComplete="email" dir="ltr" value={values.email} error={errors.email} onChange={(event) => change('email', event.currentTarget.value)} />
-              <div className="ui-field">
-                <label className="ui-field__label" htmlFor="professionalStatus">الصفة المهنية <span aria-hidden="true">*</span></label>
-                <select id="professionalStatus" className="ui-input" required value={values.professionalStatus} aria-invalid={errors.professionalStatus ? true : undefined} aria-describedby={errors.professionalStatus ? 'professionalStatus-error' : undefined} onChange={(event) => change('professionalStatus', event.currentTarget.value)}>
+              <Select id="professionalStatus" label="الصفة المهنية" required error={errors.professionalStatus} value={values.professionalStatus} onChange={(event) => change('professionalStatus', event.currentTarget.value)}>
                   <option value="">اختر الصفة المهنية</option>
                   {statusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                </select>
-                {errors.professionalStatus ? <p className="ui-field__error" id="professionalStatus-error" role="alert">{errors.professionalStatus}</p> : null}
-              </div>
+              </Select>
               <Input id="employmentDate" label="تاريخ التوظيف" required type="date" max={today} value={values.employmentDate} error={errors.employmentDate} onChange={(event) => change('employmentDate', event.currentTarget.value)} />
               <Input id="confirmationDate" label="تاريخ الترسيم أو التثبيت" type="date" max={today} hint="اختياري" value={values.confirmationDate} error={errors.confirmationDate} onChange={(event) => change('confirmationDate', event.currentTarget.value)} />
-              <div className="ui-field public-intake-grid__wide">
-                <label className="ui-field__label" htmlFor="qualifications">الشهادات والمؤهلات <span className="ui-field__hint">اختياري</span></label>
-                <textarea id="qualifications" className="ui-input public-intake-textarea" value={values.qualifications} aria-invalid={errors.qualifications ? true : undefined} aria-describedby={errors.qualifications ? 'qualifications-error' : undefined} onChange={(event) => change('qualifications', event.currentTarget.value)} />
-                {errors.qualifications ? <p className="ui-field__error" id="qualifications-error" role="alert">{errors.qualifications}</p> : null}
+              <div className="public-intake-grid__wide">
+                <Textarea id="qualifications" className="public-intake-textarea" label="الشهادات والمؤهلات" hint="اختياري" value={values.qualifications} error={errors.qualifications} onChange={(event) => change('qualifications', event.currentTarget.value)} />
               </div>
             </div>
           </fieldset>
@@ -432,14 +431,10 @@ export function PublicTeacherIntakePage() {
 
           <fieldset disabled={submitting}>
             <legend>ملاحظات</legend>
-            <div className="ui-field">
-              <label className="ui-field__label" htmlFor="notes">ملاحظات إضافية <span className="ui-field__hint">اختياري</span></label>
-              <textarea id="notes" className="ui-input public-intake-textarea" value={values.notes} aria-invalid={errors.notes ? true : undefined} aria-describedby={errors.notes ? 'notes-error' : undefined} onChange={(event) => change('notes', event.currentTarget.value)} />
-              {errors.notes ? <p className="ui-field__error" id="notes-error" role="alert">{errors.notes}</p> : null}
-            </div>
+            <Textarea id="notes" className="public-intake-textarea" label="ملاحظات إضافية" hint="اختياري" value={values.notes} error={errors.notes} onChange={(event) => change('notes', event.currentTarget.value)} />
           </fieldset>
 
-          <Button type="submit" disabled={submitting} aria-live="polite">{submitting ? 'جارٍ الإرسال…' : 'إرسال البيانات'}</Button>
+          <Button type="submit" loading={submitting}>{submitting ? 'جارٍ الإرسال…' : 'إرسال البيانات'}</Button>
         </form>
       </Card>
     </main>

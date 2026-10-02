@@ -44,12 +44,14 @@ describe('TASK-031 public teacher intake', () => {
     const { container } = renderPage();
     expect(container.querySelector('main[dir="rtl"]')).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'نموذج تقديم بيانات الأستاذ' })).toBeTruthy();
+    expect(screen.getByText('الحقول المشار إليها بنجمة مطلوبة. بقية الحقول اختيارية.')).toBeTruthy();
     expect(screen.getByRole('group', { name: 'المعلومات الشخصية' })).toBeTruthy();
     expect(screen.getByRole('group', { name: 'المعلومات المهنية' })).toBeTruthy();
     expect(screen.getByRole('group', { name: 'جهة العمل الحالية' })).toBeTruthy();
     for (const label of [/اسم المؤسسة/, /بلدية العمل/, /عنوان المؤسسة/, /رقم هاتف مدير المؤسسة/]) expect(screen.getByRole('textbox', { name: label })).toBeTruthy();
     expect(screen.getByRole('textbox', { name: /الاسم/ })).toBeTruthy();
     const status = screen.getByRole('combobox', { name: /الصفة المهنية/ });
+    expect((status as HTMLSelectElement).required).toBe(true);
     expect(within(status).getByRole('option', { name: 'مرسم' }).getAttribute('value')).toBe('PERMANENT');
     expect(within(status).getByRole('option', { name: 'متربص' }).getAttribute('value')).toBe('TRAINEE');
     expect(within(status).getByRole('option', { name: 'متعاقد' }).getAttribute('value')).toBe('CONTRACT');
@@ -63,6 +65,8 @@ describe('TASK-031 public teacher intake', () => {
     fillRequired();
     await submit();
     expect(await screen.findByRole('heading', { name: 'تم استلام بياناتك' })).toBeTruthy();
+    expect(screen.getByRole('status')).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveProperty('textContent', 'تأكيد استلام البيانات');
     expect(screen.getByText(/لا يعني اعتماد التسجيل تلقائيًا/)).toBeTruthy();
     expect(screen.queryByText('00000000-0000-4000-8000-000000000000')).toBeNull();
     expect(fetch).toHaveBeenCalledWith(`/api/v1/public/districts/${districtId}/submissions`, expect.objectContaining({
