@@ -20,7 +20,7 @@ afterEach(() => { cleanup(); vi.clearAllMocks(); });
 describe('TASK-053 operational follow-up UI', () => {
   it('renders RTL operational list, server filters, context and accessible controls', async () => {
     const { container } = renderPage(); await screen.findByText('متابعة إجراء');
-    expect(container.querySelector('main')?.getAttribute('dir')).toBe('rtl'); expect(screen.getAllByText('متأخرة').length).toBeGreaterThan(0);
+    expect(container.querySelector('.followups-page')?.getAttribute('dir')).toBe('rtl'); expect(screen.getAllByText('متأخرة').length).toBeGreaterThan(0);
     expect(screen.getByText('ابتدائية تاريخية')).toBeTruthy(); expect(mocks.listFollowUps).toHaveBeenCalledWith({ status: 'OPEN', limit: 25 });
     fireEvent.change(screen.getByLabelText('الاستحقاق'), { target: { value: 'DUE_TODAY' } });
     await waitFor(() => expect(mocks.listFollowUps).toHaveBeenLastCalledWith({ status: 'OPEN', alert: 'DUE_TODAY', limit: 25 }));
@@ -40,7 +40,7 @@ describe('TASK-053 operational follow-up UI', () => {
     mocks.patchFollowUp.mockRejectedValueOnce(new ApiRequestError('opaque', undefined, 409, 'FOLLOW_UP_REVISION_CONFLICT'));
     cleanup(); renderPage(); await screen.findByText('متابعة إجراء'); fireEvent.click(screen.getByRole('button', { name: 'تعديل الإجراء' })); fireEvent.click(screen.getByRole('button', { name: 'حفظ التعديل' }));
     expect(await screen.findByRole('button', { name: 'تحديث البيانات' })).toBeTruthy();
-    expect(screen.queryByRole('dialog')).toBeNull(); fireEvent.click(screen.getByRole('button', { name: 'تحديث البيانات' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull()); fireEvent.click(screen.getByRole('button', { name: 'تحديث البيانات' }));
     await waitFor(() => expect(screen.queryByText('تعذر تنفيذ العملية. راجع الحالة وحدّث البيانات قبل المحاولة.')).toBeNull());
   });
   it('validates the 1000-character limit by Unicode code point', async () => {

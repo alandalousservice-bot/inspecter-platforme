@@ -37,7 +37,7 @@ describe('TASK-052 report UI', () => {
   it('starts with seven accessible fields in RTL and only persists on explicit save', async () => {
     const { container } = renderRoute();
     await screen.findByRole('heading', { name: 'محتوى التقرير' });
-    expect(container.querySelector('main')?.getAttribute('dir')).toBe('rtl');
+    expect(container.querySelector('.report-page')?.getAttribute('dir')).toBe('rtl');
     expect(screen.getAllByRole('textbox')).toHaveLength(7);
     fireEvent.change(screen.getByRole('textbox', { name: /المستوى/u }), { target: { value: 'السنة الرابعة' } });
     expect(mocks.saveInspectionReport).not.toHaveBeenCalled();

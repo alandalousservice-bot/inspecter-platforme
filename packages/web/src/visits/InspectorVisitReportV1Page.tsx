@@ -249,11 +249,11 @@ export function InspectorVisitReportV1Page({ visit, initialReport }: Props) {
     finally { setBusy(false); }
   }
 
-  if (loading) return <main className="report-page" dir="rtl"><LoadingState label="جارٍ تحميل نموذج التقرير…" /></main>;
-  if (error && criteria.length === 0) return <main className="report-page" dir="rtl"><ErrorState title="تعذر تحميل نموذج التقرير" description={error} action={<Button variant="secondary" onClick={() => window.location.reload()}>إعادة التحميل</Button>} /></main>;
-  if (!visitType) return <main className="report-page" dir="rtl"><ErrorState title="نوع الزيارة غير محدد" description="لا يمكن فتح نموذج التقرير قبل تحديد نوع الزيارة." /></main>;
+  if (loading) return <div className="report-page" dir="rtl"><LoadingState label="جارٍ تحميل نموذج التقرير…" /></div>;
+  if (error && criteria.length === 0) return <div className="report-page" dir="rtl"><ErrorState title="تعذر تحميل نموذج التقرير" description={error} action={<Button variant="secondary" onClick={() => window.location.reload()}>إعادة التحميل</Button>} /></div>;
+  if (!visitType) return <div className="report-page" dir="rtl"><ErrorState title="نوع الزيارة غير محدد" description="لا يمكن فتح نموذج التقرير قبل تحديد نوع الزيارة." /></div>;
 
-  return <main className="report-page v1-report-page" dir="rtl">
+  return <div className="report-page v1-report-page" dir="rtl">
     <header className="report-page__header"><div><h1>تقرير زيارة المفتش — الإصدار الأول</h1><p>نموذج تقرير زيارة معتمد للمنصة</p></div><Link to={`/app/visits/${encodeURIComponent(visit.id)}`} onClick={navigateBack}>العودة إلى الزيارة</Link></header>
     {notice ? <SuccessState title={notice} /> : null}{error && criteria.length ? <ErrorState title={error} /> : null}
     {visit.status === 'CANCELLED' && !report ? <ErrorState title="الزيارة ملغاة" description="لا يمكن إنشاء تقرير لهذه الزيارة." /> : null}
@@ -339,5 +339,5 @@ export function InspectorVisitReportV1Page({ visit, initialReport }: Props) {
         <label htmlFor="v1-followup-date">تاريخ الاستحقاق</label><input id="v1-followup-date" className="ui-input" type="date" required value={followUpDueDate} onChange={(event) => setFollowUpDueDate(event.currentTarget.value)} />
       </form>
     </Dialog>
-  </main>;
+  </div>;
 }

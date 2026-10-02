@@ -6,7 +6,7 @@
 |---|---|---|
 | `/public/d/:districtId/register` | نموذج تقديم الأستاذ؛ من TASK-041 تصريح جهة عمل واحدة بأربعة حقول مطلوبة: اسم المؤسسة، بلدية العمل، عنوان المؤسسة، رقم هاتف مدير المؤسسة؛ تحقق وإيصال محايد. لا اختيار مؤسسة معتمدة أو مؤسسات إضافية في النموذج الجديد | POST public submissions |
 | `/login` | دخول المفتش، فشل آمن | auth |
-| `/app` | Dashboard: KPIs، طلبات معلقة، زيارات قادمة، متابعة، نشاط حديث، إجراءات سريعة؛ رسم فقط عند بيانات مفيدة | dashboard summary |
+| `/app` | يحول حاليًا إلى `/app/institutions`؛ Dashboard مستقبلية عبر TASK-070/071 وليست منفذة | redirect فقط |
 | `/app/submissions` | قائمة قراءة للمفتش مع فلترة الحالة والبحث ومؤشر تشابه محتمل وتصفح | submissions (TASK-032) |
 | `/app/submissions/:id` | عرض تصريح جهة العمل الجديد أو لقطة G3 القديمة كما هي، مع وسم «غير معتمد» وبيانات ناقصة «غير متاحة»؛ الأسماء الإضافية القديمة تاريخية فقط. ملخص المرشحات والقرار؛ بعد القبول رابط Teacher المصرح | submission detail (TASK-032); decision UI (TASK-033/034); compatibility (TASK-041) |
 | `/app/teachers` | دليل عملي عربي RTL لـ180+ أستاذ؛ بحث/مرشحات/مؤسسة/سنة-يوم-وقت وترقيم خادمي بـTASK-044، وحفظ المرشحات في URL، تنقل للملف والجدول | `GET /teachers`؛ `/me/districts` لسياق المقاطعات؛ بحث مؤسسات محدود عند مرشح المؤسسة |
@@ -18,12 +18,18 @@
 | `/app/visits/:id` | تفصيل تاريخي، إعادة جدولة وإكمال/إلغاء للمخططة فقط | GET/PATCH visits/:id |
 | `/app/visits/:id/report` | تقرير مرافقة بيداغوجية من إعداد المفتش؛ مسودة أو نهائي للقراءة فقط؛ بلا طباعة في TASK-052 | GET/PUT visits/:id/report، POST reports/:id/finalize |
 | `/app/me/professional-identity` | إكمال/تحرير الاسم واللقب المهنيين للمفتش الحالي قبل إتمام تقرير | GET/PUT me/professional-identity |
-| `/app/reference` | مكتبة مصادر موثقة ومستويات/ميادين/كفاءات/أهداف | reference |
-| `/app/proposals` | قائمة مع نوع/حالة/نسخ/أرشفة، ووسم مقترح ظاهر | proposals |
-| `/app/proposals/:id` | محرر بحسب النوع: مقطع، مخطط سنوي، توزيع سنوي، أو نموذج مذكرة للأساتذة؛ حفظ revision ونسخ وطباعة | proposal/revisions |
+| `/app/reference` | FUTURE / NOT IMPLEMENTED؛ لا route مسجل ولا يظهر في التنقل | TASK-060/061 بعد إغلاق ADR-013 |
+| `/app/proposals` | FUTURE / NOT IMPLEMENTED؛ لا route مسجل ولا يظهر في التنقل | TASK-062/063 |
+| `/app/proposals/:id` | FUTURE / NOT IMPLEMENTED؛ لا route مسجل ولا يظهر في التنقل | TASK-064/066 |
 | `/app/follow-ups` | قائمة إجراءات المتابعة البيداغوجية المفتوحة/المكتملة والتنبيه التشغيلي المشتق | GET follow-ups |
-| `/app/activity` | سجل نشاط مصرح ومخفف البيانات | audit-events |
-| `/app/print/:kind/:id` | نسخة طباعة A4 ذات عنوان ونوع/مصدر واضح | resource snapshot |
+| `/app/activity` | FUTURE / NOT IMPLEMENTED؛ لا route مسجل ولا يظهر في التنقل | لا عقد UI منفذ |
+| `/app/print/:kind/:id` | FUTURE / NOT IMPLEMENTED؛ لا route مسجل. طباعة بطاقة المعلومات فقط لها المسار المحدد أعلاه | resource snapshot مستقبلًا |
+
+## Actual authenticated navigation — G6-02
+
+التنقل الرئيسي يعرض فقط المساحات المسجلة والمنفذة: `/app/institutions` «المؤسسات»، `/app/teachers` «دليل الأساتذة»، `/app/submissions` «طلبات الأساتذة»، `/app/visits` «الزيارات»، و`/app/follow-ups` «المتابعات». مسار التفاصيل/الأبناء يبقي رابط المساحة الأم نشطًا: Teacher profile/card/schedule تحت دليل الأساتذة؛ submission detail تحت الطلبات؛ visit create/detail/report تحت الزيارات. «هويتي المهنية» رابط حساب منفصل وليس مساحة تشغيل رئيسية.
+
+`/app` يحول إلى المؤسسات كما كان؛ لا «الرئيسية» أو Dashboard وهمية. `/login` والفورم العام خارج AppShell. مسار `/app/teachers/:id/information-card/print` يحتفظ بحارس Session لكنه يعرض وثيقة الطباعة دون AppShell. `/app/reference` و`/app/proposals*` و`/app/activity` مخططات مستقبلية فقط وليست routes أو روابط قابلة للوصول حاليًا.
 
 النموذج العام لا يعطي بحثًا عن أستاذ ولا حالة قبول؛ رسالة الإرسال لا تثبت وجود سجل. قائمة Teacher ليست frontend-only filter. على الهاتف تتحول الجداول إلى عرض سجلات قابل للتصفح مع فلاتر قابلة للفتح، بينما desktop يحتفظ بكثافة الأعمدة. MemoTemplate لا يظهر كجزء من زيارة/تقرير. شاشات التكوين والحضور مؤجلة حتى قرارات المنتج.
 

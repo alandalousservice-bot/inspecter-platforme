@@ -53,7 +53,7 @@ describe('TASK-084 Teacher information card', () => {
   it('renders private details, current work, independent mark/date, legacy and schedule warning in RTL', async () => {
     const { container } = renderPage('/app/teachers/teacher-1/information-card?academicYear=2026-2027');
     expect(await screen.findByText('أمينة بن صالح')).toBeTruthy();
-    expect(container.querySelector('main[dir="rtl"]')).toBeTruthy();
+    expect(container.querySelector('.teacher-card[dir="rtl"]')).toBeTruthy();
     expect(screen.getByText('عنوان خاص')).toBeTruthy(); expect(screen.getByText('ملاحظة إدارية طويلة')).toBeTruthy();
     expect(screen.getAllByText('المدرسة الأم').length).toBeGreaterThan(0); expect(screen.getByText('school@example.invalid')).toBeTruthy();
     expect(screen.getByText('مدرسة تكملة')).toBeTruthy(); expect(screen.getByText('شهادة منظمة')).toBeTruthy();

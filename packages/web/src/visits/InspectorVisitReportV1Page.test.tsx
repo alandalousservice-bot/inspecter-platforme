@@ -47,7 +47,7 @@ describe('Inspector Visit Report V1 editor', () => {
   it('opens V1 without a report-type chooser and presents all source-oriented sections in RTL', async () => {
     renderRoute();
     expect(await screen.findByRole('heading', { name: 'تقرير زيارة المفتش — الإصدار الأول' })).toBeTruthy();
-    expect(screen.getByRole('main').getAttribute('dir')).toBe('rtl');
+    expect(document.querySelector('.v1-report-page')?.getAttribute('dir')).toBe('rtl');
     expect(screen.getByText('زيارة الترقية / التقييم')).toBeTruthy();
     for (const title of [
       '1. هوية الزيارة والتقرير', '2. معلومات الأستاذ والوضعية المهنية', '3. ظروف التفتيش وسياق الحصة',

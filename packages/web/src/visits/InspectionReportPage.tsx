@@ -33,8 +33,8 @@ export function InspectionReportPage() {
     }).catch(() => { if (mounted) setFailed(true); }).finally(() => { if (mounted) setLoading(false); });
     return () => { mounted = false; };
   }, [id]);
-  if (loading) return <main className="report-page" dir="rtl"><LoadingState label="جارٍ تحميل التقرير…" /></main>;
-  if (failed || !routing) return <main className="report-page" dir="rtl"><ErrorState title="تعذر تحميل التقرير" description="تحقق من الاتصال أو صلاحية الوصول ثم أعد المحاولة." /></main>;
+  if (loading) return <div className="report-page" dir="rtl"><LoadingState label="جارٍ تحميل التقرير…" /></div>;
+  if (failed || !routing) return <div className="report-page" dir="rtl"><ErrorState title="تعذر تحميل التقرير" description="تحقق من الاتصال أو صلاحية الوصول ثم أعد المحاولة." /></div>;
   if (routing.report?.reportType === 'INSPECTOR_VISIT' || (!routing.report && routing.visit.visitType !== null)) {
     return <InspectorVisitReportV1Page visit={routing.visit} initialReport={routing.report?.reportType === 'INSPECTOR_VISIT' ? routing.report as InspectorVisitReport : null} />;
   }
@@ -139,7 +139,7 @@ function LegacyInspectionReportPage() {
     finally { setBusy(false); }
   }
 
-  return <main className="report-page" dir="rtl">
+  return <div className="report-page" dir="rtl">
     <header className="report-page__header"><div><h1>تقرير مرافقة بيداغوجية</h1><p>تقرير من إعداد المفتش — غير رسمي</p></div><Link to={`/app/visits/${encodeURIComponent(id)}`}>العودة إلى الزيارة</Link></header>
     {loading ? <LoadingState label="جارٍ تحميل التقرير…" /> : null}
     {!loading && loadError ? <ErrorState title="تعذر تحميل التقرير" description="تحقق من الاتصال أو صلاحية الوصول ثم أعد المحاولة." action={<Button variant="secondary" onClick={() => void load()}>إعادة التحميل</Button>} /> : null}
@@ -186,5 +186,5 @@ function LegacyInspectionReportPage() {
         {followUpError ? <p role="alert">{followUpError}</p> : null}
       </form>
     </Dialog>
-  </main>;
+  </div>;
 }

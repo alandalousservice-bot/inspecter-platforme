@@ -63,7 +63,7 @@ export function TeacherInformationCardPage() {
 
   const schedulePath = `/app/teachers/${encodeURIComponent(id)}/schedules?academicYear=${encodeURIComponent(selectedYear)}`;
 
-  return <main className="teacher-card" dir="rtl">
+  return <div className="teacher-card" dir="rtl">
     <nav aria-label="مسار التنقل"><Link to="/app/teachers">دليل الأساتذة</Link><span aria-hidden="true"> / </span><Link to={`/app/teachers/${encodeURIComponent(id)}`}>ملف الأستاذ</Link><span aria-hidden="true"> / </span>بطاقة معلومات الأستاذ</nav>
     <header className="teacher-card__heading"><p>عرض خاص بالمفتش</p><h1>بطاقة معلومات الأستاذ</h1>
       {card ? <p className="teacher-card__name">{card.teacher.name} {card.teacher.surname}</p> : null}
@@ -152,5 +152,5 @@ export function TeacherInformationCardPage() {
       </dl></CardContent></Card>
       <nav className="teacher-card__actions" aria-label="روابط ملف الأستاذ"><Link to={`/app/teachers/${encodeURIComponent(id)}`}>العودة إلى ملف الأستاذ</Link><Link to={schedulePath}>التوزيع الأسبوعي</Link><Link to={`/app/teachers/${encodeURIComponent(id)}/information-card/print?academicYear=${encodeURIComponent(selectedYear)}`}>طباعة بطاقة المعلومات</Link></nav>
     </> : null}
-  </main>;
+  </div>;
 }

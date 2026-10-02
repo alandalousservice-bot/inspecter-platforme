@@ -48,7 +48,7 @@ export function FollowUpsPage() {
   }
   const statusLabel = status === 'OPEN' ? 'مفتوحة' : 'مكتملة';
 
-  return <main className="followups-page" dir="rtl">
+  return <div className="followups-page" dir="rtl">
     <header className="followups-page__header"><div><p className="followups-page__eyebrow">المرافقة البيداغوجية</p><h1>إجراءات المتابعة</h1><p>متابعات مرتبطة بتقارير المرافقة النهائية.</p></div></header>
     {notice ? <SuccessState title={notice} /> : null}
     {mutationError ? <ErrorState title={mutationError} action={conflict ? <Button variant="secondary" onClick={() => { setMode(null); setSelected(null); setMutationError(''); setConflict(false); void load(); }}>تحديث البيانات</Button> : undefined} /> : null}
@@ -80,5 +80,5 @@ export function FollowUpsPage() {
         <div className="followup-actions"><Button type="button" variant="secondary" disabled={busy} onClick={() => { setMode(null); setSelected(null); }}>إلغاء</Button><Button type="submit" disabled={busy}>{busy ? 'جارٍ الحفظ…' : mode === 'EDIT' ? 'حفظ التعديل' : 'تأكيد الإكمال'}</Button></div>
       </form>
     </Dialog>
-  </main>;
+  </div>;
 }
