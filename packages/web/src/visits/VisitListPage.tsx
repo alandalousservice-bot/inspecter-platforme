@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { ApiRequestError, getCurrentDistricts, listPedagogicalVisits, type DistrictOption, type Institution, type PedagogicalVisit, type PedagogicalVisitType, type TeacherDirectoryItem, type VisitFilters } from '../auth/client';
-import { Button, Card, CardContent, CardHeader, DataTable, EmptyState, ErrorState, Input, LoadingState, type DataTableColumn } from '../ui';
+import { Button, Card, CardContent, CardHeader, DataTable, EmptyState, ErrorState, FilterBar, Input, LoadingState, PageHeader, type DataTableColumn } from '../ui';
 import { InstitutionPicker, TeacherPicker } from './VisitPickers';
 import { VisitStatusBadge } from './VisitStatusBadge';
 import { formatAlgiers, localDateTimeToOffset, nextLocalDate } from './time';
@@ -107,8 +107,9 @@ export function VisitListPage() {
   const teacherScope = selectedDistrict || (districts.length === 1 ? districts[0].id : '');
   const institutionScope = teacher?.districtId ?? teacherScope;
   return <section className="visit-page" dir="rtl">
-    <header className="visit-page__header"><div><h1>الزيارات التربوية</h1><p>متابعة مواعيد الزيارات وحالاتها.</p></div><Link className="ui-button ui-button--primary" to={`/app/visits/new${filterKey ? `?${filterKey}` : ''}`}>زيارة جديدة</Link></header>
-    <Card><CardHeader title="مرشحات الزيارات" description="تطبق المرشحات على الخادم قبل احتساب النتائج." /><CardContent>
+    <PageHeader title="الزيارات التربوية" description="متابعة مواعيد الزيارات وحالاتها."
+      primaryAction={<Link className="ui-button ui-button--primary" to={`/app/visits/new${filterKey ? `?${filterKey}` : ''}`}>زيارة جديدة</Link>} />
+    <Card><CardHeader title="مرشحات الزيارات" description="تطبق المرشحات على الخادم قبل احتساب النتائج." /><CardContent><FilterBar title="مرشحات الزيارات">
       {districtError ? <p role="alert">تعذر تحميل المقاطعات. تبقى صلاحيات البيانات محددة من الخادم.</p> : null}
       {districts.length > 1 ? <div className="visit-filter"><label className="ui-field__label" htmlFor="visit-filter-district">المقاطعة</label><select id="visit-filter-district" className="ui-input" value={selectedDistrict} onChange={(event) => { setTeacher(null); setInstitution(null); updateFilters({ districtId: event.currentTarget.value || undefined, teacherId: undefined, institutionId: undefined }); }}><option value="">كل المقاطعات الحالية</option>{districts.map((district) => <option key={district.id} value={district.id}>{district.name}</option>)}</select></div> : null}
       {teacherScope ? <TeacherPicker districtId={teacherScope} selected={teacher} onSelect={(value) => { setTeacher(value); updateFilters({ teacherId: value?.id }); }} /> : null}
@@ -123,6 +124,7 @@ export function VisitListPage() {
       </form>
       {filterError ? <p role="alert">{filterError}</p> : null}
       <Button variant="secondary" onClick={() => { setTeacher(null); setInstitution(null); updateFilters(Object.fromEntries(allowedKeys.map((key) => [key, undefined]))); }}>مسح المرشحات</Button>
+      </FilterBar>
     </CardContent></Card>
     <Card><CardHeader title="قائمة الزيارات" description={`إجمالي النتائج: ${total}`} />
       <CardContent>

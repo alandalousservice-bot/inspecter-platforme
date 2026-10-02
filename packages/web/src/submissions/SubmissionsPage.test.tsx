@@ -67,7 +67,7 @@ function renderDetail(result: SubmissionDetail | undefined = detail) {
 }
 
 describe('TASK-032 submissions list UI', () => {
-  it('shows loading then an accessible Arabic RTL list with neutral candidate indicator only when true', async () => {
+  it('shows loading then an accessible Arabic RTL G6 table with neutral candidate indicator only when true', async () => {
     let resolve!: (value: ReturnType<typeof page>) => void;
     listSubmissions.mockReturnValueOnce(new Promise((done) => { resolve = done; }));
     const { container } = renderList();
@@ -76,7 +76,7 @@ describe('TASK-032 submissions list UI', () => {
     expect((await screen.findAllByRole('link')).some((link) => link.textContent === 'أمينة بن صالح')).toBe(true);
     expect(container.querySelector('[dir="rtl"]')).toBeTruthy();
     expect(screen.getAllByText('قد توجد طلبات مشابهة')).toHaveLength(1);
-    expect(screen.getByRole('list', { name: 'طلبات الأساتذة' })).toBeTruthy();
+    expect(screen.getByRole('table', { name: 'طلبات الأساتذة' })).toBeTruthy();
     expect(screen.getByText('إجمالي النتائج: 2')).toBeTruthy();
     expect(screen.queryByText('+213555123456')).toBeNull();
     expect(screen.queryByText('amina@example.dz')).toBeNull();

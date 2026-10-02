@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { ApiRequestError, createPedagogicalVisit, getCurrentDistricts, getValidWorkplaces, type DistrictOption, type PedagogicalVisitType, type ScheduleWarningCode, type TeacherDirectoryItem, type ValidWorkplaceOption } from '../auth/client';
-import { Button, Card, CardContent, CardHeader, Dialog, ErrorState, Input, LoadingState } from '../ui';
+import { Button, Card, CardContent, CardHeader, Dialog, ErrorState, FormSection, Input, LoadingState, PageHeader } from '../ui';
 import { TeacherPicker } from './VisitPickers';
 import { localDateTimeToOffset } from './time';
 import './visits.css';
@@ -115,12 +115,14 @@ export function VisitCreatePage() {
   const canCreate = districts.length > 0 && !districtLoading && !districtError;
   const warningDialog = warning;
   return <section className="visit-page" dir="rtl">
-    <header className="visit-page__header"><div><h1>زيارة جديدة</h1><p>أدخل الموعد صراحةً. التوزيع الأسبوعي مرجع استشاري.</p></div><Link to={`/app/visits${location.search}`}>العودة إلى الزيارات</Link></header>
+    <PageHeader title="زيارة جديدة" description="أدخل الموعد صراحةً. التوزيع الأسبوعي مرجع استشاري."
+      breadcrumbs={[{ label: 'الزيارات التربوية', to: `/app/visits${location.search}` }, { label: 'زيارة جديدة' }]}
+      backAction={<Link to={`/app/visits${location.search}`}>العودة إلى الزيارات</Link>} />
     {districtLoading ? <LoadingState label="جارٍ تحميل المقاطعات الحالية…" /> : null}
     {districtError ? <ErrorState title="تعذر تحميل المقاطعات" description="أعد المحاولة قبل التخطيط؛ لا يمكن اختيار مقاطعة يدويًا خارج النطاق." action={<Button variant="secondary" onClick={() => window.location.reload()}>إعادة المحاولة</Button>} /> : null}
     {!districtLoading && !districtError && districts.length === 0 ? <Card><CardContent><h2>لا توجد مقاطعة حالية متاحة</h2><p>لا يمكن إنشاء زيارة قبل توفر عضوية مقاطعة سارية.</p></CardContent></Card> : null}
     {canCreate ? <Card><CardHeader title="بيانات الزيارة" description="يتحقق الخادم من صلاحية الأستاذ والمؤسسة والموعد عند الحفظ." /><CardContent>
-      <form className="visit-form" onSubmit={submit} aria-busy={saving}>
+      <FormSection title="بيانات الزيارة"><form className="visit-form" onSubmit={submit} aria-busy={saving}>
         {districts.length === 1 ? <div className="visit-field"><span className="ui-field__label">المقاطعة</span><p>{districts[0].name}</p></div> : <div className="visit-field"><label className="ui-field__label" htmlFor="visit-create-district">المقاطعة <span aria-hidden="true">*</span></label><select id="visit-create-district" className="ui-input" required value={districtId} disabled={saving} aria-describedby={formError ? 'visit-create-error' : undefined} onChange={(event) => { setDistrictId(event.currentTarget.value); setTeacher(null); setWarning(null); setFormError(''); }}><option value="">اختر المقاطعة</option>{districts.map((district) => <option key={district.id} value={district.id}>{district.name}</option>)}</select></div>}
         {districtId ? <TeacherPicker districtId={districtId} selected={teacher} onSelect={chooseTeacher} disabled={saving} errorDescriptionId={formError ? 'visit-create-error' : undefined} /> : null}
         {teacher?.currentInstitution ? <p className="visit-inline-note">المؤسسة الأم الحالية: {teacher.currentInstitution.name}{teacher.currentInstitution.municipality ? ` — ${teacher.currentInstitution.municipality}` : ''}</p>
@@ -137,7 +139,7 @@ export function VisitCreatePage() {
         {start && end && start.slice(0, 10) !== end.slice(0, 10) ? <p role="status">يمتد الموعد إلى تاريخ آخر؛ سيظهر تاريخ البداية والنهاية كاملين.</p> : null}
         {formError ? <p id="visit-create-error" className="visit-error" role="alert">{formError}</p> : null}
         <Button type="submit" disabled={saving || !districtId || !teacher || !institutionId || !selectedVisitType}>{saving ? 'جارٍ إنشاء الزيارة…' : 'إنشاء الزيارة'}</Button>
-      </form>
+      </form></FormSection>
     </CardContent></Card> : null}
     <Dialog open={Boolean(warningDialog)} title={warningDialog && 'stale' in warningDialog ? 'تغيّر التوزيع الأسبوعي' : 'تنبيه الجدول الأسبوعي'}
       description={warningDialog && 'stale' in warningDialog ? 'تغير سياق التوزيع بعد التنبيه السابق. أعد فحص الموعد ثم قرر من جديد.' : warningDialog ? warningText[warningDialog.code] : undefined}

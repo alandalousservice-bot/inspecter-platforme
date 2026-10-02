@@ -53,6 +53,6 @@ describe('TASK-053 operational follow-up UI', () => {
   });
   it('completes with optional result and makes completed items read only', async () => {
     mocks.listFollowUps.mockResolvedValue({ data: [{ ...item, status: 'COMPLETED', completionNote: 'منجز', alertState: 'NONE', completedAt: '2026-09-30T10:00:00Z' }], page: { limit: 25, nextCursor: null, total: 1 } });
-    renderPage(); await screen.findByText('منجز'); expect(screen.queryByRole('button', { name: 'إكمال الإجراء' })).toBeNull(); expect(screen.getByText('هذه المتابعة مكتملة وللقراءة فقط.')).toBeTruthy();
+    renderPage(); await screen.findByText('منجز'); expect(screen.queryByRole('button', { name: 'إكمال الإجراء' })).toBeNull(); expect(screen.getByText('للقراءة فقط')).toBeTruthy();
   });
 });

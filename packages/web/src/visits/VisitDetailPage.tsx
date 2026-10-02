@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
 import { ApiRequestError, getPedagogicalVisit, getValidWorkplaces, patchPedagogicalVisit, type PedagogicalVisit, type PedagogicalVisitPatch, type PedagogicalVisitType, type ScheduleWarningCode, type ValidWorkplaceOption } from '../auth/client';
-import { Button, Card, CardContent, CardHeader, Dialog, ErrorState, Input, LoadingState, SuccessState } from '../ui';
+import { Button, Card, CardContent, CardHeader, DetailList, Dialog, ErrorState, Input, LoadingState, PageHeader, SuccessState } from '../ui';
 import { formatAlgiers, localDateTimeToOffset, utcToLocalDateTime } from './time';
 import { VisitStatusBadge } from './VisitStatusBadge';
 import './visits.css';
@@ -132,20 +132,24 @@ export function VisitDetailPage() {
 
   const dialogWarning = warning;
   return <section className="visit-page" dir="rtl">
-    <header className="visit-page__header"><div><h1>تفاصيل الزيارة</h1><p>السجل التشغيلي للزيارة التربوية.</p></div><Link to={`/app/visits${location.search}`}>العودة إلى الزيارات</Link></header>
+    <PageHeader title="تفاصيل الزيارة" description="السجل التشغيلي للزيارة التربوية."
+      breadcrumbs={[{ label: 'الزيارات التربوية', to: `/app/visits${location.search}` }, { label: 'تفاصيل الزيارة' }]}
+      backAction={<Link to={`/app/visits${location.search}`}>العودة إلى الزيارات</Link>} />
     {loading ? <LoadingState label="جارٍ تحميل تفاصيل الزيارة…" /> : null}
     {!loading && loadError ? <ErrorState title="تعذر تحميل الزيارة" description="تحقق من الاتصال أو صلاحية الوصول ثم أعد المحاولة." action={<Button variant="secondary" onClick={() => setRefresh((value) => value + 1)}>إعادة التحميل</Button>} /> : null}
     {!loading && visit ? <>
       {notice ? <SuccessState title={notice} /> : null}
       {operationError ? <ErrorState title={operationError} action={operationError.includes('تغيّرت الزيارة') ? <Button variant="secondary" onClick={() => { setOperationError(''); setRefresh((value) => value + 1); }}>تحديث البيانات</Button> : undefined} /> : null}
       <Card><CardHeader title="معلومات الزيارة" description={`السنة الدراسية ${visit.academicYear}`} action={<VisitStatusBadge status={visit.status} />} />
-        <CardContent><dl className="visit-facts">
-          <div><dt>نوع الزيارة</dt><dd>{visit.visitType ? visitTypeLabels[visit.visitType] : 'نوع الزيارة غير موثق (سجل سابق)'}</dd></div>
-          <div><dt>{visit.intervalKind === 'ACTUAL_RETROSPECTIVE' ? 'الفترة الفعلية للزيارة' : 'الموعد المخطط'}</dt><dd>{visit.actualStartAt && visit.actualEndAt ? <><span dir="auto">{formatAlgiers(visit.actualStartAt)}</span> — <span dir="auto">{formatAlgiers(visit.actualEndAt)}</span></> : visit.scheduledStartAt && visit.scheduledEndAt ? <><span dir="auto">{formatAlgiers(visit.scheduledStartAt)}</span> — <span dir="auto">{formatAlgiers(visit.scheduledEndAt)}</span></> : 'الفترة غير متاحة'}</dd></div>
-          <div><dt>الأستاذ</dt><dd><Link to={`/app/teachers/${encodeURIComponent(visit.teacher.id)}`}>{visit.teacher.name} {visit.teacher.surname}</Link></dd></div>
-          <div><dt>مؤسسة الزيارة وقت التخطيط</dt><dd>{visit.institution.name}<small> هذه هي اللقطة المحفوظة للزيارة، ولا تتغير بتغير المؤسسة الحالية للأستاذ.</small></dd></div>
-          {visit.occurredAt ? <div><dt>وقت الإنجاز الفعلي</dt><dd dir="auto">{formatAlgiers(visit.occurredAt)}</dd></div> : null}
-        </dl></CardContent>
+        <CardContent><DetailList className="visit-facts" items={[
+          { label: 'نوع الزيارة', value: visit.visitType ? visitTypeLabels[visit.visitType] : 'نوع الزيارة غير موثق (سجل سابق)' },
+          { label: visit.intervalKind === 'ACTUAL_RETROSPECTIVE' ? 'الفترة الفعلية للزيارة' : 'الموعد المخطط', value: visit.actualStartAt && visit.actualEndAt
+            ? `${formatAlgiers(visit.actualStartAt)} — ${formatAlgiers(visit.actualEndAt)}`
+            : visit.scheduledStartAt && visit.scheduledEndAt ? `${formatAlgiers(visit.scheduledStartAt)} — ${formatAlgiers(visit.scheduledEndAt)}` : 'الفترة غير متاحة' },
+          { label: 'الأستاذ', value: <Link to={`/app/teachers/${encodeURIComponent(visit.teacher.id)}`}>{visit.teacher.name} {visit.teacher.surname}</Link> },
+          { label: 'مؤسسة الزيارة وقت التخطيط', value: <>{visit.institution.name}<small> هذه هي اللقطة المحفوظة للزيارة، ولا تتغير بتغير المؤسسة الحالية للأستاذ.</small></> },
+          ...(visit.occurredAt ? [{ label: 'وقت الإنجاز الفعلي', value: formatAlgiers(visit.occurredAt) }] : []),
+        ]} /></CardContent>
       </Card>
       {visit.visitTypeEditable ? <Card><CardHeader title="نوع الزيارة" description="يمكن تصحيح النوع حتى إنشاء أي تقرير مرتبط، باستخدام رقم المراجعة الحالي." /><CardContent>
         {editingVisitType ? <div className="visit-field"><label className="ui-field__label" htmlFor="visit-detail-type">نوع الزيارة</label><select id="visit-detail-type" className="ui-input" value={nextVisitType} disabled={busy} onChange={(event) => setNextVisitType(event.currentTarget.value as PedagogicalVisitType | '')}><option value="">اختر نوع الزيارة</option>{Object.entries(visitTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><div className="visit-actions"><Button disabled={busy || !nextVisitType} onClick={() => void saveVisitType()}>{busy ? 'جارٍ الحفظ…' : 'حفظ نوع الزيارة'}</Button><Button variant="secondary" disabled={busy} onClick={() => { setEditingVisitType(false); setNextVisitType(visit.visitType ?? ''); }}>إلغاء</Button></div></div> : <Button variant="secondary" disabled={busy} onClick={() => setEditingVisitType(true)}>تصحيح نوع الزيارة</Button>}

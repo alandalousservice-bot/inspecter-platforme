@@ -47,7 +47,8 @@ describe('Inspector Visit Report V1 editor', () => {
   it('opens V1 without a report-type chooser and presents all source-oriented sections in RTL', async () => {
     renderRoute();
     expect(await screen.findByRole('heading', { name: 'تقرير زيارة المفتش — الإصدار الأول' })).toBeTruthy();
-    expect(document.querySelector('.v1-report-page')?.getAttribute('dir')).toBe('rtl');
+    await screen.findByRole('textbox', { name: 'الميدان: التخطيط' });
+    expect(document.querySelector('.report-page')?.getAttribute('dir')).toBe('rtl');
     expect(screen.getByText('زيارة الترقية / التقييم')).toBeTruthy();
     for (const title of [
       '1. هوية الزيارة والتقرير', '2. معلومات الأستاذ والوضعية المهنية', '3. ظروف التفتيش وسياق الحصة',
@@ -57,13 +58,13 @@ describe('Inspector Visit Report V1 editor', () => {
     ]) expect(screen.getByRole('heading', { name: title })).toBeTruthy();
     expect(screen.queryByRole('combobox', { name: /نوع التقرير/u })).toBeNull();
     expect(screen.queryByRole('button', { name: /طباعة|PDF/u })).toBeNull();
-    expect(screen.getByRole('textbox', { name: 'الميدان: التخطيط' })).toBeTruthy();
+    expect(await screen.findByRole('textbox', { name: 'الميدان: التخطيط' })).toBeTruthy();
     expect(screen.getByRole('textbox', { name: 'الوحدة التعليمية (قسم التحضير)' })).toBeTruthy();
   });
 
   it('uses dictionary criteria and saves explicitly without autosave', async () => {
     renderRoute(); await screen.findByRole('heading', { name: 'تقرير زيارة المفتش — الإصدار الأول' });
-    fireEvent.change(screen.getByRole('textbox', { name: 'الميدان: التخطيط' }), { target: { value: 'ملاحظة ميدانية' } });
+    fireEvent.change(await screen.findByRole('textbox', { name: 'الميدان: التخطيط' }), { target: { value: 'ملاحظة ميدانية' } });
     expect(mocks.saveInspectorVisitReport).not.toHaveBeenCalled();
     mocks.saveInspectorVisitReport.mockResolvedValue({ data: { report: { id: 'report-1', status: 'DRAFT', revision: 1,
       reportType: 'INSPECTOR_VISIT', templateSource: 'PRODUCT_OWNER_ADOPTED', templateVersion: 1,
@@ -84,14 +85,14 @@ describe('Inspector Visit Report V1 editor', () => {
 
   it('shows the promotion mark only for promotion and keeps it optional', async () => {
     renderRoute(); await screen.findByRole('heading', { name: 'تقرير زيارة المفتش — الإصدار الأول' });
-    expect(screen.getByRole('textbox', { name: 'العلامة البيداغوجية (اختيارية من 0 إلى 20)' })).toBeTruthy();
+    expect(await screen.findByRole('textbox', { name: 'العلامة البيداغوجية (اختيارية من 0 إلى 20)' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'حفظ المسودة' })).toBeTruthy();
     expect(screen.queryByText(/العلامة مطلوبة/u)).toBeNull();
   });
 
   it('preserves dirty content and does not auto-retry after a revision conflict', async () => {
     renderRoute(); await screen.findByRole('heading', { name: 'تقرير زيارة المفتش — الإصدار الأول' });
-    const mark = screen.getByRole('textbox', { name: 'العلامة البيداغوجية (اختيارية من 0 إلى 20)' });
+    const mark = await screen.findByRole('textbox', { name: 'العلامة البيداغوجية (اختيارية من 0 إلى 20)' });
     fireEvent.change(mark, { target: { value: '14.25' } });
     mocks.saveInspectorVisitReport.mockRejectedValueOnce(new ApiRequestError('conflict', undefined, 409, 'REPORT_REVISION_CONFLICT'));
     fireEvent.click(screen.getByRole('button', { name: 'حفظ المسودة' }));

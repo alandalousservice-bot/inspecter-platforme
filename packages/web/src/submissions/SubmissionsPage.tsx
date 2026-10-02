@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { Button, Card, CardContent, CardHeader, EmptyState, ErrorState, Input, LoadingState, StatusBadge, type StatusTone } from '../ui';
+import { Button, Card, CardContent, CardHeader, DataTable, EmptyState, ErrorState, FilterBar, Input, LoadingState, PageHeader, Pagination, StatusBadge, type DataTableColumn, type StatusTone } from '../ui';
 import { listSubmissions, type SubmissionListItem, type SubmissionStatus } from '../auth/client';
 import './submissions.css';
 
@@ -63,6 +63,14 @@ export function SubmissionsPage() {
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const statusLabels = useMemo(() => new Map(statusOptions.map(({ value, label }) => [value, label])), []);
+  const columns = useMemo<DataTableColumn<SubmissionListItem>[]>(() => [
+    { id: 'teacher', header: 'الأستاذ', render: (row) => <Link to={`/app/submissions/${encodeURIComponent(row.id)}`}>{row.firstName} {row.lastName}</Link> },
+    { id: 'birthDate', header: 'تاريخ الميلاد', render: (row) => formatDate(row.dateOfBirth) },
+    { id: 'institution', header: 'جهة العمل المصرح بها', render: (row) => row.primaryInstitutionName },
+    { id: 'submittedAt', header: 'تاريخ الإرسال', render: (row) => formatDateTime(row.submittedAt) },
+    { id: 'status', header: 'الحالة', render: (row) => <StatusBadge tone={statusTones[row.status]}>{statusLabels.get(row.status) ?? 'غير محددة'}</StatusBadge> },
+    { id: 'duplicates', header: 'التنبيه', render: (row) => row.hasPotentialDuplicates ? 'قد توجد طلبات مشابهة' : '—' },
+  ], [statusLabels]);
 
   function applyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -86,17 +94,12 @@ export function SubmissionsPage() {
 
   return (
     <div className="submissions-page" dir="rtl">
-      <header className="submissions-heading">
-        <div>
-          <p className="submissions-eyebrow">استقبال الأساتذة</p>
-          <h1>طلبات الأساتذة</h1>
-          <p>استعرض الطلبات الواردة ضمن المقاطعات المتاحة لك.</p>
-        </div>
-      </header>
+      <PageHeader eyebrow="استقبال الأساتذة" title="طلبات الأساتذة" description="استعرض الطلبات الواردة ضمن المقاطعات المتاحة لك." />
 
       <Card>
         <CardHeader title="قائمة الطلبات" description="تُحدّث النتائج والفلاتر من الخادم." />
         <CardContent>
+          <FilterBar title="البحث والمرشحات" description="تُحدّث النتائج والفلاتر من الخادم.">
           <form className="submissions-filters" onSubmit={applyFilters} role="search">
             <Input id="submission-search" label="البحث في الطلبات" value={searchText} onChange={(event) => setSearchText(event.currentTarget.value)} placeholder="الاسم أو المؤسسة الأساسية" />
             <div className="ui-field">
@@ -107,6 +110,7 @@ export function SubmissionsPage() {
             </div>
             <Button type="submit">تطبيق</Button>
           </form>
+          </FilterBar>
 
           <p className="submissions-result-count" aria-live="polite">إجمالي النتائج: {loading ? '…' : total}</p>
           {loading ? <LoadingState label="جارٍ تحميل الطلبات…" /> : null}
@@ -114,35 +118,12 @@ export function SubmissionsPage() {
           {!loading && !failed && rows.length === 0 ? (
             <EmptyState title={activeQuery ? 'لا توجد نتائج مطابقة' : 'لا توجد طلبات في هذه الحالة'} description={activeQuery ? 'جرّب عبارة بحث أخرى.' : 'ستظهر هنا الطلبات الواردة ضمن نطاقك.'} />
           ) : null}
-          {!loading && !failed && rows.length > 0 ? (
-            <ul className="submission-list" aria-label="طلبات الأساتذة">
-              {rows.map((row) => (
-                <li key={row.id}>
-                  <Card className="submission-list-card">
-                    <CardContent>
-                      <div className="submission-list-card__main">
-                        <h3><Link to={`/app/submissions/${encodeURIComponent(row.id)}`}>{row.firstName} {row.lastName}</Link></h3>
-                        {row.hasPotentialDuplicates ? <p className="submission-similarity" aria-label="قد توجد طلبات مشابهة">قد توجد طلبات مشابهة</p> : null}
-                      </div>
-                      <dl className="submission-list-card__facts">
-                        <div><dt>تاريخ الميلاد</dt><dd>{formatDate(row.dateOfBirth)}</dd></div>
-                        <div><dt>جهة العمل المصرح بها</dt><dd>{row.primaryInstitutionName}</dd></div>
-                        <div><dt>تاريخ الإرسال</dt><dd>{formatDateTime(row.submittedAt)}</dd></div>
-                        <div><dt>الحالة</dt><dd><StatusBadge tone={statusTones[row.status]}>{statusLabels.get(row.status) ?? 'غير محددة'}</StatusBadge></dd></div>
-                      </dl>
-                    </CardContent>
-                  </Card>
-                </li>
-              ))}
-            </ul>
-          ) : null}
+          {!loading && !failed && rows.length > 0 ? <DataTable caption="طلبات الأساتذة" columns={columns} rows={rows} rowKey={(row) => row.id} /> : null}
 
           {!loading && !failed ? (
-            <nav className="submissions-pagination" aria-label="صفحات الطلبات">
-              <Button variant="secondary" disabled={pageIndex === 0} onClick={previousPage}>السابق</Button>
-              <span aria-live="polite">الصفحة {Math.min(pageIndex + 1, pageCount)} من {pageCount}</span>
-              <Button variant="secondary" disabled={!nextCursor} onClick={nextPage}>التالي</Button>
-            </nav>
+            <Pagination label="صفحات الطلبات" currentPage={Math.min(pageIndex + 1, pageCount)} rangeStart={total ? pageIndex * PAGE_SIZE + 1 : 0}
+              rangeEnd={pageIndex * PAGE_SIZE + rows.length} total={total} hasPrevious={pageIndex > 0} hasNext={Boolean(nextCursor)}
+              onPrevious={previousPage} onNext={nextPage} />
           ) : null}
         </CardContent>
       </Card>

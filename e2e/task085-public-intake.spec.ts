@@ -130,6 +130,7 @@ test('TASK-085 public declarations, Inspector acceptance and authoritative infor
   await expect(page.getByText(teacherData.qualificationOne, { exact: true })).toHaveCount(0);
   await expect(page.getByText(teacherData.extraOne, { exact: true })).toHaveCount(0);
   await expect(page.getByText(teacherData.home, { exact: true })).toHaveCount(0);
-  await expect(page.locator('main.teacher-card')).toHaveAttribute('dir', 'rtl');
+  await expect(page.locator('.teacher-card')).toHaveAttribute('dir', 'rtl');
+  await expect(page.locator('main')).toHaveCount(1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 });

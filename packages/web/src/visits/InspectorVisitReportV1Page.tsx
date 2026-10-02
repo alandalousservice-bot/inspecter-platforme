@@ -5,7 +5,7 @@ import {
   patchFollowUp, saveInspectorVisitReport, type FollowUp, type InspectorVisitCriterion,
   type InspectorVisitReport, type InspectorVisitReportInput, type InspectorVisitV1Fields, type PedagogicalVisit,
 } from '../auth/client';
-import { Button, Card, CardContent, CardHeader, Dialog, ErrorState, LoadingState, SuccessState } from '../ui';
+import { Button, Card, CardContent, CardHeader, Dialog, ErrorState, LoadingState, PageHeader, SuccessState } from '../ui';
 import { formatAlgiers } from './time';
 import './inspection-report.css';
 import './inspector-visit-report.css';
@@ -249,12 +249,14 @@ export function InspectorVisitReportV1Page({ visit, initialReport }: Props) {
     finally { setBusy(false); }
   }
 
-  if (loading) return <div className="report-page" dir="rtl"><LoadingState label="جارٍ تحميل نموذج التقرير…" /></div>;
-  if (error && criteria.length === 0) return <div className="report-page" dir="rtl"><ErrorState title="تعذر تحميل نموذج التقرير" description={error} action={<Button variant="secondary" onClick={() => window.location.reload()}>إعادة التحميل</Button>} /></div>;
-  if (!visitType) return <div className="report-page" dir="rtl"><ErrorState title="نوع الزيارة غير محدد" description="لا يمكن فتح نموذج التقرير قبل تحديد نوع الزيارة." /></div>;
+  if (loading) return <div className="report-page" dir="rtl"><PageHeader title="تقرير زيارة المفتش — الإصدار الأول" breadcrumbs={[{ label: 'الزيارات التربوية', to: '/app/visits' }, { label: 'تفاصيل الزيارة', to: `/app/visits/${encodeURIComponent(visit.id)}` }, { label: 'التقرير' }]} /><LoadingState label="جارٍ تحميل نموذج التقرير…" /></div>;
+  if (error && criteria.length === 0) return <div className="report-page" dir="rtl"><PageHeader title="تقرير زيارة المفتش — الإصدار الأول" breadcrumbs={[{ label: 'الزيارات التربوية', to: '/app/visits' }, { label: 'تفاصيل الزيارة', to: `/app/visits/${encodeURIComponent(visit.id)}` }, { label: 'التقرير' }]} /><ErrorState title="تعذر تحميل نموذج التقرير" description={error} action={<Button variant="secondary" onClick={() => window.location.reload()}>إعادة التحميل</Button>} /></div>;
+  if (!visitType) return <div className="report-page" dir="rtl"><PageHeader title="تقرير زيارة المفتش — الإصدار الأول" breadcrumbs={[{ label: 'الزيارات التربوية', to: '/app/visits' }, { label: 'تفاصيل الزيارة', to: `/app/visits/${encodeURIComponent(visit.id)}` }, { label: 'التقرير' }]} /><ErrorState title="نوع الزيارة غير محدد" description="لا يمكن فتح نموذج التقرير قبل تحديد نوع الزيارة." /></div>;
 
   return <div className="report-page v1-report-page" dir="rtl">
-    <header className="report-page__header"><div><h1>تقرير زيارة المفتش — الإصدار الأول</h1><p>نموذج تقرير زيارة معتمد للمنصة</p></div><Link to={`/app/visits/${encodeURIComponent(visit.id)}`} onClick={navigateBack}>العودة إلى الزيارة</Link></header>
+    <PageHeader title="تقرير زيارة المفتش — الإصدار الأول" description="نموذج تقرير زيارة معتمد للمنصة"
+      breadcrumbs={[{ label: 'الزيارات التربوية', to: '/app/visits' }, { label: 'تفاصيل الزيارة', to: `/app/visits/${encodeURIComponent(visit.id)}` }, { label: 'التقرير' }]}
+      backAction={<Link to={`/app/visits/${encodeURIComponent(visit.id)}`} onClick={navigateBack}>العودة إلى الزيارة</Link>} />
     {notice ? <SuccessState title={notice} /> : null}{error && criteria.length ? <ErrorState title={error} /> : null}
     {visit.status === 'CANCELLED' && !report ? <ErrorState title="الزيارة ملغاة" description="لا يمكن إنشاء تقرير لهذه الزيارة." /> : null}
     <form onSubmit={(event) => void save(event)} aria-busy={busy}>

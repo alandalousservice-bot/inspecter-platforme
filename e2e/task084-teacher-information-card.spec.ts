@@ -45,7 +45,8 @@ test('TASK-084 Inspector directory to current information card, source independe
   await expect(page.getByText('15.5 / 20', { exact: true })).toBeVisible();
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Algiers', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
   await expect(page.getByText(today, { exact: true })).toBeVisible();
-  await expect(page.locator('main.teacher-card')).toHaveAttribute('dir', 'rtl');
+  await expect(page.locator('.teacher-card')).toHaveAttribute('dir', 'rtl');
+  await expect(page.locator('main')).toHaveCount(1);
   await expect(page.getByRole('link', { name: 'عرض التوزيع الأسبوعي الكامل' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 

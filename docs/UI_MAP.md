@@ -2,7 +2,7 @@
 
 جميع شاشات المفتش authenticated وباتجاه RTL وفق [DESIGN_SYSTEM](DESIGN_SYSTEM.md). paths مقترحة ثابتة للـMVP؛ تغييرها قرار عقد. كل شاشة بيانات لها loading skeleton، empty مع إجراء مناسب، error مع retry، success feedback بعد mutation. Query filters في URL حيث يفيد الرجوع والمشاركة الداخلية، دون بيانات حساسة فيه.
 
-ضمن G6-04، `AppShell` يحتفظ بـmain والحشو الرأسي فقط، ويملك `PageContainer` عرض الشاشة الأقصى والـgutters الأفقية. مسار `/app/teachers/:id/information-card/print` استثناء مقصود خارج shell/page container. الترحيل التمثيلي المنجز حتى الآن محدود إلى `/app/teachers` (PageHeader/FilterBar/cursor Pagination) و`/app/teachers/:id` (PageHeader/Breadcrumbs/DetailList وFormSection في وضع التحرير). باقي الشاشات أدناه جرد للمستهلكين وخطة ترحيل G6-05؛ لا يفترض أنها استعملت primitives الجديدة بالفعل.
+ضمن G6-04/G6-05، `AppShell` يحتفظ بـmain والحشو الرأسي فقط، ويملك `PageContainer` عرض الشاشة الأقصى والـgutters الأفقية. شاشات المفتش المصادق عليها المنفذة تستخدم الآن نظام الصفحة المشترك حيث يلائم معناها: PageHeader/Breadcrumbs، FilterBar، FormSection، DetailList، DataTable وPagination، مع إبقاء حالات المجال والأفعال وعقود API كما هي. دليل الأساتذة وملفه كانا الترحيل التمثيلي الأول في G6-04؛ أكمل G6-05 الاتساق عبر المؤسسات، الطلبات وتفاصيلها، بطاقة المعلومات داخل التطبيق، الجدول الأسبوعي، الزيارات وتقاريرها، المتابعات، والهوية المهنية. مسار `/app/teachers/:id/information-card/print` استثناء مقصود خارج shell/page container ونظام صفحات التطبيق. الدخول والاستمارة العامة خارج النطاق حتى G6-06، والتحقق النهائي الشامل يبقى G6-07.
 
 | Route | الشاشة والغرض | API الأساسي |
 |---|---|---|

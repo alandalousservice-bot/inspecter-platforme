@@ -1,7 +1,7 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { getTeacherInformationCard, type TeacherInformationCard } from '../auth/client';
-import { Button, Card, CardContent, CardHeader, ErrorState, Input, LoadingState } from '../ui';
+import { Button, Card, CardContent, CardHeader, DetailList, ErrorState, Input, LoadingState, PageHeader } from '../ui';
 import { weekdays } from './weekly-schedule-domain';
 import './teacher-information-card.css';
 
@@ -18,10 +18,6 @@ const validAcademicYear = (value: string) => /^\d{4}-\d{4}$/u.test(value) && Num
 const unavailable = (value: string | null | undefined) => value || 'غير متوفر';
 const displayDate = (value: string | null | undefined) => value || 'غير متوفر';
 const displayTime = (minute: number) => `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
-
-function Fact({ label, value }: { label: string; value: string | null | undefined }) {
-  return <div className="teacher-card__fact"><dt>{label}</dt><dd dir="auto">{unavailable(value)}</dd></div>;
-}
 
 export function TeacherInformationCardPage() {
   const { id = '' } = useParams();
@@ -64,10 +60,8 @@ export function TeacherInformationCardPage() {
   const schedulePath = `/app/teachers/${encodeURIComponent(id)}/schedules?academicYear=${encodeURIComponent(selectedYear)}`;
 
   return <div className="teacher-card" dir="rtl">
-    <nav aria-label="مسار التنقل"><Link to="/app/teachers">دليل الأساتذة</Link><span aria-hidden="true"> / </span><Link to={`/app/teachers/${encodeURIComponent(id)}`}>ملف الأستاذ</Link><span aria-hidden="true"> / </span>بطاقة معلومات الأستاذ</nav>
-    <header className="teacher-card__heading"><p>عرض خاص بالمفتش</p><h1>بطاقة معلومات الأستاذ</h1>
-      {card ? <p className="teacher-card__name">{card.teacher.name} {card.teacher.surname}</p> : null}
-    </header>
+    <PageHeader eyebrow="عرض خاص بالمفتش" title="بطاقة معلومات الأستاذ" description={card ? `${card.teacher.name} ${card.teacher.surname}` : undefined}
+      breadcrumbs={[{ label: 'دليل الأساتذة', to: '/app/teachers' }, { label: 'ملف الأستاذ', to: `/app/teachers/${encodeURIComponent(id)}` }, { label: 'بطاقة معلومات الأستاذ' }]} />
     <Card><CardHeader title="السنة الدراسية" description="اختر السنة صراحةً لعرض التوزيع الأسبوعي المرتبط بها." /><CardContent>
       <form className="teacher-card__year-form" onSubmit={submitYear}>
         <Input id="teacher-card-academic-year" label="السنة الدراسية" placeholder="2026-2027" value={yearDraft} onChange={changeYear}
@@ -81,27 +75,28 @@ export function TeacherInformationCardPage() {
     {!loading && loadError ? <ErrorState title="تعذر عرض بطاقة المعلومات" description="البطاقة غير متاحة ضمن نطاق الوصول أو تعذر تحميلها." action={<Button variant="secondary" onClick={() => setRefreshKey((value) => value + 1)}>إعادة المحاولة</Button>} /> : null}
     {!loading && !loadError && card ? <>
       <p className="teacher-card__as-of">الحالة المعروضة بتاريخ {card.asOfDate} — السنة الدراسية {card.academicYear}</p>
-      <Card><CardHeader title="الهوية والمعلومات الشخصية" /><CardContent><dl className="teacher-card__facts">
-        <Fact label="الاسم" value={card.teacher.name} /><Fact label="اللقب" value={card.teacher.surname} />
-        <Fact label="تاريخ الميلاد" value={displayDate(card.teacher.birthDate)} /><Fact label="مكان الميلاد" value={card.teacher.placeOfBirth} />
-        <Fact label="ولاية الميلاد" value={card.teacher.birthProvince} /><Fact label="العنوان الشخصي" value={card.teacher.personalAddress} />
-        <Fact label="رقم الهاتف" value={card.teacher.phone} /><Fact label="البريد الإلكتروني الخاص" value={card.teacher.email} />
-      </dl></CardContent></Card>
-      <Card><CardHeader title="الوضعية المهنية والإدارية" /><CardContent><dl className="teacher-card__facts">
-        <Fact label="الصفة المهنية" value={card.teacher.professionalStatus ? statusLabels[card.teacher.professionalStatus] ?? null : null} />
-        <Fact label="الإطار" value={card.teacher.professionalFramework} /><Fact label="تاريخ التوظيف" value={card.teacher.employedAt} />
-        <Fact label="تاريخ أول تعيين في التعليم" value={card.teacher.firstEducationAppointmentDate} />
-        <Fact label="رقم قرار أول تعيين في التعليم" value={card.teacher.firstEducationAppointmentDecisionNumber} />
-        <Fact label="تاريخ أول تنصيب" value={card.teacher.firstInstallationDate} /><Fact label="تاريخ التربص" value={card.teacher.traineeshipDate} />
-        <Fact label="تاريخ الترسيم" value={card.teacher.confirmedAt} />
-      </dl></CardContent></Card>
+      <Card><CardHeader title="الهوية والمعلومات الشخصية" /><CardContent><DetailList className="teacher-card__facts" items={[
+        { label: 'الاسم', value: card.teacher.name }, { label: 'اللقب', value: card.teacher.surname },
+        { label: 'تاريخ الميلاد', value: displayDate(card.teacher.birthDate) }, { label: 'مكان الميلاد', value: card.teacher.placeOfBirth },
+        { label: 'ولاية الميلاد', value: card.teacher.birthProvince }, { label: 'العنوان الشخصي', value: card.teacher.personalAddress },
+        { label: 'رقم الهاتف', value: card.teacher.phone }, { label: 'البريد الإلكتروني الخاص', value: card.teacher.email },
+      ]} /></CardContent></Card>
+      <Card><CardHeader title="الوضعية المهنية والإدارية" /><CardContent><DetailList className="teacher-card__facts" items={[
+        { label: 'الصفة المهنية', value: card.teacher.professionalStatus ? statusLabels[card.teacher.professionalStatus] ?? null : null },
+        { label: 'الإطار', value: card.teacher.professionalFramework }, { label: 'تاريخ التوظيف', value: card.teacher.employedAt },
+        { label: 'تاريخ أول تعيين في التعليم', value: card.teacher.firstEducationAppointmentDate },
+        { label: 'رقم قرار أول تعيين في التعليم', value: card.teacher.firstEducationAppointmentDecisionNumber },
+        { label: 'تاريخ أول تنصيب', value: card.teacher.firstInstallationDate }, { label: 'تاريخ التربص', value: card.teacher.traineeshipDate },
+        { label: 'تاريخ الترسيم', value: card.teacher.confirmedAt },
+      ]} /></CardContent></Card>
       <Card><CardHeader title="المؤسسة الأم" /><CardContent>
-        {card.homeInstitution ? <><dl className="teacher-card__facts"><Fact label="المؤسسة" value={card.homeInstitution.name} />
-          <Fact label="البلدية" value={card.homeInstitution.municipality} /><Fact label="البريد الإلكتروني للمؤسسة" value={card.homeInstitution.email} />
-          <Fact label="تاريخ التعيين بالمؤسسة" value={card.homeInstitution.appointment.institutionAppointmentDate} />
-          <Fact label="رقم التعيين بالمؤسسة" value={card.homeInstitution.appointment.institutionAppointmentNumber} />
-          <Fact label="رقم تأشيرة المراقب المالي" value={card.homeInstitution.appointment.financialControllerVisaNumber} />
-        </dl>{card.homeInstitution.archivedAt ? <p className="teacher-card__hint">مؤرشفة — ما زالت مرتبطة حاليًا بملف الأستاذ.</p> : null}</>
+        {card.homeInstitution ? <><DetailList className="teacher-card__facts" items={[
+          { label: 'المؤسسة', value: card.homeInstitution.name }, { label: 'البلدية', value: card.homeInstitution.municipality },
+          { label: 'البريد الإلكتروني للمؤسسة', value: card.homeInstitution.email },
+          { label: 'تاريخ التعيين بالمؤسسة', value: card.homeInstitution.appointment.institutionAppointmentDate },
+          { label: 'رقم التعيين بالمؤسسة', value: card.homeInstitution.appointment.institutionAppointmentNumber },
+          { label: 'رقم تأشيرة المراقب المالي', value: card.homeInstitution.appointment.financialControllerVisaNumber },
+        ]} />{card.homeInstitution.archivedAt ? <p className="teacher-card__hint">مؤرشفة — ما زالت مرتبطة حاليًا بملف الأستاذ.</p> : null}</>
           : <p>لا توجد مؤسسة أم معتمدة</p>}
       </CardContent></Card>
       <Card><CardHeader title="مؤسسات تكملة النصاب الحالية" /><CardContent>
@@ -116,14 +111,14 @@ export function TeacherInformationCardPage() {
         </li>)}</ul> : <p>لا توجد مؤهلات منظمة مسجلة.</p>}
         <section className="teacher-card__legacy"><h3>مؤهلات سابقة غير مفصلة</h3><p dir="auto">{card.qualifications.legacyText || 'غير متوفر'}</p></section>
       </CardContent></Card>
-      <Card><CardHeader title="التصنيف الإداري" /><CardContent><dl className="teacher-card__facts">
-        <Fact label="الصنف" value={card.teacher.administrativeCategory} /><Fact label="القسم الإداري" value={card.teacher.administrativeSection} />
-        <Fact label="الدرجة" value={card.teacher.administrativeGrade} /><Fact label="تاريخ سريان التصنيف" value={card.teacher.administrativeClassificationEffectiveDate} />
-      </dl></CardContent></Card>
-      <Card><CardHeader title="آخر تفتيش والنقطة /20" /><CardContent><dl className="teacher-card__facts">
-        <Fact label="تاريخ آخر تفتيش" value={card.inspectionSummary.lastInspectionDate} />
-        <Fact label="النقطة البيداغوجية" value={card.inspectionSummary.pedagogicalMark === null ? null : `${card.inspectionSummary.pedagogicalMark} / 20`} />
-      </dl></CardContent></Card>
+      <Card><CardHeader title="التصنيف الإداري" /><CardContent><DetailList className="teacher-card__facts" items={[
+        { label: 'الصنف', value: card.teacher.administrativeCategory }, { label: 'القسم الإداري', value: card.teacher.administrativeSection },
+        { label: 'الدرجة', value: card.teacher.administrativeGrade }, { label: 'تاريخ سريان التصنيف', value: card.teacher.administrativeClassificationEffectiveDate },
+      ]} /></CardContent></Card>
+      <Card><CardHeader title="آخر تفتيش والنقطة /20" /><CardContent><DetailList className="teacher-card__facts" items={[
+        { label: 'تاريخ آخر تفتيش', value: card.inspectionSummary.lastInspectionDate },
+        { label: 'النقطة البيداغوجية', value: card.inspectionSummary.pedagogicalMark === null ? null : `${card.inspectionSummary.pedagogicalMark} / 20` },
+      ]} /></CardContent></Card>
       <Card><CardHeader title="التوزيع الأسبوعي الحالي" description={`السنة الدراسية ${card.weeklySchedule?.academicYear ?? card.academicYear}`} action={<Link to={schedulePath}>عرض التوزيع الأسبوعي الكامل</Link>} /><CardContent>
         {!card.weeklySchedule ? <p>لم يُسجَّل جدول لهذه السنة</p> : <>
           {weekdays.map((day, index) => {
@@ -145,11 +140,11 @@ export function TeacherInformationCardPage() {
         </>}
       </CardContent></Card>
       <Card><CardHeader title="معلومات إدارية إضافية" /><CardContent><p className="teacher-card__note" dir="auto">{card.teacher.administrativeNote || 'غير متوفر'}</p></CardContent></Card>
-      <Card><CardHeader title="السياق الإداري" /><CardContent><dl className="teacher-card__facts">
-        <Fact label="المقاطعة" value={card.organizationalContext.district.name} />
-        <Fact label="المفتش" value={[card.organizationalContext.inspector?.name, card.organizationalContext.inspector?.surname].filter(Boolean).join(' ') || null} />
-        <Fact label="السنة الدراسية" value={card.academicYear} />
-      </dl></CardContent></Card>
+      <Card><CardHeader title="السياق الإداري" /><CardContent><DetailList className="teacher-card__facts" items={[
+        { label: 'المقاطعة', value: card.organizationalContext.district.name },
+        { label: 'المفتش', value: [card.organizationalContext.inspector?.name, card.organizationalContext.inspector?.surname].filter(Boolean).join(' ') || null },
+        { label: 'السنة الدراسية', value: card.academicYear },
+      ]} /></CardContent></Card>
       <nav className="teacher-card__actions" aria-label="روابط ملف الأستاذ"><Link to={`/app/teachers/${encodeURIComponent(id)}`}>العودة إلى ملف الأستاذ</Link><Link to={schedulePath}>التوزيع الأسبوعي</Link><Link to={`/app/teachers/${encodeURIComponent(id)}/information-card/print?academicYear=${encodeURIComponent(selectedYear)}`}>طباعة بطاقة المعلومات</Link></nav>
     </> : null}
   </div>;

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ApiRequestError, getProfessionalIdentity, putProfessionalIdentity, type ProfessionalIdentity } from './client';
-import { Button, Card, CardContent, CardHeader, ErrorState, Input, LoadingState, SuccessState } from '../ui';
+import { Button, Card, CardContent, CardHeader, ErrorState, Input, LoadingState, PageHeader, SuccessState } from '../ui';
 import './professional-identity.css';
 
 type Draft = { name: string; surname: string };
@@ -53,7 +53,7 @@ export function ProfessionalIdentityPage() {
   }
 
   return <div dir="rtl" className="professional-identity-page">
-    <h1>هويتي المهنية</h1>
+    <PageHeader title="هويتي المهنية" description="الاسم واللقب المستخدمان في هوية المفتش المهنية." />
     {loading ? <LoadingState label="جارٍ تحميل الهوية المهنية…" /> : loadError ? <ErrorState description="تعذر تحميل الهوية المهنية. أعد تحميل الصفحة." /> :
       <Card><CardHeader title="الاسم واللقب المهنيان" description="يُستخدمان لاحقًا لهوية المفتش في التقرير النهائي. لا يُستعمل البريد الإلكتروني اسمًا مهنيًا." />
         <CardContent>

@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { ApiRequestError, getCurrentDistricts, getCurrentInspector, listFollowUps, patchFollowUp, type DistrictOption, type FollowUp } from '../auth/client';
-import { Button, Card, CardContent, CardHeader, Dialog, EmptyState, ErrorState, Input, LoadingState, StatusBadge, SuccessState, Textarea, type StatusTone } from '../ui';
+import { Button, Card, CardContent, CardHeader, DataTable, Dialog, EmptyState, ErrorState, FilterBar, Input, LoadingState, PageHeader, Pagination, StatusBadge, SuccessState, Textarea, type DataTableColumn, type StatusTone } from '../ui';
 import './followups.css';
 
 type ActionMode = 'EDIT' | 'COMPLETE';
@@ -47,31 +47,40 @@ export function FollowUpsPage() {
     } finally { setBusy(false); }
   }
   const statusLabel = status === 'OPEN' ? 'مفتوحة' : 'مكتملة';
+  const columns = useMemo<DataTableColumn<FollowUp>[]>(() => [
+    { id: 'teacher', header: 'الأستاذ', render: (row) => `${row.context.teacher.name} ${row.context.teacher.surname}` },
+    { id: 'institution', header: 'مؤسسة الزيارة', render: (row) => row.context.institution.name },
+    { id: 'action', header: 'الإجراء المطلوب', render: (row) => row.note },
+    { id: 'dueDate', header: 'تاريخ الاستحقاق', render: (row) => <time dateTime={row.dueDate}>{row.dueDate}</time> },
+    { id: 'status', header: 'الحالة', render: (row) => {
+      const attention = row.alertState === 'OVERDUE' ? 'متأخرة' : row.alertState === 'DUE_TODAY' ? 'مستحقة اليوم' : 'غير مستحقة اليوم';
+      const tone: StatusTone = row.status === 'COMPLETED' ? 'success' : row.alertState === 'OVERDUE' ? 'danger' : row.alertState === 'DUE_TODAY' ? 'warning' : 'neutral';
+      return <StatusBadge tone={tone}>{row.status === 'COMPLETED' ? 'مكتملة' : attention}</StatusBadge>;
+    } },
+    { id: 'result', header: 'نتيجة المتابعة', render: (row) => row.completionNote || '—' },
+    { id: 'actions', header: 'الإجراءات', render: (row) => row.status === 'OPEN' && row.ownerInspectorId === inspectorId
+      ? <div className="followup-actions"><Button variant="secondary" onClick={() => openAction(row, 'EDIT')}>تعديل الإجراء</Button><Button onClick={() => openAction(row, 'COMPLETE')}>إكمال الإجراء</Button></div>
+      : 'للقراءة فقط' },
+  ], [inspectorId, openAction]);
 
   return <div className="followups-page" dir="rtl">
-    <header className="followups-page__header"><div><p className="followups-page__eyebrow">المرافقة البيداغوجية</p><h1>إجراءات المتابعة</h1><p>متابعات مرتبطة بتقارير المرافقة النهائية.</p></div></header>
+    <PageHeader eyebrow="المرافقة البيداغوجية" title="إجراءات المتابعة" description="متابعات مرتبطة بتقارير المرافقة النهائية." />
     {notice ? <SuccessState title={notice} /> : null}
     {mutationError ? <ErrorState title={mutationError} action={conflict ? <Button variant="secondary" onClick={() => { setMode(null); setSelected(null); setMutationError(''); setConflict(false); void load(); }}>تحديث البيانات</Button> : undefined} /> : null}
     <Card><CardHeader title="قائمة المتابعة" description={`الحالة: ${statusLabel} · ${total} إجراء`} />
-      <CardContent><div className="followups-filters">
+      <CardContent><FilterBar title="مرشحات المتابعة"><div className="followups-filters">
         <label>الحالة<select className="ui-input" value={status} onChange={(event) => changeFilter(() => setStatus(event.currentTarget.value as 'OPEN' | 'COMPLETED'))}><option value="OPEN">مفتوحة</option><option value="COMPLETED">مكتملة</option></select></label>
         <label>المقاطعة<select className="ui-input" value={districtId} onChange={(event) => changeFilter(() => setDistrictId(event.currentTarget.value))}><option value="">كل المقاطعات المتاحة</option>{districts.map((district) => <option key={district.id} value={district.id}>{district.name}</option>)}</select></label>
         {status === 'OPEN' ? <label>الاستحقاق<select className="ui-input" value={alert} onChange={(event) => changeFilter(() => setAlert(event.currentTarget.value))}><option value="">كل المواعيد</option><option value="OVERDUE">متأخرة</option><option value="DUE_TODAY">مستحقة اليوم</option></select></label> : null}
-      </div>
+      </div></FilterBar>
       {loading ? <LoadingState label="جارٍ تحميل إجراءات المتابعة…" /> : null}
       {!loading && loadError ? <ErrorState title="تعذر تحميل إجراءات المتابعة" description="تحقق من الاتصال والصلاحية ثم أعد المحاولة." action={<Button variant="secondary" onClick={() => void load()}>إعادة التحميل</Button>} /> : null}
       {!loading && !loadError && rows.length === 0 ? <EmptyState title={status === 'OPEN' ? 'لا توجد إجراءات مفتوحة' : 'لا توجد إجراءات مكتملة'} description="ستظهر هنا إجراءات المتابعة المصرح بها ضمن مقاطعاتك." /> : null}
       {!loading && !loadError && rows.length ? <>
-        <ul className="followup-list">{rows.map((row) => {
-          const canMutate = row.status === 'OPEN' && row.ownerInspectorId === inspectorId;
-          const attention = row.alertState === 'OVERDUE' ? 'متأخرة' : row.alertState === 'DUE_TODAY' ? 'مستحقة اليوم' : 'غير مستحقة اليوم';
-          const followupTone: StatusTone = row.status === 'COMPLETED' ? 'success' : row.alertState === 'OVERDUE' ? 'danger' : row.alertState === 'DUE_TODAY' ? 'warning' : 'neutral';
-          return <li key={row.id}><Card><CardHeader title={`${row.context.teacher.name} ${row.context.teacher.surname}`} description={`${row.context.institution.name} · ${row.note}`} action={<StatusBadge tone={followupTone}>{row.status === 'COMPLETED' ? 'مكتملة' : attention}</StatusBadge>} />
-            <CardContent><dl className="followup-context"><div><dt>الإجراء</dt><dd>{row.note}</dd></div><div><dt>تاريخ الاستحقاق</dt><dd><time dateTime={row.dueDate}>{row.dueDate}</time></dd></div><div><dt>حالة المتابعة</dt><dd>{row.status === 'OPEN' ? 'مفتوحة' : 'مكتملة'}</dd></div><div><dt>المؤسسة وقت الزيارة</dt><dd>{row.context.institution.name}</dd></div>{row.completionNote ? <div><dt>نتيجة المتابعة</dt><dd>{row.completionNote}</dd></div> : null}</dl>
-              {canMutate ? <div className="followup-actions"><Button variant="secondary" onClick={() => openAction(row, 'EDIT')}>تعديل الإجراء</Button><Button onClick={() => openAction(row, 'COMPLETE')}>إكمال الإجراء</Button></div> : <p className="followup-readonly">{row.status === 'COMPLETED' ? 'هذه المتابعة مكتملة وللقراءة فقط.' : 'للقراءة فقط؛ التعديل متاح لمالك المتابعة.'}</p>}
-            </CardContent></Card></li>;
-        })}</ul>
-        <nav className="followup-pagination" aria-label="صفحات إجراءات المتابعة"><Button variant="secondary" disabled={history.length <= 1 || loading} onClick={() => { const previous = history.slice(0, -1); setHistory(previous); setCursor(previous.at(-1)); }}>السابق</Button><span>عرض {rows.length} من {total}</span><Button variant="secondary" disabled={!nextCursor || loading} onClick={() => movePage(nextCursor ?? undefined)}>التالي</Button></nav>
+        <DataTable caption="إجراءات المتابعة" columns={columns} rows={rows} rowKey={(row) => row.id} />
+        <Pagination label="صفحات إجراءات المتابعة" currentPage={history.length} rangeStart={total ? (history.length - 1) * 25 + 1 : 0}
+          rangeEnd={(history.length - 1) * 25 + rows.length} total={total} hasPrevious={history.length > 1} hasNext={Boolean(nextCursor)}
+          onPrevious={() => { const previous = history.slice(0, -1); setHistory(previous); setCursor(previous.at(-1)); }} onNext={() => movePage(nextCursor ?? undefined)} disabled={loading} />
       </> : null}
       </CardContent>
     </Card>

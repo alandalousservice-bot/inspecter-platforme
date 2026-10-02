@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router';
-import { Button, Card, CardContent, CardHeader, DataTable, Dialog, EmptyState, ErrorState, Input, LoadingState, Select, SuccessState, type DataTableColumn } from '../ui';
+import { Button, Card, CardContent, CardHeader, DataTable, Dialog, EmptyState, ErrorState, FilterBar, Input, LoadingState, PageHeader, Pagination, Select, SuccessState, type DataTableColumn } from '../ui';
 import { ApiRequestError, createInstitution, getCurrentDistricts, listInstitutions, updateInstitution, type DistrictOption, type Institution } from '../auth/client';
 import './institutions.css';
 
@@ -182,14 +182,8 @@ export function InstitutionsPage() {
 
   return (
     <div className="institutions-page" dir="rtl">
-      <header className="institutions-heading">
-        <div>
-          <p className="institutions-eyebrow">دليل المؤسسات</p>
-          <h1>المؤسسات</h1>
-          <p>استعرض المؤسسات ضمن المقاطعات المتاحة لك، أو أضف مؤسسة جديدة.</p>
-        </div>
-        <Button disabled={!canCreate} onClick={openCreateDialog}>إضافة مؤسسة</Button>
-      </header>
+      <PageHeader eyebrow="دليل المؤسسات" title="المؤسسات" description="استعرض المؤسسات ضمن المقاطعات المتاحة لك، أو أضف مؤسسة جديدة."
+        primaryAction={<Button disabled={!canCreate} onClick={openCreateDialog}>إضافة مؤسسة</Button>} />
 
       {successMessage ? <SuccessState title={successMessage} /> : null}
 
@@ -203,10 +197,12 @@ export function InstitutionsPage() {
       <Card className="institutions-card">
         <CardHeader title="قائمة المؤسسات" description="ابحث في المؤسسات المتاحة لك، وتصفح النتائج من الخادم." />
         <CardContent>
+          <FilterBar title="البحث في المؤسسات">
           <form className="institutions-search" onSubmit={submitSearch} role="search">
             <Input id="institution-search" label="البحث عن مؤسسة" value={searchText} onChange={(event) => setSearchText(event.currentTarget.value)} placeholder="اكتب اسم المؤسسة" />
             <Button type="submit">بحث</Button>
           </form>
+          </FilterBar>
 
           <p className="institutions-result-count" aria-live="polite">إجمالي النتائج: {listLoading ? '…' : total}</p>
 
@@ -218,11 +214,9 @@ export function InstitutionsPage() {
           {!listLoading && !listError && rows.length > 0 ? <DataTable caption="قائمة المؤسسات" columns={columns} rows={rows} rowKey={(row) => row.id} /> : null}
 
           {!listLoading && !listError ? (
-            <nav className="institutions-pagination" aria-label="صفحات المؤسسات">
-              <Button variant="secondary" disabled={pageIndex === 0} onClick={goToPreviousPage}>السابق</Button>
-              <span aria-live="polite">الصفحة {pageIndex + 1} من {Math.max(1, Math.ceil(total / PAGE_SIZE))}</span>
-              <Button variant="secondary" disabled={!nextCursor} onClick={goToNextPage}>التالي</Button>
-            </nav>
+            <Pagination label="صفحات المؤسسات" currentPage={pageIndex + 1} rangeStart={total ? pageIndex * PAGE_SIZE + 1 : 0}
+              rangeEnd={pageIndex * PAGE_SIZE + rows.length} total={total} hasPrevious={pageIndex > 0} hasNext={Boolean(nextCursor)}
+              onPrevious={goToPreviousPage} onNext={goToNextPage} />
           ) : null}
         </CardContent>
       </Card>

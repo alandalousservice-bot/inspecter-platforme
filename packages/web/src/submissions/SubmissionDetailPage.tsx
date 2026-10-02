@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
-import { Button, Card, CardContent, CardHeader, EmptyState, ErrorState, LoadingState } from '../ui';
+import { Button, Card, CardContent, CardHeader, EmptyState, ErrorState, LoadingState, PageHeader } from '../ui';
 import { getSubmission, type DuplicateReason, type PotentialDuplicate, type SubmissionDetail, type SubmissionStatus } from '../auth/client';
 import { TeacherSubmissionDecisionControls } from './DecisionControls';
 import './submissions.css';
@@ -77,15 +77,13 @@ export function SubmissionDetailPage() {
 
   return (
     <div className="submission-detail-page" dir="rtl">
-      <nav aria-label="مسار التنقل"><Link to="/app/submissions">طلبات الأساتذة</Link><span aria-hidden="true"> / </span><span>تفاصيل الطلب</span></nav>
+      <PageHeader eyebrow="تفاصيل الطلب" title={profile ? `${profile.firstName} ${profile.lastName}` : 'تفاصيل الطلب'}
+        breadcrumbs={[{ label: 'طلبات الأساتذة', to: '/app/submissions' }, { label: 'تفاصيل الطلب' }]}
+        backAction={!loading && !failed ? <Button variant="secondary" onClick={() => window.history.back()}>العودة للقائمة</Button> : undefined} />
       {loading ? <LoadingState label="جارٍ تحميل تفاصيل الطلب…" /> : null}
       {!loading && failed ? <ErrorState title="تعذر عرض الطلب" description="الطلب غير متاح ضمن نطاق الوصول أو تعذر تحميله." /> : null}
       {!loading && !failed && submission && profile ? (
         <>
-          <header className="submission-detail-heading">
-            <div><p className="submissions-eyebrow">تفاصيل الطلب</p><h1>{profile.firstName} {profile.lastName}</h1></div>
-            <Button variant="secondary" onClick={() => window.history.back()}>العودة للقائمة</Button>
-          </header>
           <Card>
             <CardHeader title="البيانات المعلنة" description="البيانات الواردة من الاستمارة ولم تُتحقق هويتها بعد." />
             <CardContent>
@@ -95,7 +93,7 @@ export function SubmissionDetailPage() {
                 <Fact label="مكان الميلاد">{profile.placeOfBirth}</Fact>
                 <Fact label="رقم الهاتف"><span dir="ltr">{profile.phone}</span></Fact>
                 <Fact label="البريد الإلكتروني"><span dir="ltr">{profile.email}</span></Fact>
-                <Fact label="الصفة المهنية">{professionalStatusLabels[profile.professionalStatus] ?? profile.professionalStatus}</Fact>
+                <Fact label="الصفة المهنية">{professionalStatusLabels[profile.professionalStatus] ?? 'غير محددة'}</Fact>
                 <Fact label="تاريخ التوظيف">{formatDate(profile.employmentDate)}</Fact>
                 {profile.confirmationDate ? <Fact label="تاريخ الترسيم/التثبيت">{formatDate(profile.confirmationDate)}</Fact> : null}
                 {profile.qualifications ? <Fact label="المؤهلات">{profile.qualifications}</Fact> : null}

@@ -72,10 +72,13 @@ test('TASK-053 connected Visit→FINAL Report→FollowUp lifecycle and immutable
   await page.getByRole('button', { name: 'إكمال الإجراء' }).first().click();
   await page.getByLabel('نتيجة المتابعة').fill('تمت المراجعة ميدانيًا'); await page.getByRole('button', { name: 'تأكيد الإكمال' }).click();
   await expect(page.getByText('تم إكمال إجراء المتابعة.')).toBeVisible();
-  await page.getByLabel('الحالة').selectOption('COMPLETED'); await expect(page.getByRole('listitem').getByText('تمت المراجعة ميدانيًا', { exact: true })).toBeVisible();
-  await expect(page.getByText('هذه المتابعة مكتملة وللقراءة فقط.')).toBeVisible();
+  await page.getByLabel('الحالة').selectOption('COMPLETED'); await expect(page.getByRole('cell', { name: 'تمت المراجعة ميدانيًا', exact: true })).toBeVisible();
+  const completedRow = page.getByRole('row').filter({ has: page.getByRole('cell', { name: 'تمت المراجعة ميدانيًا', exact: true }) });
+  await expect(completedRow.getByRole('cell', { name: 'للقراءة فقط', exact: true })).toBeVisible();
   await page.reload(); await expect(page.getByRole('heading', { name: 'إجراءات المتابعة' })).toBeVisible();
-  await page.getByLabel('الحالة').selectOption('COMPLETED'); await expect(page.getByRole('listitem').getByText('تمت المراجعة ميدانيًا', { exact: true })).toBeVisible();
+  await page.getByLabel('الحالة').selectOption('COMPLETED'); await expect(page.getByRole('cell', { name: 'تمت المراجعة ميدانيًا', exact: true })).toBeVisible();
+  const reloadedCompletedRow = page.getByRole('row').filter({ has: page.getByRole('cell', { name: 'تمت المراجعة ميدانيًا', exact: true }) });
+  await expect(reloadedCompletedRow.getByRole('cell', { name: 'للقراءة فقط', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'تعديل الإجراء' })).toHaveCount(0); await expect(page.getByRole('button', { name: 'إكمال الإجراء' })).toHaveCount(0);
 
   const reportAfter = await db.inspectionReport.findUniqueOrThrow({ where: { id: reportId } });

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router';
 import { ApiRequestError, createFollowUp, finalizeInspectionReport, getInspectionReport, getPedagogicalVisit, listReportFollowUps, saveInspectionReport, type FollowUp, type InspectionReport, type InspectionReportContent, type PedagogicalVisit } from '../auth/client';
-import { Button, Card, CardContent, CardHeader, Dialog, EmptyState, ErrorState, LoadingState, SuccessState } from '../ui';
+import { Button, Card, CardContent, CardHeader, Dialog, EmptyState, ErrorState, LoadingState, PageHeader, SuccessState } from '../ui';
 import { formatAlgiers } from './time';
 import { InspectorVisitReportV1Page } from './InspectorVisitReportV1Page';
 import { VisitStatusBadge } from './VisitStatusBadge';
@@ -33,8 +33,8 @@ export function InspectionReportPage() {
     }).catch(() => { if (mounted) setFailed(true); }).finally(() => { if (mounted) setLoading(false); });
     return () => { mounted = false; };
   }, [id]);
-  if (loading) return <div className="report-page" dir="rtl"><LoadingState label="جارٍ تحميل التقرير…" /></div>;
-  if (failed || !routing) return <div className="report-page" dir="rtl"><ErrorState title="تعذر تحميل التقرير" description="تحقق من الاتصال أو صلاحية الوصول ثم أعد المحاولة." /></div>;
+  if (loading) return <div className="report-page" dir="rtl"><PageHeader title="تقرير الزيارة" breadcrumbs={[{ label: 'الزيارات التربوية', to: '/app/visits' }, { label: 'التقرير' }]} /><LoadingState label="جارٍ تحميل التقرير…" /></div>;
+  if (failed || !routing) return <div className="report-page" dir="rtl"><PageHeader title="تقرير الزيارة" breadcrumbs={[{ label: 'الزيارات التربوية', to: '/app/visits' }, { label: 'التقرير' }]} /><ErrorState title="تعذر تحميل التقرير" description="تحقق من الاتصال أو صلاحية الوصول ثم أعد المحاولة." /></div>;
   if (routing.report?.reportType === 'INSPECTOR_VISIT' || (!routing.report && routing.visit.visitType !== null)) {
     return <InspectorVisitReportV1Page visit={routing.visit} initialReport={routing.report?.reportType === 'INSPECTOR_VISIT' ? routing.report as InspectorVisitReport : null} />;
   }
@@ -140,7 +140,9 @@ function LegacyInspectionReportPage() {
   }
 
   return <div className="report-page" dir="rtl">
-    <header className="report-page__header"><div><h1>تقرير مرافقة بيداغوجية</h1><p>تقرير من إعداد المفتش — غير رسمي</p></div><Link to={`/app/visits/${encodeURIComponent(id)}`}>العودة إلى الزيارة</Link></header>
+    <PageHeader title="تقرير مرافقة بيداغوجية" description="تقرير من إعداد المفتش — غير رسمي"
+      breadcrumbs={[{ label: 'الزيارات التربوية', to: '/app/visits' }, { label: 'تفاصيل الزيارة', to: `/app/visits/${encodeURIComponent(id)}` }, { label: 'التقرير' }]}
+      backAction={<Link to={`/app/visits/${encodeURIComponent(id)}`}>العودة إلى الزيارة</Link>} />
     {loading ? <LoadingState label="جارٍ تحميل التقرير…" /> : null}
     {!loading && loadError ? <ErrorState title="تعذر تحميل التقرير" description="تحقق من الاتصال أو صلاحية الوصول ثم أعد المحاولة." action={<Button variant="secondary" onClick={() => void load()}>إعادة التحميل</Button>} /> : null}
     {!loading && !loadError && visit ? <>

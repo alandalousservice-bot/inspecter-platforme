@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Link, useParams } from 'react-router';
+import { useParams } from 'react-router';
 import { ApiRequestError, addWeeklyScheduleSlot, createWeeklySchedule, deleteWeeklyScheduleSlot, getTeacherProfile, getWeeklySchedule, getValidWorkplaces, patchWeeklyScheduleSlot,
   type TeacherProfile, type WeeklySchedule, type WeeklyScheduleSlot, type WeeklyScheduleSlotInput, type ValidWorkplaceOption } from '../auth/client';
-import { Button, Card, CardContent, CardHeader, EmptyState, ErrorState, Input, LoadingState, SuccessState } from '../ui';
+import { Button, Card, CardContent, CardHeader, EmptyState, ErrorState, FormSection, Input, LoadingState, PageHeader, SuccessState } from '../ui';
 import { formatTime, normalizeOptionalText, parseTime, weekdays } from './weekly-schedule-domain';
 import './weekly-schedule.css';
 
@@ -105,7 +105,8 @@ export function WeeklySchedulePage() {
   }
 
   return <section className="weekly-schedule" dir="rtl">
-    <header className="weekly-schedule__header"><div><h1>التوزيع الأسبوعي</h1><p>الأستاذ: {profile ? `${profile.name} ${profile.surname}` : '…'}</p></div><Link to={`/app/teachers/${encodeURIComponent(id)}`}>ملف الأستاذ</Link></header>
+    <PageHeader title="التوزيع الأسبوعي" description={profile ? `الأستاذ: ${profile.name} ${profile.surname}` : undefined}
+      breadcrumbs={[{ label: 'دليل الأساتذة', to: '/app/teachers' }, { label: 'ملف الأستاذ', to: `/app/teachers/${encodeURIComponent(id)}` }, { label: 'التوزيع الأسبوعي' }]} />
     {profileError ? <ErrorState title="تعذر تحميل ملف الأستاذ" description="تحقق من الاتصال ثم أعد المحاولة." action={<Button variant="secondary" onClick={() => window.location.reload()}>إعادة المحاولة</Button>} /> : null}
     {profile ? <Card><CardHeader title="المؤسسة الأم الحالية" /><CardContent><p>{profile.currentInstitution?.name ?? 'لا توجد مؤسسة أم حالية؛ يمكن اختيار مؤسسة تكملة نصاب صالحة للفترة.'}</p></CardContent></Card> : null}
     <Card><CardHeader title="اختيار السنة الدراسية" description="أدخل السنة صراحةً؛ لا تُختار سنة تلقائيًا." /><CardContent>
@@ -134,8 +135,7 @@ export function WeeklySchedulePage() {
           <div className="weekly-schedule__actions"><Button variant="secondary" disabled={saving} onClick={() => beginEdit(slot)}>تعديل</Button>
             <Button variant="danger" disabled={saving} onClick={() => { if (window.confirm('هل تريد حذف هذه الحصة؟')) void mutate(() => deleteWeeklyScheduleSlot(slot.id, schedule.revision), 'تم حذف الحصة.'); }}>حذف</Button></div>
         </article>)}</div>
-        <form className="weekly-schedule__form" onSubmit={(event) => { void submitSlot(event); }} aria-busy={saving}>
-          <h2>{editing ? 'تعديل الحصة' : 'إضافة حصة'}</h2>
+        <FormSection title={editing ? 'تعديل الحصة' : 'إضافة حصة'}><form className="weekly-schedule__form" onSubmit={(event) => { void submitSlot(event); }} aria-busy={saving}>
         <div className="weekly-schedule__fields">
             <Input id="schedule-valid-from" label="بداية السريان" type="date" required value={draft.validFrom} onChange={(event) => setDraft({ ...draft, validFrom: event.currentTarget.value, institutionId: '' })} disabled={saving} />
             <Input id="schedule-valid-to" label="نهاية السريان (اختياري)" type="date" value={draft.validTo} onChange={(event) => setDraft({ ...draft, validTo: event.currentTarget.value, institutionId: '' })} disabled={saving} hint="تاريخ النهاية غير مشمول؛ اتركه فارغًا للفترة المفتوحة." />
@@ -156,7 +156,7 @@ export function WeeklySchedulePage() {
           </div>
           <div className="weekly-schedule__actions"><Button type="submit" disabled={saving}>{saving ? 'جارٍ الحفظ…' : editing ? 'حفظ الحصة' : 'إضافة الحصة'}</Button>
             {editing ? <Button type="button" variant="secondary" disabled={saving} onClick={() => { setEditing(null); setDraft(blankDraft()); setFormError(''); }}>إلغاء التعديل</Button> : null}</div>
-        </form>
+        </form></FormSection>
       </CardContent></Card> : null}
   </section>;
 }
