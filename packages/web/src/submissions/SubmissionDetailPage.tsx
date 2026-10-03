@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router';
 import { Button, Card, CardContent, CardHeader, EmptyState, ErrorState, LoadingState, PageHeader } from '../ui';
 import { getSubmission, type DuplicateReason, type PotentialDuplicate, type SubmissionDetail, type SubmissionStatus } from '../auth/client';
 import { TeacherSubmissionDecisionControls } from './DecisionControls';
+import { InstitutionLocationProposalReview } from './InstitutionLocationProposalReview';
 import './submissions.css';
 
 const statusLabels: Record<SubmissionStatus, string> = {
@@ -175,6 +176,12 @@ export function SubmissionDetailPage() {
             )}
           </section>
           {refreshFailed ? <ErrorState title="تعذر تحديث التفاصيل" description="تم حفظ القرار، لكن تعذر تحميل أحدث حالة. استخدم تحديث التفاصيل للمحاولة مجددًا." /> : null}
+          <InstitutionLocationProposalReview
+            key={`${submission.id}-location-proposal`}
+            submissionId={submission.id}
+            proposal={submission.locationProposal}
+            onRefresh={refreshSubmission}
+          />
           <TeacherSubmissionDecisionControls
             key={submission.id}
             submissionId={submission.id}

@@ -5,11 +5,11 @@ import { SubmissionsPage } from './SubmissionsPage';
 import type { SubmissionDetail, SubmissionListItem } from '../auth/client';
 import { SubmissionDetailPage } from './SubmissionDetailPage';
 
-const { getSubmission, listSubmissions, decideSubmission } = vi.hoisted(() => ({
-  getSubmission: vi.fn(), listSubmissions: vi.fn(), decideSubmission: vi.fn(),
+const { getSubmission, listSubmissions, decideSubmission, decideInstitutionLocationProposal } = vi.hoisted(() => ({
+  getSubmission: vi.fn(), listSubmissions: vi.fn(), decideSubmission: vi.fn(), decideInstitutionLocationProposal: vi.fn(),
 }));
 vi.mock('../auth/client', async (importOriginal) => ({
-  ...await importOriginal<typeof import('../auth/client')>(), getSubmission, listSubmissions, decideSubmission,
+  ...await importOriginal<typeof import('../auth/client')>(), getSubmission, listSubmissions, decideSubmission, decideInstitutionLocationProposal,
 }));
 
 const row = (id: string, hasPotentialDuplicates = false): SubmissionListItem => ({
@@ -18,6 +18,7 @@ const row = (id: string, hasPotentialDuplicates = false): SubmissionListItem => 
 });
 const detail: SubmissionDetail = {
   id: 'submission-1', districtId: 'district-hidden', status: 'PENDING', submittedAt: '2026-09-28T10:00:00Z', acceptedTeacherId: null,
+  locationProposal: null,
   submittedProfile: {
     firstName: 'أمينة', lastName: 'بن صالح', dateOfBirth: '1985-03-04', placeOfBirth: 'وهران',
     phone: '+213555123456', email: 'amina@example.dz', professionalStatus: 'PERMANENT', employmentDate: '2005-09-01',

@@ -104,12 +104,32 @@ export type PotentialDuplicate = {
   submittedAt: string;
   matchReasons: DuplicateReason[];
 };
+export type CanonicalInstitutionLocation = {
+  latitude: string;
+  longitude: string;
+  source: 'MANUAL_INSPECTOR' | 'TEACHER_PROPOSED_APPROVED';
+};
+export type SubmissionLocationProposal = {
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
+  latitude: string;
+  longitude: string;
+  decidedAt: string | null;
+  decidedByInspectorId: string | null;
+  decisionReason: string | null;
+  institution: {
+    id: string;
+    name: string;
+    municipality: string | null;
+    location: CanonicalInstitutionLocation | null;
+  } | null;
+};
 export type SubmissionDetail = {
   id: string;
   districtId: string;
   status: SubmissionStatus;
   submittedAt: string;
   submittedProfile: SubmissionProfile;
+  locationProposal: SubmissionLocationProposal | null;
   declaredAdministrative: DeclaredAdministrative;
   declaredWorkplace: DeclaredWorkplace | null;
   structuredQualifications: QualificationDeclaration[];
@@ -782,4 +802,25 @@ export async function decideSubmission(input: {
   });
   if (!response.ok) return readFailure(response);
   return response.json() as Promise<{ data: SubmissionDecisionResult }>;
+}
+
+export type InstitutionLocationProposalDecisionInput =
+  | { action: 'ACCEPT_PROPOSED'; expectedCanonicalLocation: CanonicalInstitutionLocation | null }
+  | { action: 'REJECT' }
+  | { action: 'KEEP_CURRENT'; expectedCanonicalLocation: CanonicalInstitutionLocation };
+
+export async function decideInstitutionLocationProposal(input: {
+  id: string;
+  decision: InstitutionLocationProposalDecisionInput;
+}): Promise<{ data: { status: 'ACCEPTED' | 'REJECTED'; institutionId?: string } }> {
+  const csrfToken = csrfCookie();
+  if (!csrfToken) throw new ApiRequestError('تعذر التحقق من الطلب. أعد تحميل الصفحة ثم حاول مجددًا.');
+  const response = await fetch(`/api/v1/submissions/${encodeURIComponent(input.id)}/location-proposal-decision`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'content-type': 'application/json', 'x-csrf-token': csrfToken },
+    body: JSON.stringify(input.decision),
+  });
+  if (!response.ok) return readFailure(response);
+  return response.json() as Promise<{ data: { status: 'ACCEPTED' | 'REJECTED'; institutionId?: string } }>;
 }
