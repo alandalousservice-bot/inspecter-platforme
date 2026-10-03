@@ -12,11 +12,14 @@ function serverFieldErrors(fields?: Record<string, string[]>): Record<string, st
   const result: Record<string, string> = {};
   for (const key of Object.keys(fields)) {
     const fieldParts = key.split('.');
-    const field = fieldParts[0] === 'workplace' ? fieldParts[1]
+    const field = fieldParts[0] === 'workplace'
+      ? fieldParts[1] === 'locationProposal'
+        ? fieldParts[2] === 'latitude' ? 'institutionLatitude' : fieldParts[2] === 'longitude' ? 'institutionLongitude' : ''
+        : fieldParts[1]
       : fieldParts[0] === 'structuredQualifications' ? fieldParts[2] === 'issuingBody' ? 'qualificationIssuer' : fieldParts[2] === 'qualificationDate' ? 'qualificationDate' : 'qualificationName'
         : fieldParts[0] === 'supplementaryWorkplaces' ? fieldParts[2] === 'municipality' ? 'supplementaryMunicipality' : fieldParts[2] === 'institutionAddress' ? 'supplementaryAddress' : fieldParts[2] === 'directorPhone' ? 'supplementaryPhone' : 'supplementaryInstitutionName'
           : fieldParts[0];
-    if (fieldLabels[field]) result[key.includes('.') ? key : field] = `تحقق من ${fieldLabels[field]}.`;
+    if (fieldLabels[field]) result[key.startsWith('workplace.locationProposal.') ? field : key.includes('.') ? key : field] = `تحقق من ${fieldLabels[field]}.`;
   }
   return result;
 }
@@ -169,6 +172,15 @@ export function PublicTeacherIntakePage() {
               <Input id="institutionAddress" label="عنوان المؤسسة" required value={values.institutionAddress} error={errors.institutionAddress} onChange={(event) => change('institutionAddress', event.currentTarget.value)} />
               <Input id="directorPhone" label="رقم هاتف مدير المؤسسة" required type="tel" inputMode="tel" dir="ltr" hint="رقم ثابت أو محمول جزائري؛ لا يعني إدخاله التحقق من ملكيته." value={values.directorPhone} error={errors.directorPhone} onChange={(event) => change('directorPhone', event.currentTarget.value)} />
               <Input id="institutionEmail" label="البريد الإلكتروني للمؤسسة" type="email" dir="ltr" hint="اختياري؛ تصريح يحتاج إلى مراجعة المفتش." value={values.institutionEmail} error={errors.institutionEmail} onChange={(event) => change('institutionEmail', event.currentTarget.value)} />
+            </div>
+          </fieldset>
+
+          <fieldset disabled={submitting}>
+            <legend>موقع المؤسسة المصرح به</legend>
+            <p className="public-intake-fieldset-hint">المقصود موقع المؤسسة وليس موقع الأستاذ. أدخل الإحداثيين يدويًا إن توفرا؛ سيبقيان تصريحًا غير متحقق منه إلى أن يراجعهما المفتش ويعتمدهما صراحةً.</p>
+            <div className="public-intake-grid">
+              <Input id="institutionLatitude" label="خط العرض" type="text" inputMode="decimal" dir="ltr" hint="اختياري؛ من ‎-90 إلى 90، وبحد أقصى 6 منازل عشرية." value={values.institutionLatitude} error={errors.institutionLatitude} onChange={(event) => change('institutionLatitude', event.currentTarget.value)} />
+              <Input id="institutionLongitude" label="خط الطول" type="text" inputMode="decimal" dir="ltr" hint="اختياري؛ من ‎-180 إلى 180، وبحد أقصى 6 منازل عشرية." value={values.institutionLongitude} error={errors.institutionLongitude} onChange={(event) => change('institutionLongitude', event.currentTarget.value)} />
             </div>
           </fieldset>
 

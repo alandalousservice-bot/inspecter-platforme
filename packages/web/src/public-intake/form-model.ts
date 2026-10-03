@@ -30,6 +30,8 @@ export type FormValues = {
   administrativeClassificationEffectiveDate: string;
   personalAddress: string;
   institutionEmail: string;
+  institutionLatitude: string;
+  institutionLongitude: string;
 };
 
 export type QualificationValue = { name: string; issuingBody: string; qualificationDate: string };
@@ -43,7 +45,7 @@ export const initialValues: FormValues = {
   firstEducationAppointmentDecisionNumber: '', firstInstallationDate: '', traineeshipDate: '',
   institutionAppointmentDate: '', institutionAppointmentNumber: '', administrativeCategory: '',
   administrativeSection: '', administrativeGrade: '', administrativeClassificationEffectiveDate: '',
-  personalAddress: '', institutionEmail: '',
+  personalAddress: '', institutionEmail: '', institutionLatitude: '', institutionLongitude: '',
 };
 
 export const statusOptions = [
@@ -69,6 +71,7 @@ export const fieldLabels: Record<string, string> = {
   administrativeCategory: 'الصنف', administrativeSection: 'القسم الإداري', administrativeGrade: 'الدرجة',
   administrativeClassificationEffectiveDate: 'تاريخ سريان التصنيف الإداري',
   personalAddress: 'العنوان الشخصي', institutionEmail: 'البريد الإلكتروني للمؤسسة المصرح بها',
+  institutionLatitude: 'خط العرض لموقع المؤسسة', institutionLongitude: 'خط الطول لموقع المؤسسة',
   qualificationName: 'اسم الشهادة أو المؤهل', qualificationIssuer: 'الجهة المانحة',
   qualificationDate: 'تاريخ الشهادة أو المؤهل', supplementaryInstitutionName: 'اسم المؤسسة الإضافية',
   supplementaryMunicipality: 'البلدية', supplementaryAddress: 'عنوان المؤسسة الإضافية',
@@ -79,6 +82,20 @@ export const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9
 const codePoints = (value: string) => Array.from(value).length;
 const cleanName = (value: string) => value.trim().replace(/\s+/gu, ' ');
 const hasControlCharacters = (value: string) => /[\p{Cc}]/u.test(value);
+
+function decimalMagnitudeAtMost(value: string, bound: string): boolean {
+  const [integer, fraction = ''] = value.replace(/^-/, '').split('.');
+  const [boundInteger, boundFraction = ''] = bound.split('.');
+  if (integer.length !== boundInteger.length) return integer.length < boundInteger.length;
+  if (integer !== boundInteger) return integer < boundInteger;
+  const precision = Math.max(fraction.length, boundFraction.length);
+  return fraction.padEnd(precision, '0') <= boundFraction.padEnd(precision, '0');
+}
+
+function validCoordinate(value: string, bound: string): boolean {
+  return /^-?(?:0|[1-9]\d{0,2})(?:\.\d{1,6})?$/u.test(value)
+    && decimalMagnitudeAtMost(value, bound);
+}
 
 function validDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/u.test(value)) return false;
@@ -147,6 +164,14 @@ export function validate(values: FormValues, qualificationRows: QualificationVal
     if (value && !validDate(value)) errors[field] = 'أدخل تاريخًا صحيحًا.';
   }
   if (values.institutionEmail && (codePoints(values.institutionEmail.trim()) > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(values.institutionEmail.trim()))) errors.institutionEmail = 'أدخل بريدًا إلكترونيًا صحيحًا.';
+  const hasLatitude = values.institutionLatitude !== '';
+  const hasLongitude = values.institutionLongitude !== '';
+  if (hasLatitude !== hasLongitude) {
+    if (!hasLatitude) errors.institutionLatitude = 'أدخل خط العرض لإكمال إحداثيي موقع المؤسسة.';
+    if (!hasLongitude) errors.institutionLongitude = 'أدخل خط الطول لإكمال إحداثيي موقع المؤسسة.';
+  }
+  if (hasLatitude && !validCoordinate(values.institutionLatitude, '90')) errors.institutionLatitude = 'أدخل خط عرض عشريًا صحيحًا بين ‎-90 و90، وبحد أقصى 6 منازل عشرية.';
+  if (hasLongitude && !validCoordinate(values.institutionLongitude, '180')) errors.institutionLongitude = 'أدخل خط طول عشريًا صحيحًا بين ‎-180 و180، وبحد أقصى 6 منازل عشرية.';
   qualificationRows.forEach((row, index) => {
     if (!cleanName(row.name) || hasControlCharacters(row.name) || codePoints(cleanName(row.name).normalize('NFC')) > 200) errors[`structuredQualifications.${index}.name`] = 'أدخل اسم الشهادة أو المؤهل.';
     if (row.issuingBody && (hasControlCharacters(row.issuingBody) || codePoints(cleanName(row.issuingBody).normalize('NFC')) > 200)) errors[`structuredQualifications.${index}.issuingBody`] = 'تحقق من الجهة المانحة.';
@@ -186,6 +211,9 @@ export function makePayload(values: FormValues, qualificationRows: Qualification
       institutionAddress: cleanName(values.institutionAddress),
       directorPhone: values.directorPhone.trim(),
       ...(values.institutionEmail.trim() ? { institutionEmail: values.institutionEmail.trim() } : {}),
+      ...(values.institutionLatitude && values.institutionLongitude ? {
+        locationProposal: { latitude: values.institutionLatitude, longitude: values.institutionLongitude },
+      } : {}),
     },
     ...(values.confirmationDate ? { confirmationDate: values.confirmationDate } : {}),
     ...(values.qualifications.trim() ? { qualifications: values.qualifications.trim() } : {}),

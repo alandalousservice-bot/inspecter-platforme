@@ -55,6 +55,15 @@ test('TASK-085 public declarations, Inspector acceptance and authoritative infor
   await page.getByLabel('تاريخ التعيين بالمؤسسة المصرح بها').fill('2010-09-01');
   await page.getByLabel('رقم التعيين بالمؤسسة المصرح بها').fill(`قرار المؤسسة ${tag}`);
   await page.getByLabel('البريد الإلكتروني للمؤسسة').fill(`home-${tag}@example.invalid`);
+  await page.getByLabel('خط العرض').fill('36.752887');
+  await page.getByLabel('خط الطول').fill('3.042048');
+  for (const width of [1440, 768, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await expect(page.locator('main[dir="rtl"]')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    await expect(page.getByLabel('خط العرض')).toBeVisible();
+    await expect(page.getByLabel('خط الطول')).toBeVisible();
+  }
   await page.getByLabel('تاريخ أول تعيين في التعليم').fill('2005-09-01');
   await page.getByLabel('رقم قرار أول تعيين في التعليم').fill(`قرار أول ${tag}`);
   await page.getByLabel('تاريخ أول تنصيب').fill('2005-10-01');
@@ -83,6 +92,8 @@ test('TASK-085 public declarations, Inspector acceptance and authoritative infor
 
   const submission = await db.teacherSubmission.findFirstOrThrow({ where: { districtId: districtId!, submittedProfile: { path: ['email'], equals: teacherData.email } } });
   expect(submission.status).toBe('PENDING');
+  expect(submission.proposedInstitutionLatitude?.toString()).toBe('36.752887');
+  expect(submission.proposedInstitutionLongitude?.toString()).toBe('3.042048');
   await loginInspector(page);
   await page.goto('/app/submissions');
   await page.getByLabel('البحث في الطلبات').fill(teacherData.lastName);

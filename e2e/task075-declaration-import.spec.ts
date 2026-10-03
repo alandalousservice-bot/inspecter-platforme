@@ -71,6 +71,8 @@ test('real Chrome 200% zoom, RTL/Bidi preview, keyboard and visible focus', asyn
     const focus = await page.evaluate(() => { const style = getComputedStyle(document.activeElement!); return { width: parseFloat(style.outlineWidth), style: style.outlineStyle }; });
     expect(focus.width).toBeGreaterThanOrEqual(2); expect(focus.style).not.toBe('none');
     await page.keyboard.press('Enter'); await expect(page.locator('#firstName')).toBeFocused();
+    await expect(page.getByLabel('خط العرض')).toBeVisible(); await expect(page.getByLabel('خط الطول')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
     await page.screenshot({ path: test.info().outputPath('actual-200-percent.png'), fullPage: true });
   } finally { await context.close(); rmSync(profile, { recursive: true, force: true }); }
 });

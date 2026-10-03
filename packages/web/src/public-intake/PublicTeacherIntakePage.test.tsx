@@ -285,6 +285,82 @@ describe('TASK-031 public teacher intake', () => {
     expect(payload).not.toHaveProperty('institutionId');
   });
 
+  it('renders a manual institution-location declaration with clear review wording and accessible decimal text fields', () => {
+    const { container } = renderPage();
+    expect(screen.getByRole('group', { name: 'موقع المؤسسة المصرح به' })).toBeTruthy();
+    expect(screen.getByText(/موقع المؤسسة وليس موقع الأستاذ/)).toBeTruthy();
+    expect(screen.getByText(/يدويًا.*غير متحقق منه.*يراجعهما المفتش ويعتمدهما صراحةً/)).toBeTruthy();
+    const latitude = screen.getByRole('textbox', { name: 'خط العرض' }) as HTMLInputElement;
+    const longitude = screen.getByRole('textbox', { name: 'خط الطول' }) as HTMLInputElement;
+    expect(latitude.type).toBe('text');
+    expect(longitude.type).toBe('text');
+    expect(latitude.inputMode).toBe('decimal');
+    expect(longitude.inputMode).toBe('decimal');
+    expect(latitude.dir).toBe('ltr');
+    expect(longitude.dir).toBe('ltr');
+    expect(container.querySelector('main[dir="rtl"]')).toBeTruthy();
+    expect(container.innerHTML).not.toMatch(/navigator\.geolocation|getCurrentPosition|watchPosition/);
+  });
+
+  it.each([
+    ['0', '0'], ['-90', '-180'], ['90', '180'], ['36.123456', '3.123456'],
+  ])('sends a valid optional coordinate pair as unchanged decimal strings (%s, %s)', async (latitude, longitude) => {
+    renderPage();
+    fillRequired();
+    fireEvent.change(screen.getByRole('textbox', { name: 'خط العرض' }), { target: { value: latitude } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'خط الطول' }), { target: { value: longitude } });
+    await submit();
+    await screen.findByRole('heading', { name: 'تم استلام بياناتك' });
+    const payload = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body)) as Record<string, unknown>;
+    expect((payload.workplace as Record<string, unknown>).locationProposal).toEqual({ latitude, longitude });
+  });
+
+  it.each([
+    ['latitude', '90.000001', 'خط العرض'], ['latitude', '-90.000001', 'خط العرض'],
+    ['latitude', '14.1234567', 'خط العرض'], ['latitude', '1e2', 'خط العرض'],
+    ['latitude', 'NaN', 'خط العرض'], ['latitude', ' Infinity ', 'خط العرض'],
+    ['longitude', '180.000001', 'خط الطول'], ['longitude', '-180.000001', 'خط الطول'],
+    ['longitude', '3.1234567', 'خط الطول'], ['longitude', '1e2', 'خط الطول'],
+  ])('rejects invalid %s coordinate syntax/range/precision before POST', async (field, value, label) => {
+    renderPage();
+    fillRequired();
+    fireEvent.change(screen.getByRole('textbox', { name: label }), { target: { value } });
+    if (field === 'latitude') fireEvent.change(screen.getByRole('textbox', { name: 'خط الطول' }), { target: { value: '3' } });
+    else fireEvent.change(screen.getByRole('textbox', { name: 'خط العرض' }), { target: { value: '36' } });
+    await submit();
+    expect(screen.getByRole('textbox', { name: label }).getAttribute('aria-invalid')).toBe('true');
+    expect(screen.getByText(/أدخل خط/)).toBeTruthy();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('requires coordinates as a complete optional pair, focuses the missing field, and does not send on half-pairs', async () => {
+    renderPage();
+    fillRequired();
+    fireEvent.change(screen.getByRole('textbox', { name: 'خط العرض' }), { target: { value: '36' } });
+    await submit();
+    const longitude = screen.getByRole('textbox', { name: 'خط الطول' });
+    expect(longitude.getAttribute('aria-invalid')).toBe('true');
+    expect(longitude.getAttribute('aria-describedby')).toContain('institutionLongitude-error');
+    expect(document.activeElement).toBe(longitude);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('associates safe server coordinate validation feedback with the corresponding field', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(400, {
+      error: { message: 'private server message', fields: { 'workplace.locationProposal.latitude': ['invalid'] }, requestId: 'private-id' },
+    }));
+    renderPage();
+    fillRequired();
+    fireEvent.change(screen.getByRole('textbox', { name: 'خط العرض' }), { target: { value: '36' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'خط الطول' }), { target: { value: '3' } });
+    await submit();
+    await screen.findByText('تحقق من خط العرض لموقع المؤسسة.');
+    const latitude = screen.getByRole('textbox', { name: 'خط العرض' });
+    expect(latitude.getAttribute('aria-invalid')).toBe('true');
+    expect(screen.getByText('تحقق من خط العرض لموقع المؤسسة.')).toBeTruthy();
+    expect(screen.queryByText(/private server message|private-id/)).toBeNull();
+  });
+
   it('caps declaration controls at five qualifications and three supplementary workplaces', async () => {
     renderPage();
     for (let index = 0; index < 5; index++) fireEvent.click(screen.getByRole('button', { name: 'إضافة مؤهل مصرح به' }));

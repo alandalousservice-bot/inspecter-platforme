@@ -31,6 +31,7 @@ export type TeacherSubmissionPayload = {
     institutionAddress: string;
     directorPhone: string;
     institutionEmail?: string;
+    locationProposal?: { latitude: string; longitude: string };
   };
 };
 
