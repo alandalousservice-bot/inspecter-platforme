@@ -11,7 +11,8 @@ async function login(page: Page) {
   await page.getByLabel('البريد الإلكتروني').fill(inspectorEmail!);
   await page.getByLabel('كلمة المرور').fill(inspectorPassword!);
   await page.getByRole('button', { name: 'تسجيل الدخول' }).click();
-  await expect(page).toHaveURL(/\/app\/institutions$/u);
+  await expect(page).toHaveURL(/\/app$/u);
+  await expect(page.getByRole('heading', { name: 'لوحة المتابعة', level: 1 })).toBeVisible();
 }
 
 test('TASK-053A creates an explicitly typed visit, filters it server-side, and completes it', async ({ page }) => {

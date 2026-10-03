@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const task045 = process.env.TASK045_E2E === '1';
+const task075 = process.env.TASK075_E2E === '1';
 const task051 = process.env.TASK051_E2E === '1';
 const task052a = process.env.TASK052A_E2E === '1';
 const task052 = process.env.TASK052_E2E === '1';
@@ -17,7 +18,7 @@ if (!process.env.G3_E2E_DATABASE_URL) throw new Error('Run connected browser tes
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: task086 ? 'task086-information-card-print.spec.ts' : task085 ? 'task085-public-intake.spec.ts' : task084 ? 'task084-teacher-information-card.spec.ts' : task083 ? 'task083-workplace-aware-visits.spec.ts' : task082 ? 'task082-teacher-supplementary-workplaces.spec.ts' : task081 ? 'task081-teacher-qualifications.spec.ts' : task054 ? 'task054-inspector-visit-report.spec.ts' : task053 ? 'task053-followups.spec.ts' : task053a ? ['task051-pedagogical-visits.spec.ts', 'task053a-visit-types.spec.ts'] : task052 ? 'task052-inspection-report.spec.ts' : task052a ? 'task052a-professional-identity.spec.ts' : task051 ? 'task051-pedagogical-visits.spec.ts' : task045 ? 'task045-teacher-directory.spec.ts' : 'g3-connected-flow.spec.ts',
+  testMatch: task075 ? 'task075-declaration-import.spec.ts' : task086 ? 'task086-information-card-print.spec.ts' : task085 ? 'task085-public-intake.spec.ts' : task084 ? 'task084-teacher-information-card.spec.ts' : task083 ? 'task083-workplace-aware-visits.spec.ts' : task082 ? 'task082-teacher-supplementary-workplaces.spec.ts' : task081 ? 'task081-teacher-qualifications.spec.ts' : task054 ? 'task054-inspector-visit-report.spec.ts' : task053 ? 'task053-followups.spec.ts' : task053a ? ['task051-pedagogical-visits.spec.ts', 'task053a-visit-types.spec.ts'] : task052 ? 'task052-inspection-report.spec.ts' : task052a ? 'task052a-professional-identity.spec.ts' : task051 ? 'task051-pedagogical-visits.spec.ts' : task045 ? 'task045-teacher-directory.spec.ts' : 'g3-connected-flow.spec.ts',
   fullyParallel: false,
   workers: 1,
   timeout: 120_000,

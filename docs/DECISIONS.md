@@ -41,6 +41,22 @@
 | ADR-035 | ACCEPTED | خمسة أنواع زيارة صريحة، فترة فعلية للاستثنائية بأثر رجعي، وتقرير V1 ذي لب مشترك ونتيجة مهنية بحسب النوع؛ علامة الترقية 0–20 بدقة منزلتين عشريتين كحد أقصى ACCEPTED |
 | ADR-036 | ACCEPTED | قرارات Product Owner لبطاقة معلومات الأستاذ: مؤسسة أم واحدة ومؤسسات تكملة نصاب مؤرخة، موقع صريح للحصة، `SUBSTITUTE`، حقول إدارية اختيارية ومؤهلات منظمة، بطاقة قراءة مجمعة؛ «آخر تفتيش» مشتق من أربعة أنواع زيارات مكتملة محددة لا تشمل GUIDANCE أو التاريخية بلا نوع. [العقد التفصيلي](architecture/TEACHER_INFORMATION_CARD_ADR_036_CONTRACT.md) |
 | ADR-037 | ACCEPTED | لوحة المفتش التشغيلية: `/app` منزل مصادق، `GET /api/v1/dashboard/summary` مجمّع محدود لعمل المفتش ضمن عضوياته الحالية؛ بلا تقييم أساتذة أو feed تدقيق أو مخططات؛ TASK-070A/B/C |
+| ADR-038 | ACCEPTED | قرار Product Owner: استيراد JSON واحد كتعبئة محلية للاستمارة العامة فقط، عبر intake الحالي وبلا اعتماد أو مسار تخزين بديل؛ التفاصيل أدناه |
+
+## ADR-038 — Single JSON Declaration Import into Canonical Public Intake
+
+Status: **ACCEPTED** by explicit Product Owner authorization in TASK-075.
+
+1. Import belongs only to the existing public district form. It prefills unverified declarations, not an authenticated Inspector import. Reuse `POST /api/v1/public/districts/:districtId/submissions`; no new endpoint, schema, migration or dependency.
+2. Structurally valid partial files may prefill valid available fields. Show missing canonical required fields; the user completes them manually and explicitly submits through existing validation. Never invent defaults, auto-submit or auto-retry. Show success only after 202 with a valid receipt.
+3. Reject either non-empty latitude/longitude with a fixed Arabic message. Absent/null/whitespace-only coordinate strings mean no coordinate and are never mapped. Numeric zero and other non-string/non-null representations are rejected, not silently dropped. No location feature.
+4. Single UTF-8 JSON file, maximum 32,768 bytes, envelope `packageVersion="1.0"`, `type="INSPECTOR_TEACHER_RECORD"`, string `exportedAt` and object `teacherData`. One optional UTF-8 BOM is handled by the decoder and counts toward the byte cap. Extension `.json` is required; MIME is advisory. Reject invalid UTF-8, malformed JSON, duplicate decoded keys, unknown/dangerous keys, nesting beyond 16 and batch arrays. `exportedAt` is file-validation metadata only, never submitted or authoritative chronology.
+
+The flat `teacherData` allowlist is exactly: `firstName,lastName,dateOfBirth,placeOfBirth,phone,email,professionalStatus,employmentDate,confirmationDate,notes,birthProvince,personalAddress,professionalFramework,administrativeGrade,institutionName,municipality,institutionAddress,directorPhone`, plus empty-only coordinates as above. Nested `teacherData.workplace` is unsupported and rejected rather than expanding the candidate format. Four flat workplace fields map into the canonical required `workplace` object. All business values must be strings. Invalid present values block applying the preview; missing required fields do not. No blind object merge, truncation or altered canonical normalization. Optional blanks are omitted; control-character policy remains canonical.
+
+Preview/apply never sends a request; applying replaces only mapped form fields after an explicit action. Clearing preview does not clear already entered form data. Import data/raw bytes stay ephemeral: no local/session storage, IndexedDB, Cache Storage, URL, analytics, logs or plaintext export. Abort reads and release preview/file references on replacement, cancel, handoff and unmount; no physical memory-erasure claim.
+
+Canonical lifecycle remains PENDING → Inspector review → existing decision transaction. No direct Teacher, Institution, workplace relation, schedule, visit, report or FollowUp creation. ADR-011 remains advisory and Inspector-only. Public creation adds no AuditLog; Inspector decisions retain atomic audit with no imported PII. ADR-013/016 remain OPEN, TASK-060 remains BLOCKED, Dashboard and print contracts are unchanged.
 
 الأمور OPEN لا توقف المهام التي تقتصر على foundations ولا تخمّن ما وراءها. [IMPLEMENTATION_PLAN](IMPLEMENTATION_PLAN.md) يحدد gates التي تحتاجها.
 

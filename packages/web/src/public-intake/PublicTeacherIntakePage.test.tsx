@@ -240,7 +240,7 @@ describe('TASK-031 public teacher intake', () => {
     expect(screen.getByRole('button', { name: 'جارٍ الإرسال…' }).hasAttribute('disabled')).toBe(true);
     expect((screen.getByRole('group', { name: 'المعلومات الشخصية' }) as HTMLFieldSetElement).disabled).toBe(true);
     expect(fetch).toHaveBeenCalledTimes(1);
-    resolve(jsonResponse(202, { data: { receiptId: 'not-displayed' } }));
+    resolve(jsonResponse(202, { data: { receiptId: '00000000-0000-4000-8000-000000000000' } }));
     await screen.findByRole('heading', { name: 'تم استلام بياناتك' });
     await waitFor(() => expect(screen.queryByRole('button', { name: 'جارٍ الإرسال…' })).toBeNull());
   });

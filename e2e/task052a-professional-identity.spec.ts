@@ -17,7 +17,8 @@ test('existing Inspector completes and edits professional identity without losin
   await page.getByLabel('البريد الإلكتروني').fill(email!);
   await page.getByLabel('كلمة المرور').fill(password!);
   await page.getByRole('button', { name: 'تسجيل الدخول' }).click();
-  await expect(page).toHaveURL(/\/app\/institutions$/u);
+  await expect(page).toHaveURL(/\/app$/u);
+  await expect(page.getByRole('heading', { name: 'لوحة المتابعة', level: 1 })).toBeVisible();
   await page.getByRole('link', { name: 'هويتي المهنية' }).click();
   await expect(page.getByText('لم تكتمل الهوية المهنية بعد.')).toBeVisible();
   await page.getByLabel('الاسم').fill('أمينة');

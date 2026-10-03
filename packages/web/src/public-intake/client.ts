@@ -68,4 +68,15 @@ export async function submitTeacherIntake(
     const retryAfterSeconds = retryHeader && /^\d+$/u.test(retryHeader) ? Number(retryHeader) : undefined;
     throw new PublicSubmissionError(response.status, failure?.error?.fields, retryAfterSeconds);
   }
+  try {
+    const receipt: unknown = await response.json();
+    if (!receipt || typeof receipt !== 'object' || !('data' in receipt)
+      || !receipt.data || typeof receipt.data !== 'object' || !('receiptId' in receipt.data)
+      || typeof receipt.data.receiptId !== 'string'
+      || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(receipt.data.receiptId)) {
+      throw new PublicSubmissionError(502);
+    }
+  } catch {
+    throw new PublicSubmissionError(502);
+  }
 }

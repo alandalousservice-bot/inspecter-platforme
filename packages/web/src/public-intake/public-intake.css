@@ -124,3 +124,13 @@ body:has(.public-intake-page) {
     flex-direction: column;
   }
 }
+.public-intake-import {
+  border-block: 1px solid var(--color-border);
+  padding-block: var(--space-4);
+  margin-block: var(--space-4);
+  overflow-wrap: anywhere;
+}
+.public-intake-import input { max-inline-size: 100%; }
+.public-intake-import dl { margin-block: var(--space-4); }
+.public-intake-import dd { margin-inline-start: 0; }
+.public-intake-import dt { font-weight: 600; }
