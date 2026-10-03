@@ -290,6 +290,8 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
     { source_table: 'TeacherQualification', target_table: 'Teacher', confdeltype: 'r', confupdtype: 'c' },
     { source_table: 'TeacherSubmission', target_table: 'District', confdeltype: 'r', confupdtype: 'c' },
     { source_table: 'TeacherSubmission', target_table: 'Inspector', confdeltype: 'r', confupdtype: 'c' },
+    { source_table: 'TeacherSubmission', target_table: 'Inspector', confdeltype: 'r', confupdtype: 'c' },
+    { source_table: 'TeacherSubmission', target_table: 'Institution', confdeltype: 'r', confupdtype: 'c' },
     { source_table: 'TeacherSubmission', target_table: 'Teacher', confdeltype: 'r', confupdtype: 'c' },
     { source_table: 'TeacherSubmissionQualificationDeclaration', target_table: 'TeacherSubmission', confdeltype: 'r', confupdtype: 'c' },
     { source_table: 'TeacherSubmissionSupplementaryWorkplaceDeclaration', target_table: 'TeacherSubmission', confdeltype: 'r', confupdtype: 'c' },

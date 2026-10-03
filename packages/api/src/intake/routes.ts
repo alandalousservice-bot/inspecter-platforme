@@ -1,5 +1,5 @@
 import type { Express } from 'express';
-import type { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import { ApiError } from '../http/api-error.js';
 import { validateBody } from '../http/validate-body.js';
@@ -45,7 +45,7 @@ export function registerTeacherSubmissionRoutes(app: Express, database: IntakeDa
         administrativeSection, administrativeGrade, administrativeClassificationEffectiveDate,
         personalAddress, structuredQualifications, supplementaryWorkplaces, workplace, ...profileFields
       } = input;
-      const { institutionEmail, ...legacyWorkplace } = workplace;
+      const { institutionEmail, locationProposal, ...legacyWorkplace } = workplace;
       const profile = Object.fromEntries([
         ...Object.entries(profileFields),
         ['workplace', legacyWorkplace],
@@ -69,6 +69,11 @@ export function registerTeacherSubmissionRoutes(app: Express, database: IntakeDa
           administrativeClassificationEffectiveDate: asDatabaseDate(administrativeClassificationEffectiveDate),
           personalAddress,
           declaredHomeInstitutionEmail: institutionEmail,
+          ...(locationProposal ? {
+            proposedInstitutionLatitude: new Prisma.Decimal(locationProposal.latitude),
+            proposedInstitutionLongitude: new Prisma.Decimal(locationProposal.longitude),
+            locationProposalStatus: 'PENDING',
+          } : {}),
           ...(structuredQualifications?.length ? {
             qualificationDeclarations: { create: structuredQualifications.map((item, position) => ({
               position, name: item.name, issuingBody: item.issuingBody,

@@ -21,6 +21,8 @@ export const AuditAction = {
   INSPECTOR_PROPOSAL_ARCHIVED: 'INSPECTOR_PROPOSAL_ARCHIVED',
   INSTITUTION_CREATED: 'INSTITUTION_CREATED',
   INSTITUTION_UPDATED: 'INSTITUTION_UPDATED',
+  INSTITUTION_LOCATION_PROPOSAL_ACCEPTED: 'INSTITUTION_LOCATION_PROPOSAL_ACCEPTED',
+  INSTITUTION_LOCATION_PROPOSAL_REJECTED: 'INSTITUTION_LOCATION_PROPOSAL_REJECTED',
   TEACHER_INSTITUTION_LINKED: 'TEACHER_INSTITUTION_LINKED',
   TEACHER_INSTITUTION_CHANGED: 'TEACHER_INSTITUTION_CHANGED',
   WEEKLY_SCHEDULE_CREATED: 'WEEKLY_SCHEDULE_CREATED',
@@ -96,6 +98,13 @@ const eventContracts = {
       changedFields: z.array(z.enum(['name', 'municipality', 'address', 'directorPhone', 'email', 'location'])).min(1),
       locationChange: z.enum(['SET', 'UPDATE', 'CLEAR']).optional(),
     }).strict(),
+  },
+  [AuditAction.INSTITUTION_LOCATION_PROPOSAL_ACCEPTED]: {
+    entityType: 'TeacherSubmission', metadata: z.object({ institutionId: z.string().uuid() }).strict(),
+  },
+  [AuditAction.INSTITUTION_LOCATION_PROPOSAL_REJECTED]: {
+    entityType: 'TeacherSubmission',
+    metadata: z.object({ institutionId: z.string().uuid().optional(), decisionReason: z.literal('KEEP_CURRENT').optional() }).strict(),
   },
   [AuditAction.TEACHER_INSTITUTION_LINKED]: {
     entityType: 'Teacher',

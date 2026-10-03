@@ -152,6 +152,8 @@ test('clean migration creates the documented snapshot table, indexes and restric
     'firstInstallationDate', 'traineeshipDate', 'institutionAppointmentDate', 'institutionAppointmentNumber',
     'administrativeCategory', 'administrativeSection', 'administrativeGrade', 'administrativeClassificationEffectiveDate',
     'personalAddress', 'declaredHomeInstitutionEmail',
+    'proposedInstitutionLatitude', 'proposedInstitutionLongitude', 'locationProposalStatus', 'locationProposalDecidedAt',
+    'locationProposalDecidedByInspectorId', 'locationProposalInstitutionId', 'locationProposalDecisionReason',
   ].sort());
   assert.equal(columns.find(({ column_name }) => column_name === 'submittedProfile').data_type, 'jsonb');
   assert.match(columns.find(({ column_name }) => column_name === 'status').column_default, /PENDING/u);
@@ -161,7 +163,7 @@ test('clean migration creates the documented snapshot table, indexes and restric
   assert.ok(indexes.some(({ indexname, indexdef }) => indexname === 'TeacherSubmission_acceptedTeacherId_key'
     && indexdef.includes('UNIQUE') && indexdef.includes('"acceptedTeacherId"')));
   const fks = await db.$queryRawUnsafe(`SELECT conname, confdeltype, confupdtype FROM pg_catalog.pg_constraint WHERE conrelid=to_regclass('"${schemaName}"."TeacherSubmission"') AND contype='f'`);
-  assert.equal(fks.length, 3);
+  assert.equal(fks.length, 5);
   assert.ok(fks.every(({ confdeltype, confupdtype }) => confdeltype === 'r' && confupdtype === 'c'));
   const history = await db.$queryRawUnsafe(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL)::int AS applied FROM "${schemaName}"."_prisma_migrations"`);
   assert.equal(history[0].total, history[0].applied);

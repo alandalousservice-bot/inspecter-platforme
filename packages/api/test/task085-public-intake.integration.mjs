@@ -111,7 +111,7 @@ before(async () => {
   cpSync(join(migrationsDir, migrationName), join(tempMigrations, migrationName), { recursive: true });
   runPrisma(['migrate', 'deploy'], upgradeUrl, tempSchema);
   upgradeDb = new PrismaClient({ datasources: { db: { url: upgradeUrl } } }); await upgradeDb.$connect();
-  const retained = await upgradeDb.teacherSubmission.findUniqueOrThrow({ where: { id: beforeIds.submissionId } });
+  const [retained] = await upgradeDb.$queryRaw`SELECT "submittedProfile", "birthProvince", "professionalFramework", "firstEducationAppointmentDate", "firstEducationAppointmentDecisionNumber", "firstInstallationDate", "traineeshipDate", "institutionAppointmentDate", "institutionAppointmentNumber", "administrativeCategory", "administrativeSection", "administrativeGrade", "administrativeClassificationEffectiveDate", "personalAddress", "declaredHomeInstitutionEmail" FROM "TeacherSubmission" WHERE "id"=${beforeIds.submissionId}::uuid`;
   assert.deepEqual(retained.submittedProfile, beforeProfile);
   for (const field of ['birthProvince', 'professionalFramework', 'firstEducationAppointmentDate', 'firstEducationAppointmentDecisionNumber', 'firstInstallationDate', 'traineeshipDate', 'institutionAppointmentDate', 'institutionAppointmentNumber', 'administrativeCategory', 'administrativeSection', 'administrativeGrade', 'administrativeClassificationEffectiveDate', 'personalAddress', 'declaredHomeInstitutionEmail']) assert.equal(retained[field], null);
   assert.equal(await upgradeDb.teacherSubmissionQualificationDeclaration.count(), 0);

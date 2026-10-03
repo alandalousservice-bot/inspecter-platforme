@@ -34,7 +34,7 @@
 
 ## Teacher-proposed Institution location (ADR-040 / TASK-077B planned)
 
-العقد المستقبلي المعتمد في [TASK-077](architecture/TASK_077_INSTITUTION_LOCATION_PROPOSAL.md#persistence-and-history): سبعة حقول typed nullable على TeacherSubmission للموقع المقترح وحالته وقراره، بلا جدول عام أو تغيير snapshot القديم. الزوج immutable وقرار الموقع مستقل عن قرار الطلب. الموقع المعتمد يبقى Institution فقط؛ يتوسع source CHECK مستقبلًا إلى MANUAL_INSPECTOR وTEACHER_PROPOSED_APPROVED. لا coordinates على Teacher/TeacherSupplementaryWorkplace/WeeklyScheduleSlot/PedagogicalVisit. migration forward-only في TASK-077B، بلا backfill أو تغيير تاريخ؛ التفاصيل والقيود والعلاقات في العقد المركزي. لم يُنفذ هذا التطور في TASK-077A؛ القسم التالي هو baseline TASK-076A التاريخي.
+TASK-077B implementation: TeacherSubmission stores nullable `proposedInstitutionLatitude/Longitude DECIMAL(9,6)`, `locationProposalStatus VARCHAR(16)`, `locationProposalDecidedAt`, `locationProposalDecidedByInspectorId UUID`, `locationProposalInstitutionId UUID`, and `locationProposalDecisionReason VARCHAR(32)`. CHECKs enforce pair/ranges/status/final-state metadata and the bounded KEEP_CURRENT reason. Decider FK is RESTRICT/CASCADE; Institution composite `(institutionId,districtId)` FK prevents cross-district binding. Index `(districtId,locationProposalStatus,submittedAt)` supports scoped pending review. Institution source CHECK now allows MANUAL_INSPECTOR and TEACHER_PROPOSED_APPROVED; existing values are unchanged. One forward migration; no backfill. Detailed semantics and tests: [TASK-077 contract](architecture/TASK_077_INSTITUTION_LOCATION_PROPOSAL.md#persistence-and-history).
 
 ## Institution location persistence (ADR-039 / TASK-076A)
 

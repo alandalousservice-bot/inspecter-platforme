@@ -88,7 +88,7 @@ before(async () => {
   cpSync(join(migrationsDir, 'migration_lock.toml'), join(tempRoot, 'migration_lock.toml'));
   const allMigrations = readdirSync(migrationsDir, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
   assert.equal(allMigrations.filter((name) => name === migrationName).length, 1);
-  for (const name of allMigrations.filter((name) => name !== migrationName)) cpSync(join(migrationsDir, name), join(tempMigrations, name), { recursive: true });
+  for (const name of allMigrations.filter((name) => name < migrationName)) cpSync(join(migrationsDir, name), join(tempMigrations, name), { recursive: true });
   const tempSchema = join(tempRoot, 'schema.prisma'); cpSync(schemaPath, tempSchema);
   runPrisma(['migrate', 'deploy'], upgradeUrl, tempSchema);
   const oldSchema = new PrismaClient({ datasources: { db: { url: upgradeUrl } } }); await oldSchema.$connect();

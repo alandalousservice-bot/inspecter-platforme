@@ -34,6 +34,7 @@ model Inspector {
   sessions           Session[]
   auditEvents        AuditLog[]
   decidedSubmissions TeacherSubmission[]           @relation("TeacherSubmissionDecider")
+  locationProposalDecisions TeacherSubmission[]     @relation("LocationProposalDecider")
   visits             PedagogicalVisit[]
   finalizedReports   InspectionReport[]
   ownedFollowUps     FollowUp[]
@@ -88,6 +89,7 @@ model Institution {
   visits                  PedagogicalVisit[]
   supplementaryWorkplaces TeacherSupplementaryWorkplace[]
   scheduleSlots           WeeklyScheduleSlot[]
+  locationProposals       TeacherSubmission[]               @relation("LocationProposalInstitution")
 
   @@unique([id, districtId])
   @@index([districtId, name])
@@ -116,13 +118,23 @@ model TeacherSubmission {
   administrativeClassificationEffectiveDate DateTime?                                            @db.Date
   personalAddress                           String?                                              @db.VarChar(300)
   declaredHomeInstitutionEmail              String?                                              @db.VarChar(254)
+  proposedInstitutionLatitude               Decimal?                                             @db.Decimal(9, 6)
+  proposedInstitutionLongitude              Decimal?                                             @db.Decimal(9, 6)
+  locationProposalStatus                    String?                                              @db.VarChar(16)
+  locationProposalDecidedAt                 DateTime?
+  locationProposalDecidedByInspectorId      String?                                              @db.Uuid
+  locationProposalInstitutionId             String?                                              @db.Uuid
+  locationProposalDecisionReason            String?                                              @db.VarChar(32)
   district                                  District                                             @relation(fields: [districtId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   decidedByInspector                        Inspector?                                           @relation("TeacherSubmissionDecider", fields: [decidedByInspectorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   acceptedTeacher                           Teacher?                                             @relation("AcceptedSubmission", fields: [acceptedTeacherId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   qualificationDeclarations                 TeacherSubmissionQualificationDeclaration[]
   supplementaryWorkplaceDeclarations        TeacherSubmissionSupplementaryWorkplaceDeclaration[]
+  locationProposalDecidedByInspector        Inspector?                                           @relation("LocationProposalDecider", fields: [locationProposalDecidedByInspectorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  locationProposalInstitution               Institution?                                         @relation("LocationProposalInstitution", fields: [locationProposalInstitutionId, districtId], references: [id, districtId], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([districtId, status, submittedAt])
+  @@index([districtId, locationProposalStatus, submittedAt])
 }
 
 model TeacherSubmissionQualificationDeclaration {

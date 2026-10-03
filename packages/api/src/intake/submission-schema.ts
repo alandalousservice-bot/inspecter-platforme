@@ -105,6 +105,12 @@ const workplaceSchema = z.object({
   institutionAddress: cleanText(300, true),
   directorPhone: directorPhoneField,
   institutionEmail: emailField.optional(),
+  locationProposal: z.object({
+    latitude: z.string().regex(/^-?(?:0|[1-9]\d{0,2})(?:\.\d{1,6})?$/u, 'قيمة غير صالحة.')
+      .refine((value) => Number(value) >= -90 && Number(value) <= 90, 'قيمة غير صالحة.'),
+    longitude: z.string().regex(/^-?(?:0|[1-9]\d{0,2})(?:\.\d{1,6})?$/u, 'قيمة غير صالحة.')
+      .refine((value) => Number(value) >= -180 && Number(value) <= 180, 'قيمة غير صالحة.'),
+  }).strict().optional(),
 }).strict();
 
 const qualificationDeclarationSchema = z.object({

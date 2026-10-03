@@ -170,7 +170,13 @@ Projection includes `visitTypeEditable:boolean`, computed from non-CANCELLED sta
 
 ### Institution location proposal (ADR-040 / TASK-077 planned)
 
-العقد المستقبلي المعتمد: public POST الحالي يقبل اختياريًا workplace.locationProposal بكائن strict يحوي latitude/longitude كنصين عشريين كاملين ضمن حدود TASK-076A؛ الغياب بلا مقترح، null/نصف زوج/مفاتيح إضافية/أرقام JSON/دقة زائدة مرفوضة. الرد يبقى 202 receipt-only، ولا canonical mutation أو public lookup. تفاصيل الحماية والإدخال والأهلية والقرار والتدقيق في [TASK-077 contract](architecture/TASK_077_INSTITUTION_LOCATION_PROPOSAL.md). TASK-077B يسجل الصيغة الدقيقة لمسار قرار المفتش والتزامن قبل استهلاك UI؛ لا route منفذ ضمن TASK-077A. المصدر المستقبلي للـInstitution DTO يقبل MANUAL_INSPECTOR أو TEACHER_PROPOSED_APPROVED، server-controlled؛ baseline التالي يصف TASK-076A فقط. TASK-075/ADR-038 يبقى بلا تغيير.
+`POST /api/v1/public/districts/:districtId/submissions` accepts optional strict `workplace.locationProposal:{latitude:string,longitude:string}`. It stores typed proposal decimals and PENDING status only; receipt remains `202 {data:{receiptId}}`. No public proposal readback or canonical Institution mutation.
+
+`GET /api/v1/submissions/:id` adds `locationProposal:null|{status,latitude,longitude,decidedAt,decidedByInspectorId,decisionReason,institution}` to the existing Inspector-only detail. Absent proposals are null; coordinates are fixed six-place strings. District scoping and no-store remain.
+
+`POST /api/v1/submissions/:id/location-proposal-decision` strict body is `{action:"REJECT"}`; `{action:"KEEP_CURRENT",expectedCanonicalLocation:{latitude,longitude,source}}`; or `{action:"ACCEPT_PROPOSED",expectedCanonicalLocation:null|{latitude,longitude,source}}`. Expected canonical state prevents stale replacement; ACCEPT_PROPOSED is explicit replacement intent. ACCEPT requires an ACCEPTED submission whose accepted Teacher has an explicitly linked home Institution in the same authorized current district, active and unarchived. REJECT does not mutate Institution. KEEP_CURRENT requires an existing canonical location and resolves only that proposal as REJECTED with reason KEEP_CURRENT. Concurrent/final/stale decisions return 409; missing/out-of-scope targets use generic 404. CSRF is required.
+
+Decision and canonical mutation are atomic with proposal ACCEPTED/REJECTED audit; when canonical coordinates/source actually change, existing INSTITUTION_UPDATED event is also appended. Audit metadata contains no coordinates. Exact invariants, races and history are in [TASK-077 contract](architecture/TASK_077_INSTITUTION_LOCATION_PROPOSAL.md). TASK-075/ADR-038 remains unchanged. Institution source values are server-controlled MANUAL_INSPECTOR or TEACHER_PROPOSED_APPROVED.
 
 ### Institution location (ADR-039 / TASK-076A)
 

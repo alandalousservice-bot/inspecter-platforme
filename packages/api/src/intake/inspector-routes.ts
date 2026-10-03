@@ -168,6 +168,10 @@ export function registerInspectorSubmissionRoutes(
       where: { id: idResult.data },
       select: {
         id: true, districtId: true, status: true, submittedAt: true, submittedProfile: true, acceptedTeacherId: true,
+        proposedInstitutionLatitude: true, proposedInstitutionLongitude: true, locationProposalStatus: true,
+        locationProposalDecidedAt: true, locationProposalDecidedByInspectorId: true,
+        locationProposalDecisionReason: true,
+        locationProposalInstitution: { select: { id: true, name: true, municipality: true } },
         birthProvince: true, professionalFramework: true, firstEducationAppointmentDate: true,
         firstEducationAppointmentDecisionNumber: true, firstInstallationDate: true, traineeshipDate: true,
         institutionAppointmentDate: true, institutionAppointmentNumber: true, administrativeCategory: true,
@@ -211,6 +215,17 @@ export function registerInspectorSubmissionRoutes(
         status: submission.status,
         submittedAt: submission.submittedAt,
         acceptedTeacherId: submission.status === 'ACCEPTED' ? submission.acceptedTeacherId : null,
+        locationProposal: submission.proposedInstitutionLatitude === null || submission.proposedInstitutionLongitude === null
+          ? null
+          : {
+            status: submission.locationProposalStatus,
+            latitude: submission.proposedInstitutionLatitude.toFixed(6),
+            longitude: submission.proposedInstitutionLongitude.toFixed(6),
+            decidedAt: submission.locationProposalDecidedAt,
+            decidedByInspectorId: submission.locationProposalDecidedByInspectorId,
+            decisionReason: submission.locationProposalDecisionReason,
+            institution: submission.locationProposalInstitution,
+          },
         submittedProfile,
         declaredAdministrative: {
           birthProvince: submission.birthProvince,
