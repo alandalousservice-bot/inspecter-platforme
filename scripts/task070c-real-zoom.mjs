@@ -203,12 +203,14 @@ try {
     const focus = await page.evaluate(() => {
       const element = document.activeElement;
       return {
+        sidebarFocused: Boolean(element?.closest('.app-sidebar')),
         label: element?.getAttribute('aria-label'),
         focusVisible: element?.matches(':focus-visible') ?? false,
         outlineWidth: Number.parseFloat(getComputedStyle(element).outlineWidth) || 0,
         outlineStyle: getComputedStyle(element).outlineStyle,
       };
     });
+    assert(!focus.sidebarFocused, 'A hidden mobile-drawer link remained in the keyboard tab order.');
     if (focus.label === 'فتح قائمة التنقل') {
       assert(focus.focusVisible && focus.outlineStyle !== 'none' && focus.outlineWidth >= 2, 'Mobile navigation focus ring is not visible at 200%.');
       focusedMenu = true;
@@ -243,6 +245,33 @@ try {
   await page.keyboard.press('Enter');
   await page.waitForURL((url) => url.pathname === '/app/visits/new');
   await page.goto('http://127.0.0.1:5173/app');
+  await page.unroute('**/api/v1/dashboard/summary');
+  const academicStart = new Date().getUTCMonth() >= 8 ? new Date().getUTCFullYear() : new Date().getUTCFullYear() - 1;
+  const academicYear = `${academicStart}-${academicStart + 1}`;
+  const actualZoomRoutes = [
+    '/app', '/app/teachers', '/app/teachers/84000000-0000-4000-8000-000000000101',
+    '/app/submissions', '/app/submissions/84000000-0000-4000-8000-000000000903',
+    '/app/visits', '/app/visits/84000000-0000-4000-8000-000000000602',
+    '/app/visits/84000000-0000-4000-8000-000000000602/report', '/app/follow-ups',
+    `/app/teachers/84000000-0000-4000-8000-000000000101/information-card?academicYear=${academicYear}`,
+  ];
+  for (const route of actualZoomRoutes) {
+    await page.goto(`http://127.0.0.1:5173${route}`);
+    await page.waitForLoadState('networkidle');
+    const routeGeometry = await page.evaluate(() => ({
+      width: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      direction: getComputedStyle(document.documentElement).direction,
+      mainCount: document.querySelectorAll('main').length,
+      hiddenDrawer: getComputedStyle(document.querySelector('.app-sidebar')).visibility === 'hidden',
+    }));
+    assert(routeGeometry.width === at200.clientWidth && routeGeometry.scrollWidth <= routeGeometry.width
+      && routeGeometry.direction === 'rtl' && routeGeometry.mainCount === 1 && routeGeometry.hiddenDrawer,
+    `200% route geometry/shell check failed: ${new URL(page.url()).pathname}.`);
+    if (route.includes('/information-card?')) {
+      assert(await page.locator('.teacher-card').count() > 0, 'Teacher Information Card is missing at actual 200% zoom.');
+    }
+  }
   await page.getByRole('button', { name: 'تسجيل الخروج' }).click();
   await page.waitForURL('**/login');
 
@@ -250,7 +279,7 @@ try {
   const after = await businessCounts();
   assert(JSON.stringify(before) === JSON.stringify(after), 'Persistent LOCAL UAT business records changed during zoom verification.');
 
-  console.log(`TASK-070C real Chrome zoom PASS; 100pct_dpr=${at100.dpr.toFixed(2)}; 200pct_dpr=${at200.dpr.toFixed(2)}; css_width=${at100.innerWidth}->${at200.innerWidth}; overflow=none; bidi=PASS; reduced_motion=PASS; keyboard_drawer=PASS; keyboard_quick_action=PASS; business_data_preserved=true; geometry=${JSON.stringify({ scrollX: at200.scrollX, appMain: at200.appMain, pageContainer: at200.pageContainer, dashboardSections: at200.dashboardSections })}; screenshot=${screenshotPath}`);
+  console.log(`TASK-070C real Chrome zoom PASS; 100pct_dpr=${at100.dpr.toFixed(2)}; 200pct_dpr=${at200.dpr.toFixed(2)}; css_width=${at100.innerWidth}->${at200.innerWidth}; overflow=none; routes_at_200=${actualZoomRoutes.length}; bidi=PASS; reduced_motion=PASS; keyboard_drawer=PASS; keyboard_quick_action=PASS; business_data_preserved=true; geometry=${JSON.stringify({ scrollX: at200.scrollX, appMain: at200.appMain, pageContainer: at200.pageContainer, dashboardSections: at200.dashboardSections })}; screenshot=${screenshotPath}`);
 } finally {
   await context?.close();
   await db.$disconnect();

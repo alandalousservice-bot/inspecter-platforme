@@ -28,6 +28,8 @@
   gap: var(--space-3);
   min-height: 3.25rem;
   padding-inline: var(--space-2);
+  padding-block-end: var(--space-3);
+  border-block-end: 1px solid var(--color-border);
   color: var(--color-text-primary);
 }
 .app-sidebar__brand-icon { flex: 0 0 auto; width: 1.625rem; height: 1.625rem; color: var(--color-primary); }
@@ -103,6 +105,7 @@
   padding-inline: var(--page-gutter);
   border-block-end: 1px solid var(--color-border);
   background: var(--color-surface-elevated);
+  box-shadow: var(--elevation-low);
 }
 .app-topbar__context,
 .app-topbar__account,

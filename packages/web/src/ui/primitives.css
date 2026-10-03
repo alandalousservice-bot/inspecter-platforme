@@ -80,7 +80,10 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
+  box-shadow: var(--elevation-low);
+  transition: border-color var(--motion-short) ease, box-shadow var(--motion-short) ease;
 }
+.ui-card:hover { border-color: var(--color-border-strong); box-shadow: var(--elevation-high); }
 .ui-card__header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
 .ui-card__title, .ui-dialog__title { margin: 0; font-size: var(--font-size-card); }
 .ui-dialog__description { margin: 0; line-height: var(--line-height-body); }
@@ -199,6 +202,7 @@
 @keyframes ui-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
+  .ui-card { transition: none; }
   .ui-button, .ui-button__spinner, .ui-state__indicator { animation: none; transition: none; }
 }
 @media (max-width: 48rem) {
