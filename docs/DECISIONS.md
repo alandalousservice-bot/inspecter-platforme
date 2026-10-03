@@ -43,6 +43,22 @@
 | ADR-037 | ACCEPTED | لوحة المفتش التشغيلية: `/app` منزل مصادق، `GET /api/v1/dashboard/summary` مجمّع محدود لعمل المفتش ضمن عضوياته الحالية؛ بلا تقييم أساتذة أو feed تدقيق أو مخططات؛ TASK-070A/B/C |
 | ADR-038 | ACCEPTED | قرار Product Owner: استيراد JSON واحد كتعبئة محلية للاستمارة العامة فقط، عبر intake الحالي وبلا اعتماد أو مسار تخزين بديل؛ التفاصيل أدناه |
 | ADR-039 | ACCEPTED | قرار Product Owner: موقع المؤسسة بإحداثيي WGS84 يديرهما المفتش يدويًا؛ TASK-076A بلا مزود خرائط أو خريطة مقاطعة، وعرض المزود الصريح لمؤسسة مختارة مؤجل إلى TASK-076B |
+| ADR-040 | ACCEPTED | Product Owner LP-01..LP-04: مقترح موقع المؤسسة الأم على TeacherSubmission، إدخال يدوي وقرار مفتش مستقل؛ لا GPS أو خرائط مضمّنة؛ TASK-077A..077F |
+
+## ADR-040 — Teacher-Proposed Institution Location and Explicit Inspector Approval
+
+Status: **ACCEPTED** by explicit Product Owner decisions LP-01..LP-04 in TASK-077A. Implementation is deferred to TASK-077B..077F. The authoritative contract is [TASK-077 location proposal](architecture/TASK_077_INSTITUTION_LOCATION_PROPOSAL.md).
+
+- LP-01 ACCEPTED: proposals apply only to the declared HOME/primary Institution; supplementary proposals are DEFERRED, without speculative persistence.
+- LP-02 ACCEPTED: manual decimal-string entry only. Browser/device capture and one-time geolocation are DEFERRED; no GPS permission, getCurrentPosition, watchPosition or background location in MVP.
+- LP-03 ACCEPTED: proposal ACCEPT requires an ACCEPTED TeacherSubmission and an Institution explicitly resolved/linked through the existing authoritative workflow. Submission acceptance never approves location. REJECTED or INTERNAL_REVIEW cannot bypass this invariant.
+- LP-04 ACCEPTED: KEEP CURRENT rejects only that proposal with structural reason KEEP_CURRENT; other pending proposals remain independent. No voting, latest-wins, nearest selection or automatic reconciliation.
+
+Canonical location belongs only to Institution. Reuse TeacherSubmission typed proposal/decision fields, not a generic proposal table. Preserve immutable submitted coordinates and independent PENDING/ACCEPTED/REJECTED decision history. Add server-only canonical source TEACHER_PROPOSED_APPROVED alongside MANUAL_INSPECTOR using String + DB CHECK, not a PostgreSQL enum. Neither source proves official/GPS verification, presence or attendance.
+
+The new public field is optional workplace.locationProposal; public POST never mutates Institution and keeps the receipt-only 202. TASK-075/ADR-038 coordinate rejection is unchanged. Inspector approval, canonical mutation and required audits are atomic; no coordinate values in audits/logs. No tracking or persistent browser storage. Future navigation is explicit external Google Maps using canonical coordinates only; the platform does not render maps.
+
+ADR-039 remains ACCEPTED and records the original TASK-076A implementation. ADR-040 prospectively evolves its public-proposal/source boundary and supersedes its unimplemented provider-rendering direction; it does not rewrite history. TASK-076B is superseded, not completed. ADR-013/014/016 remain OPEN; TASK-060 remains BLOCKED.
 
 ## ADR-038 — Single JSON Declaration Import into Canonical Public Intake
 

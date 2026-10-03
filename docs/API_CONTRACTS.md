@@ -168,6 +168,10 @@ Projection includes `visitTypeEditable:boolean`, computed from non-CANCELLED sta
 - `POST /institutions` accepts only `{districtId,name,externalCode?}`. District membership is required; an out-of-scope District returns generic 404. No update, delete, archive, or unarchive operation is introduced by TASK-023.
 - Archive semantics are defined by [ADR-024](DECISIONS.md#adr-024--institution-archive-list-policy).
 
+### Institution location proposal (ADR-040 / TASK-077 planned)
+
+العقد المستقبلي المعتمد: public POST الحالي يقبل اختياريًا workplace.locationProposal بكائن strict يحوي latitude/longitude كنصين عشريين كاملين ضمن حدود TASK-076A؛ الغياب بلا مقترح، null/نصف زوج/مفاتيح إضافية/أرقام JSON/دقة زائدة مرفوضة. الرد يبقى 202 receipt-only، ولا canonical mutation أو public lookup. تفاصيل الحماية والإدخال والأهلية والقرار والتدقيق في [TASK-077 contract](architecture/TASK_077_INSTITUTION_LOCATION_PROPOSAL.md). TASK-077B يسجل الصيغة الدقيقة لمسار قرار المفتش والتزامن قبل استهلاك UI؛ لا route منفذ ضمن TASK-077A. المصدر المستقبلي للـInstitution DTO يقبل MANUAL_INSPECTOR أو TEACHER_PROPOSED_APPROVED، server-controlled؛ baseline التالي يصف TASK-076A فقط. TASK-075/ADR-038 يبقى بلا تغيير.
+
 ### Institution location (ADR-039 / TASK-076A)
 
 الموقع جزء من DTO المؤسسة في list/detail وPOST/PATCH responses: `location:null` أو `{latitude:string,longitude:string,source:"MANUAL_INSPECTOR"}`؛ الأرقام عشرية كنصوص ثابتة بست منازل كحد أقصى، ولا تُرسل Prisma Decimal objects. GET لا يكشف مؤسسة خارج membership الحالية.

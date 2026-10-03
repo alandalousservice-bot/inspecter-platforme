@@ -32,6 +32,10 @@
 
 سياسة Institution: `archivedAt = NULL` تعني نشطة، وغير NULL تعني مؤرشفة. قوائم TASK-023 الافتراضية تستبعد المؤرشفة (بما في ذلك البحث والحساب)، مع إبقاء السجل والعلاقات. التفاصيل في [ADR-024](DECISIONS.md#adr-024--institution-archive-list-policy).
 
+## Teacher-proposed Institution location (ADR-040 / TASK-077B planned)
+
+العقد المستقبلي المعتمد في [TASK-077](architecture/TASK_077_INSTITUTION_LOCATION_PROPOSAL.md#persistence-and-history): سبعة حقول typed nullable على TeacherSubmission للموقع المقترح وحالته وقراره، بلا جدول عام أو تغيير snapshot القديم. الزوج immutable وقرار الموقع مستقل عن قرار الطلب. الموقع المعتمد يبقى Institution فقط؛ يتوسع source CHECK مستقبلًا إلى MANUAL_INSPECTOR وTEACHER_PROPOSED_APPROVED. لا coordinates على Teacher/TeacherSupplementaryWorkplace/WeeklyScheduleSlot/PedagogicalVisit. migration forward-only في TASK-077B، بلا backfill أو تغيير تاريخ؛ التفاصيل والقيود والعلاقات في العقد المركزي. لم يُنفذ هذا التطور في TASK-077A؛ القسم التالي هو baseline TASK-076A التاريخي.
+
 ## Institution location persistence (ADR-039 / TASK-076A)
 
 تضيف migration واحدة forward-only إلى `Institution`: `latitude Decimal? @db.Decimal(9,6)`, `longitude Decimal? @db.Decimal(9,6)`, و`locationSource String? @db.VarChar(32)`. التخزين PostgreSQL `NUMERIC(9,6)` دقيق؛ الإحداثيات درجات WGS84. CHECKs تفرض `-90 <= latitude <= 90`, و`-180 <= longitude <= 180`، والحالتين فقط: الحقول الثلاثة NULL، أو كلا الإحداثيين غير NULL والمصدر `MANUAL_INSPECTOR`. المصدر يصف إدخال المفتش ولا يثبت تحققًا خارجيًا. `0,0` زوج صالح.

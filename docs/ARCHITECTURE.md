@@ -34,6 +34,10 @@ TASK-030 يفترض نسخة API واحدة؛ محدد المعدل في الذ�
 
 AuditLog سجل تدقيق للأفعال التي يتطلب عقدها التسجيل، منفصل عن سجلات تشغيل التطبيق والتحليلات وtelemetry. خدمة append تأخذ Prisma transaction client من العملية؛ فشل إضافة حدث مطلوب يُرجع mutation معها. payload محدود بمخطط الحدث ويستبعد الأسرار والبيانات الشخصية المعتادة. الإضافة فقط مضمونة عبر الخدمة، لا ضد الكتابة المباشرة بامتيازات DB؛ سياسة الاحتفاظ والحذف تبقى ضمن ADR-014 OPEN. [ADR-025](DECISIONS.md#adr-025--auditlog-event-payload-and-append-contract).
 
+## Institution location proposal evolution (ADR-040)
+
+Canonical location is Institution-owned; TeacherSubmission may hold only an untrusted HOME Institution proposal. Manual entry only; supplementary proposals and browser geolocation deferred. Existing submission acceptance and explicit Institution resolution/linking precede a separate proposal approval transaction. No Teacher/device/tracking coordinates or automatic matching. Proposal decision, canonical mutation and required audit append are atomic under existing transaction conventions, with stale canonical overwrite protection. [TASK-077 contract](architecture/TASK_077_INSTITUTION_LOCATION_PROPOSAL.md) centralizes persistence, boundaries and privacy. ADR-039 remains the historical TASK-076A baseline; its unimplemented rendering direction is prospectively superseded: no in-platform maps, only future explicit external Google Maps directions from canonical coordinates. No implementation in TASK-077A and no change to ADR-038 import semantics or ADR-014 retention.
+
 ## قرار الترتيب
 
 
