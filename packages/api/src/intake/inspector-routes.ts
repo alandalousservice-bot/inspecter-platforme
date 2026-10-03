@@ -3,6 +3,7 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import { ApiError } from '../http/api-error.js';
 import { requireInspectorDistrictMembership } from '../policy/district-access.js';
+import { serializeCanonicalInstitutionLocation } from '../institutions/location-serialization.js';
 import { findPotentialDuplicateCandidates, hasPotentialDuplicateCandidates, type SubmissionSnapshot } from './duplicate-candidates.js';
 import { projectDeclaredWorkplace } from './declared-workplace.js';
 
@@ -171,7 +172,14 @@ export function registerInspectorSubmissionRoutes(
         proposedInstitutionLatitude: true, proposedInstitutionLongitude: true, locationProposalStatus: true,
         locationProposalDecidedAt: true, locationProposalDecidedByInspectorId: true,
         locationProposalDecisionReason: true,
-        locationProposalInstitution: { select: { id: true, name: true, municipality: true } },
+        locationProposalInstitution: { select: {
+          id: true, districtId: true, name: true, municipality: true,
+          latitude: true, longitude: true, locationSource: true,
+        } },
+        acceptedTeacher: { select: { institution: { select: {
+          id: true, districtId: true, name: true, municipality: true,
+          latitude: true, longitude: true, locationSource: true,
+        } } } },
         birthProvince: true, professionalFramework: true, firstEducationAppointmentDate: true,
         firstEducationAppointmentDecisionNumber: true, firstInstallationDate: true, traineeshipDate: true,
         institutionAppointmentDate: true, institutionAppointmentNumber: true, administrativeCategory: true,
@@ -208,6 +216,10 @@ export function registerInspectorSubmissionRoutes(
       return value ? [[field, value]] : [];
     }));
 
+    const proposalInstitution = submission.locationProposalInstitution
+      ?? (submission.acceptedTeacher?.institution?.districtId === submission.districtId
+        ? submission.acceptedTeacher.institution
+        : null);
     response.json({
       data: {
         id: submission.id,
@@ -224,7 +236,12 @@ export function registerInspectorSubmissionRoutes(
             decidedAt: submission.locationProposalDecidedAt,
             decidedByInspectorId: submission.locationProposalDecidedByInspectorId,
             decisionReason: submission.locationProposalDecisionReason,
-            institution: submission.locationProposalInstitution,
+            institution: proposalInstitution === null ? null : {
+              id: proposalInstitution.id,
+              name: proposalInstitution.name,
+              municipality: proposalInstitution.municipality,
+              location: serializeCanonicalInstitutionLocation(proposalInstitution),
+            },
           },
         submittedProfile,
         declaredAdministrative: {

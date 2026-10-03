@@ -199,6 +199,66 @@ test('Inspector detail scopes proposal and reports absence as null', async () =>
   assert.equal(login.status, 401);
 });
 
+test('Inspector detail returns the linked canonical Institution location independently of the proposal', async () => {
+  const target = await db.institution.create({ data: {
+    districtId: district.id, name: 'Canonical detail target',
+    latitude: '35.125', longitude: '2.5', locationSource: 'MANUAL_INSPECTOR',
+  } });
+  const proposed = await makeAcceptedProposal({ latitude: '36.5', longitude: '3.25' }, target);
+  let detailResponse = await req(`/api/v1/submissions/${proposed.id}`);
+  assert.equal(detailResponse.status, 200);
+  let detail = (await detailResponse.json()).data.locationProposal;
+  assert.deepEqual(detail.institution, {
+    id: target.id, name: target.name, municipality: target.municipality,
+    location: { latitude: '35.125000', longitude: '2.500000', source: 'MANUAL_INSPECTOR' },
+  });
+  assert.deepEqual({ latitude: detail.latitude, longitude: detail.longitude }, { latitude: '36.500000', longitude: '3.250000' });
+  assert.equal(detail.status, 'PENDING');
+
+  await db.institution.update({ where: { id: target.id }, data: {
+    latitude: '47.75', longitude: '-11.125', locationSource: 'TEACHER_PROPOSED_APPROVED',
+  } });
+  detailResponse = await req(`/api/v1/submissions/${proposed.id}`);
+  detail = (await detailResponse.json()).data.locationProposal;
+  assert.deepEqual(detail.institution.location, {
+    latitude: '47.750000', longitude: '-11.125000', source: 'TEACHER_PROPOSED_APPROVED',
+  });
+  assert.deepEqual({ latitude: detail.latitude, longitude: detail.longitude }, { latitude: '36.500000', longitude: '3.250000' });
+
+  const same = await makeAcceptedProposal({ latitude: '47.75', longitude: '-11.125' }, target);
+  detailResponse = await req(`/api/v1/submissions/${same.id}`);
+  detail = (await detailResponse.json()).data.locationProposal;
+  assert.deepEqual(detail.institution.location, {
+    latitude: '47.750000', longitude: '-11.125000', source: 'TEACHER_PROPOSED_APPROVED',
+  });
+  assert.equal(detail.status, 'PENDING', 'matching coordinates do not imply a decision');
+
+  const accepted = await req(`/api/v1/submissions/${same.id}/location-proposal-decision`, { method: 'POST', body: {
+    action: 'ACCEPT_PROPOSED', expectedCanonicalLocation: { latitude: '47.75', longitude: '-11.125', source: 'TEACHER_PROPOSED_APPROVED' },
+  } });
+  assert.equal(accepted.status, 200);
+  const laterInstitution = await db.institution.create({ data: { districtId: district.id, name: 'Later Teacher Institution' } });
+  await db.teacher.update({ where: { id: same.teacher.id }, data: { institutionId: laterInstitution.id } });
+  detailResponse = await req(`/api/v1/submissions/${same.id}`);
+  detail = (await detailResponse.json()).data.locationProposal;
+  assert.equal(detail.institution.id, target.id, 'recorded decision target remains authoritative after Teacher relinking');
+  assert.deepEqual(detail.institution.location, {
+    latitude: '47.750000', longitude: '-11.125000', source: 'TEACHER_PROPOSED_APPROVED',
+  });
+});
+
+test('Inspector detail returns a null canonical location and does not infer an unresolved Institution', async () => {
+  const noLocation = await db.institution.create({ data: { districtId: district.id, name: 'No canonical location' } });
+  const unresolved = await makeAcceptedProposal({ latitude: '1', longitude: '2' }, noLocation);
+  const unresolvedDetail = (await (await req(`/api/v1/submissions/${unresolved.id}`)).json()).data.locationProposal;
+  assert.deepEqual(unresolvedDetail.institution.location, null);
+
+  const withoutResolvedInstitution = await publicSubmission({ latitude: '3', longitude: '4' });
+  const withoutResolvedId = (await withoutResolvedInstitution.json()).data.receiptId;
+  const noInstitutionDetail = (await (await req(`/api/v1/submissions/${withoutResolvedId}`)).json()).data.locationProposal;
+  assert.equal(noInstitutionDetail.institution, null);
+});
+
 test('ACCEPT sets canonical location, preserves the proposal and writes coordinate-free atomic audits', async () => {
   const proposal = await makeAcceptedProposal({ latitude: '36.5', longitude: '3.25' });
   const response = await req(`/api/v1/submissions/${proposal.id}/location-proposal-decision`, {

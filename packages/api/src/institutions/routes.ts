@@ -7,6 +7,7 @@ import { validateBody } from '../http/validate-body.js';
 import { requireAuthenticatedMutationCsrf } from '../identity/auth-routes.js';
 import { cleanText, directorPhoneField, emailField } from '../intake/submission-schema.js';
 import { requireInspectorDistrictMembership } from '../policy/district-access.js';
+import { serializeCanonicalInstitutionLocation } from './location-serialization.js';
 
 type InstitutionDatabase = Pick<PrismaClient, 'institution' | 'inspectorDistrictMembership' | '$transaction'>;
 
@@ -54,9 +55,7 @@ function serializeInstitution(institution: Awaited<ReturnType<typeof findScopedI
   const { latitude: lat, longitude: lng, locationSource, ...data } = institution;
   return {
     ...data,
-    location: lat === null || lng === null || locationSource === null ? null : {
-      latitude: lat.toFixed(6), longitude: lng.toFixed(6), source: locationSource,
-    },
+    location: serializeCanonicalInstitutionLocation({ latitude: lat, longitude: lng, locationSource }),
   };
 }
 
