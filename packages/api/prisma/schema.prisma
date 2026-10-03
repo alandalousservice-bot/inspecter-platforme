@@ -76,6 +76,9 @@ model Institution {
   municipality            String?
   address                 String?
   directorPhone           String?
+  latitude                Decimal?                        @db.Decimal(9, 6)
+  longitude               Decimal?                        @db.Decimal(9, 6)
+  locationSource          String?                         @db.VarChar(32)
   email                   String?                         @db.VarChar(254)
   archivedAt              DateTime?
   createdAt               DateTime                        @default(now())

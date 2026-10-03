@@ -11,7 +11,7 @@
 | Identity | InspectorDistrictMembership | inspectorId/districtId، role، validFrom/validTo؛ نطاق وصول قابل للتغيير تاريخيًا |
 | Intake | TeacherSubmission | `districtId` FK من رابط المقاطعة؛ `submittedProfile` snapshot تاريخي غير متحقق. شكل G3 القديم يحفظ `primaryInstitutionName/additionalInstitutionNames`؛ شكل ما بعد TASK-041 يحفظ `workplace` لمؤسسة واحدة، دون تغيير snapshots القديمة. status يبدأ `PENDING` ثم `ACCEPTED/REJECTED/INTERNAL_REVIEW`، submittedAt وبيانات القرار وacceptedTeacherId؛ لا login أو Institution/Teacher أو ربط مؤسسة من public POST؛ ADR-015/ADR-029 |
 | Core | Teacher | سجل مهني حالي يُنشأ عند قبول TeacherSubmission فقط؛ `institutionId` nullable من TASK-040 للمؤسسة الحالية المعتمدة الواحدة كحد أقصى؛ لا password أو notes أو علاقة مؤسسات متعددة |
-| Core | Institution | districtId، name، externalCode اختياري، archivedAt؛ من TASK-040: municipality/address/directorPhone nullable للصفوف القائمة |
+| Core | Institution | districtId، name، externalCode اختياري، archivedAt؛ من TASK-040: municipality/address/directorPhone nullable للصفوف القائمة؛ من ADR-039/TASK-076A: زوج موقع يدوي nullable موضح أدناه |
 | Core | ProfessionalHistory | أساس مؤجل لأحداث مهنية أخرى عند وجود عقد؛ لا يُستخدم لنقل مؤسسة أو تاريخ علاقة Teacher بها، ولا يحل محل AuditLog |
 | Schedule | WeeklySchedule | teacherId، academicYear، revision؛ جدول حالي واحد لكل Teacher وسنة، بلا status أو validFrom/validTo أو تاريخ نسخ |
 | Schedule | WeeklyScheduleSlot | scheduleId، dayOfWeek، startMinute/endMinute، levelLabel/groupLabel/notes اختيارية؛ سياق المكان من مؤسسة Teacher الحالية المعتمدة، بلا institutionId أو assignmentId |
@@ -31,6 +31,12 @@
 | Identity | Session | inspectorId، tokenHash، expiresAt، revokedAt، createdAt؛ server-side revocation |
 
 سياسة Institution: `archivedAt = NULL` تعني نشطة، وغير NULL تعني مؤرشفة. قوائم TASK-023 الافتراضية تستبعد المؤرشفة (بما في ذلك البحث والحساب)، مع إبقاء السجل والعلاقات. التفاصيل في [ADR-024](DECISIONS.md#adr-024--institution-archive-list-policy).
+
+## Institution location persistence (ADR-039 / TASK-076A)
+
+تضيف migration واحدة forward-only إلى `Institution`: `latitude Decimal? @db.Decimal(9,6)`, `longitude Decimal? @db.Decimal(9,6)`, و`locationSource String? @db.VarChar(32)`. التخزين PostgreSQL `NUMERIC(9,6)` دقيق؛ الإحداثيات درجات WGS84. CHECKs تفرض `-90 <= latitude <= 90`, و`-180 <= longitude <= 180`، والحالتين فقط: الحقول الثلاثة NULL، أو كلا الإحداثيين غير NULL والمصدر `MANUAL_INSPECTOR`. المصدر يصف إدخال المفتش ولا يثبت تحققًا خارجيًا. `0,0` زوج صالح.
+
+كل الصفوف القائمة تبقى NULL؛ لا backfill أو استنتاج من العنوان. API يرفض أكثر من ست منازل عشرية والصيغ الأسية وغير العشرية قبل تحويل Prisma Decimal لأن NUMERIC(scale) يقرّب الإدخال. لا جدول تاريخ مواقع أو حقول تحقق/نسخ على Teacher أو علاقات العمل/الجدول/الزيارة، ولا PostGIS أو spatial index. الصلاحيات والتسلسل الذري مع AuditLog في [ADR-039](DECISIONS.md#adr-039--inspector-managed-institution-location-and-explicit-map-access) وعقد [API](API_CONTRACTS.md#institution-location-adr-039--task-076a).
 
 العدد 23 يشمل foundations مؤجلة التنفيذ وفق الخطة، ولا يعني إنشاء كل الجداول في migration واحدة. بعد [ADR-029](DECISIONS.md#adr-029--one-current-teacher-workplace-after-g3) لا جدول `TeacherInstitutionAssignment` في المستقبل؛ العلاقة الحالية هي FK مباشر nullable. `WeeklySchedule` و`WeeklyScheduleSlot` منفصلان وفق [ADR-030](DECISIONS.md#adr-030--weekly-schedule-mvp-contract). `ProposalRevision` يحفظ نسخ المقترحات الأربع ولا يربط Memo بـVisit/Report. `CurriculumItem` يثبت فقط taxonomy عالية المستوى؛ لا تُحمّل بيانات رسمية بلا مصدر موثق.
 

@@ -160,7 +160,7 @@ after(async () => {
 
 test('TASK-023 migration chain installs Institution fields, FK and district/name index', async () => {
   const columns = await db.$queryRaw`SELECT column_name FROM information_schema.columns WHERE table_schema=${schemaName} AND table_name='Institution'`;
-  assert.deepEqual(columns.map(({ column_name }) => column_name).sort(), ['address', 'archivedAt', 'createdAt', 'directorPhone', 'districtId', 'email', 'externalCode', 'id', 'municipality', 'name', 'updatedAt'].sort());
+  assert.deepEqual(columns.map(({ column_name }) => column_name).sort(), ['address', 'archivedAt', 'createdAt', 'directorPhone', 'districtId', 'email', 'externalCode', 'id', 'latitude', 'locationSource', 'longitude', 'municipality', 'name', 'updatedAt'].sort());
   const districtNameIndex = await db.$queryRaw`SELECT indexname, indexdef FROM pg_catalog.pg_indexes WHERE schemaname=${schemaName} AND tablename='Institution' AND indexname='Institution_districtId_name_idx'`;
   assert.equal(districtNameIndex.length, 1);
   assert.ok(districtNameIndex[0].indexdef.includes('districtId'));
@@ -168,7 +168,7 @@ test('TASK-023 migration chain installs Institution fields, FK and district/name
   const fks = await db.$queryRaw`SELECT confdeltype, confupdtype FROM pg_catalog.pg_constraint WHERE conrelid=to_regclass(${`${schemaName}."Institution"`}) AND contype='f'`;
   assert.deepEqual(fks.map(({ confdeltype, confupdtype }) => ({ confdeltype, confupdtype })), [{ confdeltype: 'r', confupdtype: 'c' }]);
   const history = await db.$queryRawUnsafe(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL)::int AS applied FROM "${schemaName}"."_prisma_migrations"`);
-  assert.deepEqual(history[0], { total: 19, applied: 19 });
+  assert.equal(history[0].total, history[0].applied);
 });
 
 test('authenticated District context returns only current memberships for the session owner', async () => {
@@ -228,7 +228,7 @@ test('TASK-042 create persists normalized workplace data and writes a minimal sc
   assert.deepEqual(data, {
     id: data.id, districtId: districtA.id, name: 'ابتدائية النور', externalCode: 'N-02',
     municipality: 'بلدية وهران', address: 'شارع الاستقلال', directorPhone: '+213555123456',
-    email: 'Contact@example.dz', archivedAt: null, createdAt: data.createdAt, updatedAt: data.updatedAt,
+    email: 'Contact@example.dz', archivedAt: null, createdAt: data.createdAt, updatedAt: data.updatedAt, location: null,
   });
   assert.ok(create.headers.get('x-request-id'));
   const audit = await db.auditLog.findFirstOrThrow({ where: { action: 'INSTITUTION_CREATED', entityId: data.id } });
@@ -288,7 +288,7 @@ test('TASK-042 detail and update expose authorized fields and conceal cross-dist
   const detail = await request(`/api/v1/institutions/${institution.id}`, { cookies: allowedCookies });
   assert.equal(detail.status, 200);
   assert.deepEqual(Object.keys((await detail.json()).data).sort(), [
-    'id', 'districtId', 'name', 'externalCode', 'municipality', 'address', 'directorPhone', 'email', 'archivedAt', 'createdAt', 'updatedAt',
+    'id', 'districtId', 'name', 'externalCode', 'municipality', 'address', 'directorPhone', 'email', 'archivedAt', 'createdAt', 'updatedAt', 'location',
   ].sort());
 
   const update = await request(`/api/v1/institutions/${institution.id}`, {

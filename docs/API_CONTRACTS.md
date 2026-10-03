@@ -168,6 +168,16 @@ Projection includes `visitTypeEditable:boolean`, computed from non-CANCELLED sta
 - `POST /institutions` accepts only `{districtId,name,externalCode?}`. District membership is required; an out-of-scope District returns generic 404. No update, delete, archive, or unarchive operation is introduced by TASK-023.
 - Archive semantics are defined by [ADR-024](DECISIONS.md#adr-024--institution-archive-list-policy).
 
+### Institution location (ADR-039 / TASK-076A)
+
+الموقع جزء من DTO المؤسسة في list/detail وPOST/PATCH responses: `location:null` أو `{latitude:string,longitude:string,source:"MANUAL_INSPECTOR"}`؛ الأرقام عشرية كنصوص ثابتة بست منازل كحد أقصى، ولا تُرسل Prisma Decimal objects. GET لا يكشف مؤسسة خارج membership الحالية.
+
+POST `/institutions` يقبل `location` اختياريًا: غيابه أو `null` يعني بلا موقع، والكائن strict يحوي `latitude` و`longitude` فقط. PATCH `/institutions/:id`: الغياب لا يغير الموقع، و`null` يمحو الزوج والمصدر، والكائن يستبدل الاثنين ويعين الخادم `source=MANUAL_INSPECTOR`. لا يقبل العميل المصدر أو حقول verification، ولا يقبل نصف زوج. القيم نص عشري bounded غير أسي ضمن -90..90/-180..180 وبحد أقصى 6 كسور؛ يرفض الصيغ غير العشرية وNaN وInfinity والدقة الزائدة قبل Decimal conversion، بلا تطبيع أو تقريب صامت. `0,0` صالح.
+
+المسارات تتطلب Inspector ACTIVE وجلسة صالحة؛ mutations تتطلب CSRF. النطاق membership الحالية للمؤسسة؛ الغائب/خارج النطاق 404 عام. المؤسسة المؤرشفة تظل قابلة للقراءة بحسب detail القائم، وأي PATCH لها 409. AuditLog القائم ذري: الإنشاء دون موقع metadata `{}`، وبموقع `{locationChange:"SET"}`؛ التحديث يضيف `"location"` إلى `changedFields` و`locationChange` أحد `SET/UPDATE/CLEAR` فقط عند تغير فعلي. لا إحداثيات في audit أو logs. فشل التدقيق يلغي mutation.
+
+Public intake وTASK-075 ليس لهما صلاحية موقع مؤسسة؛ لا endpoint جديد أو شبكة خارجية ضمن TASK-076A. تفاصيل المجال في [ADR-039](DECISIONS.md#adr-039--inspector-managed-institution-location-and-explicit-map-access) و[DATABASE](DATABASE.md#institution-location-persistence-adr-039--task-076a).
+
 ### Teacher directory search (TASK-044 contract)
 
 حالة تنفيذ TASK-044: `COMPLETED`. `GET /api/v1/teachers` هو مسار القائمة الوحيد، قراءة لمفتش ذي Session صالحة وحالة `ACTIVE`، مع `Cache-Control: no-store` وغلاف الخطأ و`requestId` المعتادين. لا CSRF إضافي لـGET ولا AuditLog للقراءة. كل ترشيح وعدّ وترقيم يجري على الخادم بعد قصر النتائج على Districts ذات عضوية Inspector سارية وقت الطلب وفق TASK-022. `districtId` UUID اختياري **دائمًا**: غيابه يبحث في جميع مقاطعات المفتش الحالية حتى إن تعددت، وغياب العضويات يعيد قائمة فارغة؛ وجوده يضيّق إلى مقاطعة واحدة مصرح بها، وخارج النطاق يعيد `404` عامًا بلا كشف وجود سجلات. لا يُقبل نطاق من body أو IP.

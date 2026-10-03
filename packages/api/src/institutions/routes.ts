@@ -11,11 +11,18 @@ import { requireInspectorDistrictMembership } from '../policy/district-access.js
 type InstitutionDatabase = Pick<PrismaClient, 'institution' | 'inspectorDistrictMembership' | '$transaction'>;
 
 const uuid = z.string().uuid();
+const decimalText = /^-?(?:0|[1-9]\d{0,2})(?:\.\d{1,6})?$/u;
+const latitude = z.string().refine((value) => decimalText.test(value)
+  && new Prisma.Decimal(value).gte(-90) && new Prisma.Decimal(value).lte(90), 'إحداثي خط العرض غير صالح.');
+const longitude = z.string().refine((value) => decimalText.test(value)
+  && new Prisma.Decimal(value).gte(-180) && new Prisma.Decimal(value).lte(180), 'إحداثي خط الطول غير صالح.');
+const locationSchema = z.object({ latitude, longitude }).strict();
 const workplaceFields = {
   municipality: cleanText(150, true).nullable().optional(),
   address: cleanText(300, true).nullable().optional(),
   directorPhone: directorPhoneField.nullable().optional(),
   email: emailField.nullable().optional(),
+  location: locationSchema.nullable().optional(),
 };
 const createSchema = z.object({
   districtId: uuid,
@@ -36,11 +43,22 @@ const listSchema = z.object({
 const institutionSelect = {
   id: true, districtId: true, name: true, externalCode: true,
   municipality: true, address: true, directorPhone: true,
+  latitude: true, longitude: true, locationSource: true,
   email: true, archivedAt: true, createdAt: true, updatedAt: true,
 } as const;
 const changedInstitutionFields = ['name', 'municipality', 'address', 'directorPhone', 'email'] as const;
 type ChangedInstitutionField = typeof changedInstitutionFields[number];
 type InstitutionUpdate = z.infer<typeof updateSchema>;
+
+function serializeInstitution(institution: Awaited<ReturnType<typeof findScopedInstitution>>) {
+  const { latitude: lat, longitude: lng, locationSource, ...data } = institution;
+  return {
+    ...data,
+    location: lat === null || lng === null || locationSource === null ? null : {
+      latitude: lat.toFixed(6), longitude: lng.toFixed(6), source: locationSource,
+    },
+  };
+}
 
 function parseListQuery(request: Request) {
   const parsed = listSchema.safeParse(request.query);
@@ -81,7 +99,29 @@ function changedFields(institution: Awaited<ReturnType<typeof findScopedInstitut
     const value = patch[field];
     if (value !== undefined && value !== institution[field]) changed[field] = value;
   }
-  return changed;
+  let locationChange: 'SET' | 'UPDATE' | 'CLEAR' | undefined;
+  let locationData: Pick<Prisma.InstitutionUpdateInput, 'latitude' | 'longitude' | 'locationSource'> | undefined;
+  if (patch.location !== undefined) {
+    const sameLocation = patch.location === null
+      ? institution.latitude === null && institution.longitude === null && institution.locationSource === null
+      : institution.latitude !== null && institution.longitude !== null
+        && institution.latitude.equals(patch.location.latitude) && institution.longitude.equals(patch.location.longitude)
+        && institution.locationSource === 'MANUAL_INSPECTOR';
+    if (!sameLocation) {
+      if (patch.location === null) {
+        locationChange = 'CLEAR';
+        locationData = { latitude: null, longitude: null, locationSource: null };
+      } else {
+        locationChange = institution.latitude === null ? 'SET' : 'UPDATE';
+        locationData = {
+          latitude: new Prisma.Decimal(patch.location.latitude),
+          longitude: new Prisma.Decimal(patch.location.longitude),
+          locationSource: 'MANUAL_INSPECTOR',
+        };
+      }
+    }
+  }
+  return { changed, locationChange, locationData };
 }
 
 export function registerInstitutionRoutes(
@@ -125,23 +165,32 @@ export function registerInstitutionRoutes(
     ]);
     const hasNext = rows.length > query.limit;
     const data = hasNext ? rows.slice(0, query.limit) : rows;
-    response.json({ data, page: { limit: query.limit, nextCursor: hasNext ? data.at(-1)?.id ?? null : null, total } });
+    response.json({ data: data.map(serializeInstitution), page: { limit: query.limit, nextCursor: hasNext ? data.at(-1)?.id ?? null : null, total } });
   });
 
   app.post('/api/v1/institutions', validateBody(createSchema), async (request, response) => {
     requireAuthenticatedMutationCsrf(request);
     const input = request.body as z.infer<typeof createSchema>;
+    const { location, ...institutionInput } = input;
     const inspectorId = response.locals.inspectorId as string;
     const requestId = response.locals.requestId as string;
     const institution = await database.$transaction(async (transaction) => {
       await requireInspectorDistrictMembership(transaction, inspectorId, input.districtId);
-      const created = await transaction.institution.create({ data: input, select: institutionSelect });
+      const created = await transaction.institution.create({
+        data: {
+          ...institutionInput,
+          ...(location ? {
+            latitude: new Prisma.Decimal(location.latitude), longitude: new Prisma.Decimal(location.longitude),
+            locationSource: 'MANUAL_INSPECTOR',
+          } : {}),
+        }, select: institutionSelect,
+      });
       await appendAuditEvent(transaction, {
         source: 'HTTP', actorInspectorId: inspectorId, districtId: created.districtId,
         action: AuditAction.INSTITUTION_CREATED, entityType: 'Institution', entityId: created.id,
-        requestId, metadata: {},
+        requestId, metadata: location ? { locationChange: 'SET' } : {},
       });
-      return created;
+      return serializeInstitution(created);
     });
     response.status(201).json({ data: institution });
   });
@@ -150,7 +199,7 @@ export function registerInstitutionRoutes(
     const id = uuid.safeParse(request.params.id);
     if (!id.success) throw invalidId();
     const institution = await findScopedInstitution(database, response.locals.inspectorId as string, id.data);
-    response.json({ data: institution });
+    response.json({ data: serializeInstitution(institution) });
   });
 
   app.patch('/api/v1/institutions/:id', validateBody(updateSchema), async (request, response) => {
@@ -164,16 +213,20 @@ export function registerInstitutionRoutes(
       await transaction.$queryRaw`SELECT id FROM "Institution" WHERE id = ${id.data}::uuid FOR UPDATE`;
       const institution = await findScopedInstitution(transaction, inspectorId, id.data);
       if (institution.archivedAt !== null) throw new ApiError(409, 'CONFLICT', 'لا يمكن تعديل مؤسسة مؤرشفة.');
-      const changes = changedFields(institution, patch);
-      const fields = Object.keys(changes).sort() as ChangedInstitutionField[];
-      if (fields.length === 0) return institution;
-      const updated = await transaction.institution.update({ where: { id: institution.id }, data: changes as Prisma.InstitutionUpdateInput, select: institutionSelect });
+      const { changed, locationChange, locationData } = changedFields(institution, patch);
+      const fields = [...Object.keys(changed), ...(locationChange ? ['location'] : [])].sort();
+      if (fields.length === 0) return serializeInstitution(institution);
+      const updated = await transaction.institution.update({
+        where: { id: institution.id },
+        data: { ...changed, ...locationData } as Prisma.InstitutionUpdateInput,
+        select: institutionSelect,
+      });
       await appendAuditEvent(transaction, {
         source: 'HTTP', actorInspectorId: inspectorId, districtId: institution.districtId,
         action: AuditAction.INSTITUTION_UPDATED, entityType: 'Institution', entityId: institution.id,
-        requestId, metadata: { changedFields: fields },
+        requestId, metadata: { changedFields: fields, ...(locationChange ? { locationChange } : {}) },
       });
-      return updated;
+      return serializeInstitution(updated);
     });
     response.json({ data: result });
   });

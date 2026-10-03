@@ -102,13 +102,13 @@ before(async () => {
   runPrisma(['migrate', 'deploy'], upgradeUrl, tempSchema);
   const upgraded = await connectClient(upgradeUrl);
   const upgradedTeacher = await upgraded.teacher.findUniqueOrThrow({ where: { id: savedIds.teacher } });
-  const upgradedInstitution = await upgraded.institution.findUniqueOrThrow({ where: { id: savedIds.institution } });
+  const upgradedInstitution = await upgraded.$queryRaw`SELECT "email" FROM "Institution" WHERE "id"=${savedIds.institution}::uuid`;
   assert.equal(upgradedTeacher.professionalStatus, 'TEMPORARY_CONTRACT');
   assert.equal(upgradedTeacher.qualifications, 'legacy free text');
   for (const field of ['professionalFramework', 'firstEducationAppointmentDate', 'firstEducationAppointmentDecisionNumber', 'firstInstallationDate', 'traineeshipDate', 'institutionAppointmentDate', 'institutionAppointmentNumber', 'financialControllerVisaNumber', 'administrativeCategory', 'administrativeSection', 'administrativeGrade', 'administrativeClassificationEffectiveDate', 'birthProvince', 'personalAddress', 'administrativeNote']) {
     assert.equal(upgradedTeacher[field], null, field);
   }
-  assert.equal(upgradedInstitution.email, null);
+  assert.deepEqual(upgradedInstitution, [{ email: null }]);
   assert.equal(await upgraded.teacherSubmission.count({ where: { id: savedIds.submission } }), 1);
   assert.equal(await upgraded.weeklySchedule.count({ where: { id: savedIds.schedule } }), 1);
   assert.equal(await upgraded.pedagogicalVisit.count({ where: { id: savedIds.visit } }), 1);

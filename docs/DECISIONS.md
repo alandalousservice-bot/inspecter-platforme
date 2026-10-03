@@ -42,6 +42,7 @@
 | ADR-036 | ACCEPTED | قرارات Product Owner لبطاقة معلومات الأستاذ: مؤسسة أم واحدة ومؤسسات تكملة نصاب مؤرخة، موقع صريح للحصة، `SUBSTITUTE`، حقول إدارية اختيارية ومؤهلات منظمة، بطاقة قراءة مجمعة؛ «آخر تفتيش» مشتق من أربعة أنواع زيارات مكتملة محددة لا تشمل GUIDANCE أو التاريخية بلا نوع. [العقد التفصيلي](architecture/TEACHER_INFORMATION_CARD_ADR_036_CONTRACT.md) |
 | ADR-037 | ACCEPTED | لوحة المفتش التشغيلية: `/app` منزل مصادق، `GET /api/v1/dashboard/summary` مجمّع محدود لعمل المفتش ضمن عضوياته الحالية؛ بلا تقييم أساتذة أو feed تدقيق أو مخططات؛ TASK-070A/B/C |
 | ADR-038 | ACCEPTED | قرار Product Owner: استيراد JSON واحد كتعبئة محلية للاستمارة العامة فقط، عبر intake الحالي وبلا اعتماد أو مسار تخزين بديل؛ التفاصيل أدناه |
+| ADR-039 | ACCEPTED | قرار Product Owner: موقع المؤسسة بإحداثيي WGS84 يديرهما المفتش يدويًا؛ TASK-076A بلا مزود خرائط أو خريطة مقاطعة، وعرض المزود الصريح لمؤسسة مختارة مؤجل إلى TASK-076B |
 
 ## ADR-038 — Single JSON Declaration Import into Canonical Public Intake
 
@@ -57,6 +58,15 @@ The flat `teacherData` allowlist is exactly: `firstName,lastName,dateOfBirth,pla
 Preview/apply never sends a request; applying replaces only mapped form fields after an explicit action. Clearing preview does not clear already entered form data. Import data/raw bytes stay ephemeral: no local/session storage, IndexedDB, Cache Storage, URL, analytics, logs or plaintext export. Abort reads and release preview/file references on replacement, cancel, handoff and unmount; no physical memory-erasure claim.
 
 Canonical lifecycle remains PENDING → Inspector review → existing decision transaction. No direct Teacher, Institution, workplace relation, schedule, visit, report or FollowUp creation. ADR-011 remains advisory and Inspector-only. Public creation adds no AuditLog; Inspector decisions retain atomic audit with no imported PII. ADR-013/016 remain OPEN, TASK-060 remains BLOCKED, Dashboard and print contracts are unchanged.
+
+## ADR-039 — Inspector-managed Institution Location and Explicit Map Access
+
+Status: **ACCEPTED** by Product Owner for TASK-076A.
+
+1. Physical Institution location is manually managed by an authenticated Inspector and belongs only to `Institution`. Store WGS84 decimal-degree `latitude` and `longitude` as nullable PostgreSQL `NUMERIC(9,6)` / Prisma `Decimal? @db.Decimal(9,6)`, with nullable `locationSource VARCHAR(32)`. The only MVP source is server-assigned `MANUAL_INSPECTOR`; this records who supplied the value, not external verification. Enforce latitude `[-90,90]`, longitude `[-180,180]`, and the all-null or complete-pair-plus-source invariant in PostgreSQL. `0,0` is a valid explicit pair. API input rejects more than six fractional digits and non-decimal syntax before Decimal conversion.
+2. Existing Institution list/detail and POST/PATCH contracts add `location: null | {latitude:string, longitude:string, source:"MANUAL_INSPECTOR"}`. POST omission/null means no location; PATCH omission means unchanged, null clears all three columns, and an object sets both coordinates with server-selected source. Source and other provenance cannot be supplied by the client. Current Inspector session, CSRF, district-membership and generic 404 policies remain authoritative; archived Institution location cannot be mutated. Mutation and existing `INSTITUTION_CREATED/UPDATED` audit append are atomic. Audit records only location transition type and changed-field name, never coordinates or request values.
+3. Public intake and TASK-075 imports cannot establish location or modify Institution. Do not duplicate location on Teacher, supplementary workplace, schedule slot, Visit or device; location is neither attendance nor visit evidence. No history table, geocoding, verification fields, PostGIS, spatial index, map provider, or district-wide map/read model is introduced by TASK-076A. Existing rows remain NULL after forward migration.
+4. Provider rendering is a later explicit action for an individually selected Institution. TASK-076A makes no external network request. Provider choice/policy must be honored before enabling rendering; browser/device geolocation remains disabled. No Teacher marker represents live presence. Schedule-derived wording, if later approved, is “مكان العمل حسب التوزيع الأسبوعي”.
 
 الأمور OPEN لا توقف المهام التي تقتصر على foundations ولا تخمّن ما وراءها. [IMPLEMENTATION_PLAN](IMPLEMENTATION_PLAN.md) يحدد gates التي تحتاجها.
 

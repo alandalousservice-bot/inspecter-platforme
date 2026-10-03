@@ -87,10 +87,15 @@ const eventContracts = {
   [AuditAction.INSPECTOR_PROPOSAL_UPDATED]: { entityType: 'InspectorProposal', metadata: z.object({}).strict() },
   [AuditAction.INSPECTOR_PROPOSAL_CLONED]: { entityType: 'InspectorProposal', metadata: z.object({}).strict() },
   [AuditAction.INSPECTOR_PROPOSAL_ARCHIVED]: { entityType: 'InspectorProposal', metadata: z.object({}).strict() },
-  [AuditAction.INSTITUTION_CREATED]: { entityType: 'Institution', metadata: z.object({}).strict() },
+  [AuditAction.INSTITUTION_CREATED]: {
+    entityType: 'Institution', metadata: z.object({ locationChange: z.literal('SET').optional() }).strict(),
+  },
   [AuditAction.INSTITUTION_UPDATED]: {
     entityType: 'Institution',
-    metadata: z.object({ changedFields: z.array(z.enum(['name', 'municipality', 'address', 'directorPhone', 'email'])).min(1) }).strict(),
+    metadata: z.object({
+      changedFields: z.array(z.enum(['name', 'municipality', 'address', 'directorPhone', 'email', 'location'])).min(1),
+      locationChange: z.enum(['SET', 'UPDATE', 'CLEAR']).optional(),
+    }).strict(),
   },
   [AuditAction.TEACHER_INSTITUTION_LINKED]: {
     entityType: 'Teacher',
