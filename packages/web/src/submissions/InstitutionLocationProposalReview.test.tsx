@@ -42,6 +42,7 @@ describe('TASK-077D institution location proposal review', () => {
   });
 
   it('keeps proposed and canonical coordinates distinct and labels their trusted source', () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
     render(<Harness initial={{ ...pendingProposal, institution: { ...pendingProposal.institution!, location: canonical } }} />);
     expect(screen.getByText('35.654321')).toBeTruthy();
     expect(screen.getByText('-0.654321')).toBeTruthy();
@@ -50,6 +51,15 @@ describe('TASK-077D institution location proposal review', () => {
     expect(screen.getByText(/مدخل يدويًا من طرف المفتش/)).toBeTruthy();
     expect(screen.getAllByText(/35\./).every((node) => node.closest('bdi')?.getAttribute('dir') === 'ltr')).toBe(true);
     expect(screen.getByRole('button', { name: 'الاحتفاظ بالموقع الحالي' })).toBeTruthy();
+    const directions = screen.getByRole('link', { name: 'الاتجاه إلى المؤسسة' });
+    const directionsUrl = new URL((directions as HTMLAnchorElement).href);
+    expect([...directionsUrl.searchParams.entries()]).toEqual([['api', '1'], ['destination', '35.123456,-0.123456']]);
+    expect(directionsUrl.searchParams.get('destination')).not.toContain('35.654321');
+    expect(directionsUrl.searchParams.get('destination')).not.toContain('-0.654321');
+    expect(directions.getAttribute('target')).toBe('_blank');
+    expect(directions.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(document.querySelector('iframe')).toBeNull();
   });
 
   it('shows teacher-proposed source and hides all actions for persisted terminal states', () => {
@@ -57,6 +67,7 @@ describe('TASK-077D institution location proposal review', () => {
       ...pendingProposal.institution!, location: { ...canonical, source: 'TEACHER_PROPOSED_APPROVED' },
     } }} />);
     expect(screen.getByText(/مقترح سابق تم اعتماده من طرف المفتش/)).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'الاتجاه إلى المؤسسة' })).toBeTruthy();
     expect(screen.getByText('تم اعتماد الموقع المقترح')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'اعتماد الموقع المقترح' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'رفض المقترح' })).toBeNull();
@@ -68,8 +79,15 @@ describe('TASK-077D institution location proposal review', () => {
     } }} />);
     expect(screen.getByText('تم رفض مقترح الموقع')).toBeTruthy();
     expect(screen.getByText('تم الاحتفاظ بالموقع المعتمد للمؤسسة.')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'الاتجاه إلى المؤسسة' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'اعتماد الموقع المقترح' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'الاحتفاظ بالموقع الحالي' })).toBeNull();
+  });
+
+  it('hides directions when there is no canonical location, including a pending proposal with coordinates', () => {
+    render(<Harness initial={pendingProposal} />);
+    expect(screen.getByText('35.654321')).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'الاتجاه إلى المؤسسة' })).toBeNull();
   });
 
   it('keeps equal proposal and canonical coordinates pending until an explicit decision', () => {

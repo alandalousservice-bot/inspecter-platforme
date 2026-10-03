@@ -85,6 +85,14 @@ test('Inspector reviews and accepts proposed Institution coordinates with explic
   await expect(page.getByText('35.123456', { exact: true })).toBeVisible();
   await expect(page.getByText('-0.123456', { exact: true })).toBeVisible();
   await expect(page.getByText(/مدخل يدويًا من طرف المفتش/u)).toBeVisible();
+  const initialDirections = page.getByRole('link', { name: 'الاتجاه إلى المؤسسة' });
+  await expect(initialDirections).toBeVisible();
+  const initialUrl = new URL(await initialDirections.getAttribute('href')!);
+  expect([...initialUrl.searchParams.entries()]).toEqual([['api', '1'], ['destination', '35.123456,-0.123456']]);
+  await expect(initialDirections).toHaveAttribute('target', '_blank');
+  await expect(initialDirections).toHaveAttribute('rel', 'noopener noreferrer');
+  expect(requestUrls.some((url) => url.includes('google.com'))).toBe(false);
+  expect(await page.locator('iframe').count()).toBe(0);
 
   for (const width of [1440, 768, 390]) {
     await page.setViewportSize({ width, height: 950 });
@@ -110,6 +118,19 @@ test('Inspector reviews and accepts proposed Institution coordinates with explic
   await page.getByRole('button', { name: 'تأكيد اعتماد الموقع المقترح' }).click();
   await expect(page.getByText('تم اعتماد الموقع المقترح')).toBeVisible();
   await expect(page.getByRole('button', { name: 'اعتماد الموقع المقترح' })).toHaveCount(0);
+  const refreshedDirections = page.getByRole('link', { name: 'الاتجاه إلى المؤسسة' });
+  const refreshedUrl = new URL(await refreshedDirections.getAttribute('href')!);
+  expect([...refreshedUrl.searchParams.entries()]).toEqual([['api', '1'], ['destination', '35.654321,-0.654321']]);
+  expect(refreshedUrl.searchParams.get('destination')).not.toContain('35.123456');
+  expect(refreshedUrl.searchParams.get('destination')).not.toContain('-0.123456');
+  await refreshedDirections.focus();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Shift+Tab');
+  expect(await refreshedDirections.evaluate((element) => element === document.activeElement)).toBe(true);
+  const directionsFocus = await page.evaluate(() => ({ outline: parseFloat(getComputedStyle(document.activeElement!).outlineWidth), style: getComputedStyle(document.activeElement!).outlineStyle }));
+  expect(directionsFocus.outline).toBeGreaterThanOrEqual(2);
+  expect(directionsFocus.style).not.toBe('none');
+  expect(requestUrls.some((url) => url.includes('google.com'))).toBe(false);
   current = await db.institution.findUniqueOrThrow({ where: { id: institutionId! } });
   expect(current.latitude?.toFixed(6)).toBe('35.654321');
   expect(current.longitude?.toFixed(6)).toBe('-0.654321');

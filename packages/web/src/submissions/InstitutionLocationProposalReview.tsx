@@ -5,6 +5,7 @@ import {
   type CanonicalInstitutionLocation,
   type SubmissionLocationProposal,
 } from '../auth/client';
+import { googleMapsDirectionsUrl } from '../institutions/google-maps-directions';
 import { Button, Card, CardContent, CardHeader, Dialog, ErrorState } from '../ui';
 import './institution-location-proposal-review.css';
 
@@ -47,6 +48,7 @@ export function InstitutionLocationProposalReview({ submissionId, proposal, onRe
   const [decisionCommitted, setDecisionCommitted] = useState(false);
   const inFlight = useRef(false);
   const canonical = proposal?.institution?.location ?? null;
+  const directionsUrl = googleMapsDirectionsUrl(canonical);
 
   if (!proposal) {
     return (
@@ -163,6 +165,14 @@ export function InstitutionLocationProposalReview({ submissionId, proposal, onRe
             <>
               <CoordinatePair latitude={canonical.latitude} longitude={canonical.longitude} />
               <p className="location-proposal-review__source">مصدر الموقع: {sourceLabels[canonical.source]}</p>
+              {directionsUrl ? (
+                <div className="location-proposal-review__directions">
+                  <a className="ui-button ui-button--secondary" href={directionsUrl} rel="noopener noreferrer" target="_blank">
+                    الاتجاه إلى المؤسسة
+                  </a>
+                  <p>سيُفتح Google Maps خارجيًا مع مشاركة موقع المؤسسة المعتمد كوجهة فقط.</p>
+                </div>
+              ) : null}
             </>
           ) : <p>لا يوجد موقع معتمد للمؤسسة حاليًا.</p>}
         </section>

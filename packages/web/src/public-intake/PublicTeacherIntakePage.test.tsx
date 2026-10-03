@@ -299,6 +299,7 @@ describe('TASK-031 public teacher intake', () => {
     expect(latitude.dir).toBe('ltr');
     expect(longitude.dir).toBe('ltr');
     expect(container.querySelector('main[dir="rtl"]')).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'الاتجاه إلى المؤسسة' })).toBeNull();
     expect(container.innerHTML).not.toMatch(/navigator\.geolocation|getCurrentPosition|watchPosition/);
   });
 

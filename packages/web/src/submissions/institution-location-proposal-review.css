@@ -51,6 +51,23 @@
   margin-block-start: var(--space-4);
 }
 
+.location-proposal-review__directions {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+  margin-block-start: var(--space-3);
+}
+
+.location-proposal-review__directions a {
+  text-decoration: none;
+}
+
+.location-proposal-review__directions p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+}
+
 .location-proposal-review__notice,
 .location-proposal-review__kept {
   padding: var(--space-3);
@@ -68,6 +85,10 @@
   }
 
   .location-proposal-review__actions > button {
+    width: 100%;
+  }
+
+  .location-proposal-review__directions a {
     width: 100%;
   }
 }
