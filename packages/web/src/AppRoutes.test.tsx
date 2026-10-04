@@ -31,7 +31,21 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-describe('application route integration for TASK-070B', () => {
+describe('application route integration', () => {
+  it('renders a public Inspector landing page at / and links to login without session access', () => {
+    renderAt('/');
+    expect(screen.getByRole('heading', { name: 'منصة مفتش التربية البدنية والرياضية', level: 1 })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'دخول فضاء المفتش' }).getAttribute('href')).toBe('/login');
+    expect(screen.getByRole('heading', { name: 'كل ما تحتاجه لمتابعة مهامك', level: 2 })).toBeTruthy();
+    expect(mocks.getCurrentInspector).not.toHaveBeenCalled();
+    expect(mocks.login).not.toHaveBeenCalled();
+    expect(document.querySelector('.app-sidebar')).toBeNull();
+    expect(document.querySelector('.app-topbar')).toBeNull();
+    fireEvent.click(screen.getByRole('link', { name: 'دخول فضاء المفتش' }));
+    expect(screen.getByRole('heading', { name: 'دخول فضاء المفتش', level: 1 })).toBeTruthy();
+    expect(mocks.getCurrentInspector).not.toHaveBeenCalled();
+  });
+
   it('lands successful login at the authenticated Dashboard in AppShell', async () => {
     mocks.login.mockResolvedValue({ id: 'inspector-1', email: 'inspector@example.invalid' });
     renderAt('/login');

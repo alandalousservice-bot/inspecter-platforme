@@ -16,6 +16,7 @@ function renderLogin() {
     <MemoryRouter initialEntries={['/login']}>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/" element={<h1>الرئيسية</h1>} />
         <Route path="/app" element={<h1>مساحة العمل</h1>} />
       </Routes>
     </MemoryRouter>,
@@ -31,6 +32,7 @@ describe('inspector login page', () => {
     expect(screen.getByLabelText(/كلمة المرور/).getAttribute('autocomplete')).toBe('current-password');
     expect(screen.queryByRole('navigation')).toBeNull();
     expect(screen.queryByRole('button', { name: 'تسجيل الخروج' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'العودة إلى الرئيسية' }).getAttribute('href')).toBe('/');
   });
 
   it('submits credentials and navigates after success', async () => {

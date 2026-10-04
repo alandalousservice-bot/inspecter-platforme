@@ -5,13 +5,120 @@ body:has(.login-page) {
 .login-page {
   display: grid;
   min-height: 100vh;
+  min-height: 100svh;
   place-items: center;
-  padding: var(--space-4);
-  background: var(--color-background);
+  position: relative;
+  isolation: isolate;
+  padding: var(--space-6) var(--page-gutter-mobile);
+  background:
+    radial-gradient(ellipse at 82% 18%, color-mix(in srgb, var(--color-primary) 22%, transparent), transparent 38rem),
+    radial-gradient(ellipse at 12% 88%, color-mix(in srgb, var(--color-focus-on-dark) 10%, transparent), transparent 34rem),
+    var(--color-public-background);
+  color: var(--color-public-text);
 }
 
-.login-card {
-  width: min(100%, 28rem);
+.login-page::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background-image: linear-gradient(color-mix(in srgb, var(--color-public-text) 3%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--color-public-text) 3%, transparent) 1px, transparent 1px);
+  background-size: 3.5rem 3.5rem;
+  mask-image: linear-gradient(to bottom, black, transparent 72%);
+  content: '';
+}
+
+.login-layout {
+  display: grid;
+  width: min(100%, 29rem);
+  gap: var(--space-4);
+}
+
+.login-back {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: var(--space-2);
+  padding-inline: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-public-text) 18%, transparent);
+  border-radius: var(--radius-control);
+  color: var(--color-public-text-muted);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  transition: background-color var(--motion-fast) ease, border-color var(--motion-fast) ease, color var(--motion-fast) ease;
+}
+
+.login-back:hover {
+  border-color: color-mix(in srgb, var(--color-focus-on-dark) 55%, transparent);
+  background: color-mix(in srgb, var(--color-public-text) 8%, transparent);
+  color: var(--color-public-text);
+}
+
+.login-back svg { width: 1rem; height: 1rem; }
+
+.login-card.ui-card,
+.login-card.ui-card:hover {
+  width: 100%;
+  padding: clamp(var(--space-6), 6vw, var(--space-8));
+  border-color: color-mix(in srgb, var(--color-focus-on-dark) 28%, transparent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-navigation) 72%, var(--color-public-background));
+  box-shadow: 0 1.25rem 3.5rem color-mix(in srgb, var(--color-public-background) 55%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--color-public-text) 7%, transparent);
+  color: var(--color-public-text);
+}
+
+.login-card__identity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-3);
+  padding-block-end: var(--space-6);
+  border-block-end: 1px solid color-mix(in srgb, var(--color-public-text) 13%, transparent);
+}
+
+.login-card__mark {
+  display: grid;
+  width: 3.25rem;
+  height: 3.25rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--color-focus-on-dark) 42%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-primary) 24%, transparent);
+  color: var(--color-focus-on-dark);
+}
+
+.login-card__mark svg { width: 1.75rem; height: 1.75rem; }
+
+.login-card__identity-copy { display: grid; min-width: 0; gap: var(--space-1); }
+.login-card__eyebrow { color: var(--color-focus-on-dark); font-size: var(--font-size-small); font-weight: var(--font-weight-bold); }
+.login-card__product-name { color: var(--color-public-text-muted); font-size: var(--font-size-metadata); line-height: var(--line-height-compact); }
+
+.login-card .login-card__heading { padding-block-start: var(--space-6); }
+.login-card__heading h1 { color: var(--color-public-text); font-size: var(--font-size-section-title); line-height: var(--line-height-heading); }
+.login-card .login-card__description { color: var(--color-public-text-muted); }
+.login-card .ui-field__label { color: var(--color-public-text); }
+.login-card .ui-input { border-color: var(--color-border-strong); }
+.login-card .ui-state--error { border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border)); background: var(--color-danger-subtle); color: var(--color-text-primary); }
+
+.login-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--color-public-text-muted);
+  font-size: var(--font-size-small);
+  text-align: center;
+}
+
+.login-note svg { width: 1rem; height: 1rem; flex: 0 0 auto; color: var(--color-focus-on-dark); }
+
+.login-layout :where(a, button, input):focus-visible {
+  outline-color: var(--color-focus-on-dark);
+  box-shadow: 0 0 0 2px var(--color-public-background);
 }
 
 .login-card__heading {
@@ -20,18 +127,8 @@ body:has(.login-page) {
 }
 
 .login-card__heading h1,
-.login-card__description,
-.login-card__eyebrow {
-  margin: 0;
-}
-
-.login-card__heading h1 {
-  font-size: var(--font-size-page);
-}
-
-.login-card__eyebrow,
 .login-card__description {
-  color: var(--color-text-secondary);
+  margin: 0;
 }
 
 .login-form {
@@ -43,4 +140,16 @@ body:has(.login-page) {
 .login-form__submit {
   width: 100%;
   margin-block-start: var(--space-2);
+}
+
+.login-form__submit svg { width: 1rem; height: 1rem; }
+.login-form__submit:disabled { border-color: color-mix(in srgb, var(--color-focus-on-dark) 35%, transparent); background: var(--color-primary-hover); color: var(--color-on-primary); opacity: 1; }
+
+@media (max-width: 35rem) {
+  .login-page { padding-inline: var(--space-4); }
+  .login-card__product-name { max-width: 18rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-back { transition: none; }
 }

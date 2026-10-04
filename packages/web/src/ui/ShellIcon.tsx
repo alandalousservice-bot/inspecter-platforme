@@ -11,7 +11,13 @@ export type ShellIconName =
   | 'menu'
   | 'close'
   | 'collapse'
-  | 'expand';
+  | 'expand'
+  | 'shield'
+  | 'login'
+  | 'lock'
+  | 'arrow-back'
+  | 'arrow-down'
+  | 'reports';
 
 const shapes: Record<ShellIconName, ReactNode> = {
   dashboard: <><rect x="3.5" y="3.5" width="7" height="7" rx="1.5" /><rect x="13.5" y="3.5" width="7" height="5" rx="1.5" /><rect x="13.5" y="12" width="7" height="8.5" rx="1.5" /><rect x="3.5" y="13" width="7" height="7.5" rx="1.5" /></>,
@@ -25,6 +31,12 @@ const shapes: Record<ShellIconName, ReactNode> = {
   close: <><path d="m6 6 12 12M18 6 6 18" /></>,
   collapse: <><path d="m9 5 7 7-7 7" /><path d="M20 4v16" /></>,
   expand: <><path d="m15 5-7 7 7 7" /><path d="M4 4v16" /></>,
+  shield: <><path d="M12 3 20 6v5c0 5-3.4 8.2-8 10-4.6-1.8-8-5-8-10V6z" /><path d="m9 12 2 2 4-4" /></>,
+  login: <><path d="M10 17 15 12 10 7" /><path d="M15 12H3" /><path d="M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6" /></>,
+  lock: <><rect x="4.5" y="10" width="15" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3" /></>,
+  'arrow-back': <><path d="m9 18 6-6-6-6" /><path d="M15 12H4" /></>,
+  'arrow-down': <><path d="M12 4v15M6 13l6 6 6-6" /></>,
+  reports: <><path d="M6 3.5h8l4 4v13H6z" /><path d="M14 3.5v4h4M9 12h6M9 15.5h6M9 8.5h1" /></>,
 };
 
 export function ShellIcon({ name, className }: { name: ShellIconName; className?: string }) {

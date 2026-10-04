@@ -17,12 +17,14 @@ import { VisitListPage } from './visits/VisitListPage';
 import { InspectionReportPage } from './visits/InspectionReportPage';
 import { FollowUpsPage } from './followups/FollowUpsPage';
 import { DashboardPage } from './dashboard/DashboardPage';
+import { LandingPage } from './landing/LandingPage';
 
 export function AppRoutes() {
   return (
     <Routes>
       <Route path="/public/d/:districtId/register" element={<PublicTeacherIntakePage />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/" element={<LandingPage />} />
       <Route path="/app" element={<SessionPage />}>
         <Route index element={<DashboardPage />} />
         <Route path="institutions" element={<InstitutionsPage />} />
@@ -40,7 +42,6 @@ export function AppRoutes() {
         <Route path="follow-ups" element={<FollowUpsPage />} />
         <Route path="me/professional-identity" element={<ProfessionalIdentityPage />} />
       </Route>
-      <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
