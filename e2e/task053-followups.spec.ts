@@ -48,6 +48,19 @@ test('TASK-053 connected Visit→FINAL Report→FollowUp lifecycle and immutable
   await page.getByLabel('الاستحقاق').selectOption('OVERDUE'); await expect(page.getByText('مراجعة تطبيق الإحماء').first()).toBeVisible();
   await page.getByLabel('الاستحقاق').selectOption('DUE_TODAY'); await expect(page.getByText('التحقق من تنفيذ التوجيه').first()).toBeVisible();
   await page.getByLabel('الاستحقاق').selectOption(''); await expect(page.getByText('مراجعة تطبيق الإحماء').first()).toBeVisible();
+  for (const width of [1440, 1280, 768, 390]) {
+    await page.setViewportSize({ width, height: width < 500 ? 844 : 900 });
+    await expect(page.getByRole('heading', { name: 'إجراءات المتابعة' })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    if (width <= 768) {
+      const tableRegion = page.getByRole('region', { name: 'إجراءات المتابعة' });
+      expect(await tableRegion.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+      await page.getByRole('button', { name: 'تعديل الإجراء' }).first().focus();
+      expect(await page.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.textContent)).toContain('تعديل الإجراء');
+    }
+    await page.screenshot({ path: `test-results/g8-09-followups-list-${width}.png`, fullPage: true });
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
 
   const browser = page.context().browser(); if (!browser) throw new Error('Browser context is unavailable.');
   const readerContext = await browser.newContext(); const readerPage = await readerContext.newPage();
@@ -66,7 +79,19 @@ test('TASK-053 connected Visit→FINAL Report→FollowUp lifecycle and immutable
   await expect(page.getByRole('button', { name: 'تحديث البيانات' })).toBeVisible();
   await page.getByRole('button', { name: 'تحديث البيانات' }).click(); await expect(page.getByText('مراجعة تطبيق الإحماء').first()).toBeVisible();
 
+  const longArabicNote = 'متابعة تربوية: التحقق من توظيف التدرج في النشاط، وإتاحة فرص مشاركة متوازنة للتلاميذ، ومراجعة تنفيذ التوجيهات في السياق المدرسي. '.repeat(3);
+  for (const width of [1440, 1280, 768, 390]) {
+    await page.setViewportSize({ width, height: width < 500 ? 844 : 900 });
+    await page.getByRole('button', { name: 'تعديل الإجراء' }).first().click();
+    await expect(page.getByRole('dialog', { name: 'تعديل إجراء المتابعة' })).toBeVisible();
+    await expect(page.getByRole('dialog').getByText('ابتدائية المتابعة ذات الاسم العربي الطويل لاختبار الالتفاف في الجداول والمساحات الضيقة')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    await page.screenshot({ path: `test-results/g8-09-followups-edit-${width}.png`, fullPage: true });
+    await page.getByRole('button', { name: 'إلغاء' }).click();
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByRole('button', { name: 'تعديل الإجراء' }).first().click();
+  await page.getByRole('textbox', { name: 'الإجراء المطلوب' }).fill(longArabicNote);
   await page.getByLabel('تاريخ الاستحقاق').fill('2020-01-02'); await page.getByRole('button', { name: 'حفظ التعديل' }).click();
   await expect(page.getByText('تم حفظ التعديل.')).toBeVisible();
   await page.getByRole('button', { name: 'إكمال الإجراء' }).first().click();
@@ -93,4 +118,28 @@ test('TASK-053 connected Visit→FINAL Report→FollowUp lifecycle and immutable
   // A 384×500 CSS viewport models 200% zoom from the preceding 768×1000 viewport.
   await page.setViewportSize({ width: 384, height: 500 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+
+  if (process.env.G8_09_REAL_ZOOM === '1') {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.goto(`/app/visits/${visitId}/report`);
+    await expect(page.locator('.accompaniment-workspace')).toBeVisible();
+    const initialDpr = await page.evaluate(() => window.devicePixelRatio);
+    let zoomedDpr = initialDpr;
+    for (let step = 0; step < 12 && zoomedDpr < initialDpr * 1.9; step += 1) {
+      await page.keyboard.press('Control+Shift+Equal');
+      await page.waitForTimeout(150);
+      zoomedDpr = await page.evaluate(() => window.devicePixelRatio);
+    }
+    expect(zoomedDpr).toBeGreaterThanOrEqual(initialDpr * 1.9);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    await page.screenshot({ path: 'test-results/g8-09-accompaniment-real-200-percent.png', fullPage: true });
+    await page.goto('/app/follow-ups');
+    await page.getByLabel('الحالة').selectOption('OPEN');
+    const editAction = page.getByRole('button', { name: 'تعديل الإجراء' }).first();
+    await editAction.focus(); await expect(editAction).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    await editAction.click();
+    await expect(page.getByRole('dialog', { name: 'تعديل إجراء المتابعة' })).toBeVisible();
+    await page.screenshot({ path: 'test-results/g8-09-followup-real-200-percent.png', fullPage: true });
+  }
 });

@@ -42,8 +42,8 @@ try {
     const district = await db.district.create({ data: { name: `TASK-053 ${runId}` } });
     await db.inspectorDistrictMembership.create({ data: { inspectorId: inspector.id, districtId: district.id, role: 'INSPECTOR', validFrom: new Date(Date.now() - 60_000) } });
     await db.inspectorDistrictMembership.create({ data: { inspectorId: otherInspector.id, districtId: district.id, role: 'INSPECTOR', validFrom: new Date(Date.now() - 60_000) } });
-    const institution = await db.institution.create({ data: { districtId: district.id, name: 'ابتدائية المتابعة التاريخية' } });
-    const teacher = await db.teacher.create({ data: { districtId: district.id, institutionId: institution.id, name: 'ليلى', surname: 'تجريبية' } });
+    const institution = await db.institution.create({ data: { districtId: district.id, name: 'ابتدائية المتابعة ذات الاسم العربي الطويل لاختبار الالتفاف في الجداول والمساحات الضيقة' } });
+    const teacher = await db.teacher.create({ data: { districtId: district.id, institutionId: institution.id, name: 'ليلى الأستاذة صاحبة الاسم العربي الطويل لاختبار العرض دون قص', surname: 'تجريبية' } });
     const start = new Date('2028-02-12T08:00:00.000Z');
     const visit = await db.pedagogicalVisit.create({ data: { districtId: district.id, inspectorId: inspector.id, teacherId: teacher.id, institutionId: institution.id,
       institutionNameSnapshot: institution.name, academicYear: '2027-2028', scheduledStartAt: start, scheduledEndAt: new Date(start.getTime() + 3_600_000), status: 'COMPLETED', occurredAt: new Date() } });
@@ -54,7 +54,9 @@ try {
     process.env.TASK053_E2E_REPORT_ID = report.id; process.env.TASK053_E2E_VISIT_ID = visit.id;
   } finally { await db.$disconnect(); }
   process.env.G3_E2E_DATABASE_URL = databaseUrl; process.env.TASK053_E2E = '1';
-  exitCode = run([resolve(root, 'node_modules/@playwright/test/cli.js'), 'test', '--config=playwright.config.ts']);
+  const playwrightArgs = [resolve(root, 'node_modules/@playwright/test/cli.js'), 'test', '--config=playwright.config.ts'];
+  if (process.env.G8_09_HEADFUL === '1') playwrightArgs.push('--headed');
+  exitCode = run(playwrightArgs);
   if (exitCode === 0) {
     const verify = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
     try {

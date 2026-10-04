@@ -22,6 +22,9 @@ describe('TASK-053 operational follow-up UI', () => {
     const { container } = renderPage(); await screen.findByText('متابعة إجراء');
     expect(container.querySelector('.followups-page')?.getAttribute('dir')).toBe('rtl'); expect(screen.getAllByText('متأخرة').length).toBeGreaterThan(0);
     expect(screen.getByText('ابتدائية تاريخية')).toBeTruthy(); expect(mocks.listFollowUps).toHaveBeenCalledWith({ status: 'OPEN', limit: 25 });
+    expect(container.querySelector('.followups-card__mark svg')?.getAttribute('aria-hidden')).toBe('true');
+    expect(container.querySelector('.followup-teacher [dir="auto"]')?.textContent).toContain('أستاذ تجريبي');
+    expect(screen.queryByText('غير مستحقة اليوم')).toBeNull();
     fireEvent.change(screen.getByLabelText('الاستحقاق'), { target: { value: 'DUE_TODAY' } });
     await waitFor(() => expect(mocks.listFollowUps).toHaveBeenLastCalledWith({ status: 'OPEN', alert: 'DUE_TODAY', limit: 25 }));
     expect(screen.getByRole('button', { name: 'تعديل الإجراء' })).toBeTruthy(); expect(screen.queryByRole('button', { name: /حذف|أرشفة|نقل الملكية/u })).toBeNull();
@@ -31,6 +34,15 @@ describe('TASK-053 operational follow-up UI', () => {
     expect(await screen.findByText('لا توجد إجراءات مفتوحة')).toBeTruthy();
     cleanup(); mocks.listFollowUps.mockRejectedValueOnce(new Error('private db detail')); renderPage();
     expect(await screen.findByText('تعذر تحميل إجراءات المتابعة')).toBeTruthy(); expect(screen.queryByText('private db detail')).toBeNull();
+  });
+  it('keeps the initial loading state and opens edit with the existing teacher/workplace context', async () => {
+    mocks.getCurrentInspector.mockReturnValueOnce(new Promise(() => undefined)); renderPage();
+    expect(screen.getByText('جارٍ تحميل إجراءات المتابعة…')).toBeTruthy();
+    cleanup(); mocks.getCurrentInspector.mockResolvedValue({ id: item.ownerInspectorId, email: 'hidden@example.invalid' }); renderPage();
+    await screen.findByText('متابعة إجراء'); fireEvent.click(screen.getByRole('button', { name: 'تعديل الإجراء' }));
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.textContent).toContain('أستاذ تجريبي'); expect(dialog.textContent).toContain('ابتدائية تاريخية');
+    expect(dialog.querySelector('dl.followup-dialog-context')).toBeTruthy();
   });
   it('edits explicitly and handles stale revision with manual refresh', async () => {
     renderPage(); await screen.findByText('متابعة إجراء'); fireEvent.click(screen.getByRole('button', { name: 'تعديل الإجراء' }));

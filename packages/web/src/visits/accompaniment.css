@@ -1,0 +1,32 @@
+@media screen {
+  .accompaniment-workspace { gap: clamp(var(--space-4), 2vw, var(--space-6)); }
+  .accompaniment-header .ui-page-header__eyebrow { color: var(--color-primary); font-weight: var(--font-weight-semibold); }
+  .accompaniment-context-card,
+  .accompaniment-content-card,
+  .accompaniment-state-card { border-color: color-mix(in srgb, var(--color-primary) 17%, var(--color-border)); }
+  .accompaniment-context-card { border-inline-start: 3px solid var(--color-primary); }
+  .accompaniment-context-card .ui-card__header,
+  .accompaniment-content-card .ui-card__header,
+  .accompaniment-state-card .ui-card__header { align-items: center; }
+  .accompaniment-content-card .ui-card__title { line-height: var(--line-height-heading); }
+  .accompaniment-form { gap: var(--space-6); }
+  .accompaniment-section { padding-block: var(--space-5); }
+  .accompaniment-section h3 { padding-block-end: var(--space-3); border-block-end: 1px solid var(--color-border); }
+  .accompaniment-section h3 > span { border: 1px solid color-mix(in srgb, var(--color-primary) 18%, var(--color-border)); }
+  .accompaniment-form .report-field { align-content: start; }
+  .accompaniment-form .report-field label { line-height: var(--line-height-body); }
+  .accompaniment-form .report-textarea { min-height: 14rem; line-height: 1.9; }
+  .accompaniment-form :is(input, textarea):read-only { color: var(--color-text-secondary); }
+  .accompaniment-workspace .report-followup-list li { align-items: center; border-block-end-color: var(--color-border); border-radius: var(--radius-control); }
+  .accompaniment-workspace .report-followup-list li > strong { min-width: min(100%, 16rem); max-width: 44rem; flex: 1 1 20rem; line-height: 1.8; overflow-wrap: anywhere; white-space: pre-wrap; }
+  .accompaniment-workspace .report-followup-list li > span { color: var(--color-text-secondary); line-height: var(--line-height-body); }
+  .accompaniment-workspace .report-followup-form textarea { min-height: 10rem; line-height: 1.9; text-align: start; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .accompaniment-workspace :is(a, button, input, textarea):focus-visible { outline: 3px solid var(--color-focus-ring); outline-offset: 3px; }
+
+  @media (max-width: 48rem) {
+    .accompaniment-form { gap: var(--space-4); }
+    .accompaniment-section { padding-block: var(--space-4); }
+    .accompaniment-form .report-textarea { min-height: 12rem; }
+    .accompaniment-workspace .report-followup-list li { align-items: flex-start; }
+  }
+}

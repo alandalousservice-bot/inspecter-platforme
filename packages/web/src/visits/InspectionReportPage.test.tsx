@@ -34,16 +34,28 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe('TASK-052 report UI', () => {
+  it('keeps the supported loading and safe load-error presentations', async () => {
+    mocks.getPedagogicalVisit.mockReturnValueOnce(new Promise(() => undefined)); renderRoute();
+    expect(screen.getByText('جارٍ تحميل التقرير…')).toBeTruthy();
+    cleanup(); mocks.getPedagogicalVisit.mockRejectedValueOnce(new Error('private connection detail')); renderRoute();
+    expect(await screen.findByText('تعذر تحميل التقرير')).toBeTruthy();
+    expect(screen.queryByText('private connection detail')).toBeNull();
+  });
+
   it('starts with seven accessible fields in RTL and only persists on explicit save', async () => {
     const { container } = renderRoute();
     await screen.findByRole('heading', { name: 'محتوى التقرير' });
     expect(container.querySelector('.report-page')?.getAttribute('dir')).toBe('rtl');
+    expect(container.querySelector('.accompaniment-workspace')).toBeTruthy();
+    expect(screen.getByText('وثيقة مهنية من إعداد المفتش')).toBeTruthy();
+    expect(screen.getByText('تقرير من إعداد المفتش — غير رسمي')).toBeTruthy();
     expect(screen.getAllByRole('textbox')).toHaveLength(7);
     expect(await screen.findByRole('heading', { name: /سياق الحصة/u })).toBeTruthy();
     expect(screen.getByRole('heading', { name: /الملاحظات والتوجيه المهني/u })).toBeTruthy();
     const fieldOrder = Array.from(container.querySelectorAll('.report-field input, .report-field textarea')).map((field) => field.id);
     expect(fieldOrder).toEqual(['report-levelClass', 'report-lessonTopic', 'report-pedagogicalObservations', 'report-strengths', 'report-improvementAreas', 'report-guidanceRecommendations', 'report-inspectorConclusion']);
     expect(screen.getByText('لم يُحفظ بعد')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /طباعة|PDF|توقيع/u })).toBeNull();
     fireEvent.change(screen.getByRole('textbox', { name: /المستوى/u }), { target: { value: 'السنة الرابعة' } });
     expect(mocks.saveInspectionReport).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'حفظ المسودة' }));

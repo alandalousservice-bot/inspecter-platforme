@@ -39,8 +39,21 @@ test('TASK-052 connected draft, final snapshots, cancelled draft and stale revis
   await expect(page.getByRole('heading', { name: 'محتوى التقرير' })).toBeVisible();
   await expect(page.locator('.report-page')).toHaveAttribute('dir', 'rtl');
   await fillMinimum(page); await page.getByRole('textbox', { name: /الملاحظات البيداغوجية/u }).fill('ملاحظة ميدانية خاصة غير معروضة في الرابط');
+  await page.getByRole('textbox', { name: /نقاط القوة/u }).fill('ملاحظة بيداغوجية عربية مطولة لاختبار التفاف النص ووضوحه في مساحة التوثيق المهني. '.repeat(8));
+  await page.getByRole('textbox', { name: /جوانب تحتاج إلى تحسين/u }).fill('نص يتجاوز الحد المعتمد. '.repeat(180));
+  await page.getByRole('button', { name: 'حفظ المسودة' }).click();
+  await expect(page.getByText('الحد الأقصى 4000 محرفًا.')).toBeVisible();
+  await page.getByRole('textbox', { name: /جوانب تحتاج إلى تحسين/u }).fill('');
   await saveDraft(page); await expect(page.getByRole('textbox', { name: /المستوى \/ القسم/u })).toHaveValue('السنة الرابعة');
   await page.reload(); await expect(page.getByRole('textbox', { name: /خلاصة المفتش/u })).toHaveValue('خلاصة مرافقة تربوية تجريبية');
+  await expect(page.getByRole('textbox', { name: /نقاط القوة/u })).toHaveValue(/ملاحظة بيداغوجية عربية مطولة/u);
+  for (const width of [1440, 1280, 768, 390]) {
+    await page.setViewportSize({ width, height: width < 500 ? 844 : 900 });
+    await expect(page.locator('.accompaniment-workspace')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    await page.screenshot({ path: `test-results/g8-09-accompaniment-draft-${width}.png`, fullPage: true });
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
 
   // FLOW B: use the existing TASK-051 completion UI, then finalize and verify persistence/read-only.
   await page.goto(`/app/visits/${plannedId}`); await page.getByRole('button', { name: 'إكمال الزيارة' }).click();
@@ -90,7 +103,7 @@ test('TASK-052 connected draft, final snapshots, cancelled draft and stale revis
     await expect(page.locator('.report-page')).toHaveAttribute('dir', 'rtl');
     await expect(page.getByRole('heading', { name: 'سياق الزيارة' })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
-    await page.screenshot({ path: `test-results/g8-08-legacy-cancelled-${width}.png`, fullPage: true });
+    await page.screenshot({ path: `test-results/g8-09-accompaniment-detail-${width}.png`, fullPage: true });
   }
   await page.setViewportSize({ width: 768, height: 1000 });
   await page.evaluate(() => { document.documentElement.style.zoom = '2'; });

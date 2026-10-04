@@ -1,12 +1,39 @@
-.followups-page { display: grid; gap: var(--space-6); min-width: 0; }
-.followups-filters { display: grid; grid-template-columns: repeat(3, minmax(10rem, 1fr)); gap: var(--space-3); margin-block-end: var(--space-4); }
-.followups-filters label { display: grid; gap: var(--space-2); font-weight: 600; }
-.followup-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
-.followup-form { display: grid; gap: var(--space-4); }
-.followup-form textarea { min-height: 7rem; }
-@media (max-width: 42rem) {
-  .followups-filters { grid-template-columns: 1fr; }
-  .followup-context > div { grid-template-columns: 1fr; gap: var(--space-1); }
-  .followup-actions, .followup-actions .ui-button { width: 100%; }
-  .followup-actions { display: grid; }
+@media screen {
+  .followups-page { display: grid; gap: var(--space-6); min-width: 0; }
+  .followups-page .ui-page-header__eyebrow { color: var(--color-primary); font-weight: var(--font-weight-semibold); }
+  .followups-card { border-color: color-mix(in srgb, var(--color-primary) 17%, var(--color-border)); }
+  .followups-card .ui-card__header { align-items: center; }
+  .followups-card__mark { display: grid; width: 2.75rem; height: 2.75rem; flex: 0 0 auto; place-items: center; border: 1px solid color-mix(in srgb, var(--color-primary) 22%, var(--color-border)); border-radius: var(--radius-md); color: var(--color-primary); background: var(--color-primary-subtle); }
+  .followups-card__mark svg { width: 1.35rem; height: 1.35rem; }
+  .followups-filters { display: grid; grid-template-columns: repeat(3, minmax(10rem, 1fr)); gap: var(--space-3); margin-block-end: var(--space-4); }
+  .followups-filters label { display: grid; gap: var(--space-2); min-width: 0; color: var(--color-text-primary); font-weight: var(--font-weight-semibold); }
+  .followups-filters .ui-input { min-width: 0; }
+  .followups-page .ui-table-wrap { border-color: color-mix(in srgb, var(--color-primary) 15%, var(--color-border)); }
+  .followups-page .ui-table th { background: var(--color-surface-subtle); }
+  .followups-page .ui-table tbody tr:focus-within { outline: 2px solid var(--color-focus-ring); outline-offset: -2px; }
+  .followup-teacher, .followup-context, .followup-note, .followup-state { display: inline-flex; min-width: 0; align-items: flex-start; gap: var(--space-2); }
+  .followup-teacher, .followup-context, .followup-note { line-height: var(--line-height-body); overflow-wrap: anywhere; }
+  .followup-teacher svg, .followup-context svg, .followup-note svg, .followup-state svg { width: 1.1rem; height: 1.1rem; flex: 0 0 auto; margin-block-start: 0.1em; color: var(--color-primary); }
+  .followup-teacher { font-weight: var(--font-weight-semibold); }
+  .followup-note { max-width: 34rem; white-space: pre-wrap; }
+  .followup-state { align-items: center; flex-wrap: wrap; }
+  .followup-state svg { margin-block-start: 0; }
+  .followup-state .ui-status-badge { white-space: normal; }
+  .followup-date { display: inline-block; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .followup-result { display: block; max-width: 28rem; line-height: var(--line-height-body); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .followup-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+  .followup-form { display: grid; gap: var(--space-4); min-width: 0; }
+  .followup-form textarea { min-height: 10rem; resize: vertical; line-height: 1.85; text-align: start; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .followup-dialog-context { display: grid; gap: var(--space-2); margin: 0; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-surface-subtle); }
+  .followup-dialog-context > div { display: grid; grid-template-columns: minmax(7rem, .35fr) minmax(0, 1fr); gap: var(--space-3); min-width: 0; }
+  .followup-dialog-context dt { color: var(--color-text-muted); font-size: var(--font-size-small); }
+  .followup-dialog-context dd { min-width: 0; margin: 0; color: var(--color-text-primary); font-weight: var(--font-weight-medium); overflow-wrap: anywhere; }
+  .followup-dialog-context time { font-variant-numeric: tabular-nums; }
+  .followups-page :is(a, button, select, textarea):focus-visible { outline: 3px solid var(--color-focus-ring); outline-offset: 3px; }
+  @media (max-width: 42rem) {
+    .followups-filters { grid-template-columns: minmax(0, 1fr); }
+    .followup-dialog-context > div { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
+    .followup-actions, .followup-actions .ui-button { width: 100%; }
+    .followup-actions { display: grid; }
+  }
 }
