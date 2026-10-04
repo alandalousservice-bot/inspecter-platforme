@@ -415,18 +415,20 @@ test('TASK-050 migration, visit API lifecycle, privacy, scope, concurrency and a
   });
 
   await t.test('overlap exclusions reject conflicts, allow adjacent/different parties, and concurrent create has one winner', async () => {
-    const base = new Date('2026-10-04T07:00:00Z');
+    // Current home proves future eligibility only; keep this overlap fixture
+    // future-dated and separate from the fixed dates in other scenarios.
+    const base = new Date(Date.UTC(Math.max(2033, new Date().getUTCFullYear() + 1), 0, 15, 7));
     const iso = (date) => date.toISOString();
     const first = await create(iso(base), iso(new Date(base.getTime() + 3_600_000))); assert.equal(first.status, 201);
     const conflictResponse = await create(iso(new Date(base.getTime() + 15 * 60_000)), iso(new Date(base.getTime() + 45 * 60_000))); assert.equal(conflictResponse.status, 409);
     assert.equal((await conflictResponse.json()).error.code, 'VISIT_OVERLAP_CONFLICT');
     const adjacent = await create(iso(new Date(base.getTime() + 3_600_000)), iso(new Date(base.getTime() + 7_200_000))); assert.equal(adjacent.status, 201);
     const different = await call(path, 'POST', bodyFor(iso(base), iso(new Date(base.getTime() + 3_600_000)), otherTeacher.id), otherCookies); assert.equal(different.status, 201);
-    const raceBase = new Date('2026-10-05T07:00:00Z');
+    const raceBase = new Date(base.getTime() + 86_400_000);
     const race = await Promise.all([0, 1].map(() => create(iso(raceBase), iso(new Date(raceBase.getTime() + 3_600_000)))));
     assert.deepEqual(race.map((item) => item.status).sort(), [201, 409]);
 
-    const inspectorRaceStart = new Date('2026-10-12T07:00:00Z');
+    const inspectorRaceStart = new Date(base.getTime() + 7 * 86_400_000);
     const inspectorRaceEnd = new Date(inspectorRaceStart.getTime() + 3_600_000);
     const contestants = await Promise.all(['One', 'Two'].map(async (suffix) => {
       const raceInstitution = await db.institution.create({ data: { districtId: district.id, name: `Inspector race ${suffix}` } });
