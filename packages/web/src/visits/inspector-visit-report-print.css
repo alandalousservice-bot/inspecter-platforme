@@ -1,0 +1,107 @@
+@page visit-report {
+  size: A4 portrait;
+  margin: 6mm;
+}
+
+  .visit-report-print-route { display: grid; gap: 1rem; min-width: 0; }
+  .visit-report-print__controls { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  .visit-report-print__controls a,
+  .visit-report-print__controls button {
+    min-height: 2.75rem; padding: 0.55rem 1rem; border: 1px solid var(--color-border);
+    border-radius: var(--radius-control); background: var(--color-surface-raised); color: var(--color-text);
+    font: inherit; text-decoration: none; cursor: pointer;
+  }
+  .visit-report-print__controls a:focus-visible,
+  .visit-report-print__controls button:focus-visible { outline: 3px solid var(--color-focus-ring); outline-offset: 3px; }
+  .visit-report-print__controls p { margin: 0; color: var(--color-text-muted); font-size: var(--font-size-small); }
+  .visit-report-print__document { display: grid; justify-items: center; gap: 1rem; min-width: 0; }
+  .visit-report-print__sheet {
+    page: visit-report; box-sizing: border-box; width: 198mm; min-height: 285mm; padding: 4mm;
+    border: 1pt solid #222; background: #fff; color: #111; font-family: var(--font-sans);
+    font-size: 9pt; line-height: 1.3; direction: rtl;
+  }
+  .visit-report-print__sheet--second { display: flex; flex-direction: column; }
+  .visit-report-print__administrative-header { position: relative; padding: 0 1mm 2mm; text-align: center; }
+  .visit-report-print__republic, .visit-report-print__ministry { margin: 0; font-weight: 700; }
+  .visit-report-print__republic { font-size: 11pt; }
+  .visit-report-print__ministry { margin-block-start: 1mm; font-size: 10pt; }
+  .visit-report-print__header-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; margin-block: 3mm 2mm; text-align: start; }
+  .visit-report-print__header-columns p { margin: 1mm 0; }
+  .visit-report-print__title-box { display: inline-block; min-width: 75mm; margin-block: 1mm 2mm; padding: 1mm 7mm; border: 1px solid #222; box-shadow: 1.5mm 1.5mm 0 #111; }
+  .visit-report-print__title-box h1, .visit-report-print__title-box p { margin: 0; font-size: 14pt; line-height: 1.2; }
+  .visit-report-print__title-box p { margin-block-start: 1mm; letter-spacing: 1mm; }
+  .visit-report-print__subject { margin: 1mm 0 0; text-align: end; font-weight: 700; }
+  .visit-report-print__identity { padding-block: 2mm; border-block: 1px solid #333; }
+  .visit-report-print__facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1mm 4mm; margin: 0; }
+  .visit-report-print__fact { display: grid; grid-template-columns: minmax(27mm, auto) minmax(0, 1fr); gap: 1.5mm; min-width: 0; padding-block: 0.7mm; border-block-end: 0.35pt dotted #777; }
+  .visit-report-print__fact dt { font-weight: 700; }
+  .visit-report-print__fact dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+  .visit-report-print__lesson-context { margin-block-start: 2mm; }
+  .visit-report-print__lesson-context h2,
+  .visit-report-print__guidance > h2 { margin: 0 0 1.5mm; padding-block-end: 1mm; border-block-end: 1px solid #333; font-size: 11pt; }
+  .visit-report-print__facts--compact { gap: 0.5mm 4mm; }
+  .visit-report-print__page-one-criteria { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2mm 4mm; margin-block-start: 2mm; }
+  .visit-report-print__page-one-criteria::before { position: absolute; inset-block: 0; inset-inline-start: 50%; border-inline-start: 0.6pt solid #555; content: ''; pointer-events: none; }
+  .visit-report-print__criteria-block { min-width: 0; }
+  .visit-report-print__criteria-block h3 { margin: 0 0 0.8mm; padding-block-end: 0.6mm; border-block-end: 0.7pt solid #444; font-size: 9.3pt; }
+  .visit-report-print__criteria-block dl { display: grid; gap: 0.6mm; margin: 0; }
+  .visit-report-print__criterion { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(15mm, 0.8fr); gap: 2mm; min-width: 0; align-items: end; }
+  .visit-report-print__criterion dt { min-width: 0; overflow-wrap: anywhere; }
+  .visit-report-print__criterion dd { min-width: 0; min-height: 4mm; margin: 0; padding-inline: 1mm; border-block-end: 0.45pt dotted #555; overflow-wrap: anywhere; white-space: pre-wrap; }
+  .visit-report-print__continuation { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; padding-block-end: 3mm; border-block-end: 2px double #333; }
+  .visit-report-print__continuation::before { position: absolute; inset-block: 0; inset-inline-start: 50%; border-inline-start: 0.6pt solid #555; content: ''; pointer-events: none; }
+  .visit-report-print__guidance { margin-block-start: 3mm; }
+  .visit-report-print__intro { margin: 0 0 2mm; }
+  .visit-report-print__narrative { break-inside: auto; min-width: 0; margin-block-start: 2mm; }
+  .visit-report-print__narrative h3 { margin: 0 0 1mm; font-size: 9.5pt; text-decoration: underline; text-underline-offset: 1mm; }
+  .visit-report-print__narrative p { min-height: 5mm; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; word-break: normal; }
+  .visit-report-print__conclusion { margin-block-start: 3mm; padding-block: 2mm; border-block: 2px double #333; }
+  .visit-report-print__outcome-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm 5mm; margin: 2mm 0 0; }
+  .visit-report-print__signature-area { display: grid; grid-template-columns: 1fr 38mm 1fr; gap: 5mm; align-items: end; min-height: 45mm; margin-block-start: auto; padding-block-start: 4mm; direction: ltr; break-inside: avoid; }
+  .visit-report-print__signature-area > div:first-child { direction: rtl; }
+  .visit-report-print__signature-area p { margin: 1mm 0; }
+  .visit-report-print__signature-line { display: flex; align-items: end; width: 55mm; height: 20mm; margin-block-start: 2mm; padding: 0 2mm 1mm; border-block-end: 1px solid #333; }
+  .visit-report-print__stamp { display: grid; place-items: center; width: 38mm; height: 38mm; border: 0.6pt dotted #666; color: #333; }
+  .visit-report-print__page-number { display: flex; justify-content: space-between; gap: 2mm; margin-block-start: 3mm; padding-block-start: 1mm; border-block-start: 0.4pt solid #777; font-size: 7.5pt; }
+  @media screen and (max-width: 52rem) {
+    .visit-report-print__sheet { width: min(100%, 198mm); min-height: 0; padding: 3mm; }
+    .visit-report-print__header-columns, .visit-report-print__page-one-criteria,
+    .visit-report-print__continuation, .visit-report-print__outcome-facts { grid-template-columns: minmax(0, 1fr); }
+    .visit-report-print__signature-area { grid-template-columns: minmax(0, 1fr) 34mm; }
+  }
+
+@media print {
+  body.visit-report-print-active { margin: 0 !important; padding: 0 !important; background: #fff !important; color: #111 !important; }
+  body.visit-report-print-active .app-header,
+  body.visit-report-print-active .app-sidebar,
+  body.visit-report-print-active .app-shell__header,
+  body.visit-report-print-active .app-shell__sidebar,
+  body.visit-report-print-active .app-topbar,
+  body.visit-report-print-active .app-shell__national-banner,
+  body.visit-report-print-active .app-shell__drawer-layer,
+  body.visit-report-print-active .skip-link,
+  body.visit-report-print-active .visit-report-print__controls { display: none !important; }
+  body.visit-report-print-active #root,
+  body.visit-report-print-active .app-shell,
+  body.visit-report-print-active .app-shell__layout,
+  body.visit-report-print-active .app-shell__content,
+  body.visit-report-print-active .app-main,
+  body.visit-report-print-active .ui-page,
+  body.visit-report-print-active .visit-report-print-route,
+  body.visit-report-print-active .visit-report-print__document { display: block !important; width: auto !important; min-width: 0 !important; max-width: none !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; border: 0 !important; background: #fff !important; box-shadow: none !important; }
+  body.visit-report-print-active .visit-report-print__document { color: #111 !important; font-family: Arial, Tahoma, sans-serif; }
+  body.visit-report-print-active .visit-report-print__sheet { box-sizing: border-box; width: 198mm; min-height: 285mm; margin: 0; padding: 4mm; border: 1pt solid #222; color: #111; background: #fff; font-size: 9.2pt; line-height: 1.3; page: visit-report; }
+  body.visit-report-print-active .visit-report-print__fact { padding-block: 1mm; }
+  body.visit-report-print-active .visit-report-print__criteria-block dl { gap: 1mm; }
+  body.visit-report-print-active .visit-report-print__criterion dd { min-height: 5mm; }
+  body.visit-report-print-active .visit-report-print__narrative p { min-height: 7mm; }
+  body.visit-report-print-active .visit-report-print__sheet--first { break-after: page; page-break-after: always; }
+  body.visit-report-print-active .visit-report-print__sheet--second { break-before: page; page-break-before: always; }
+  body.visit-report-print-active .visit-report-print__page-number { break-inside: avoid; }
+  body.visit-report-print-active .visit-report-print__criteria-block,
+  body.visit-report-print-active .visit-report-print__criterion { break-inside: avoid; }
+  body.visit-report-print-active .visit-report-print__narrative p { white-space: pre-wrap; overflow-wrap: anywhere; }
+  body.visit-report-print-active a { color: #111 !important; text-decoration: none !important; }
+  body.visit-report-print-active * { box-shadow: none !important; text-shadow: none !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  body.visit-report-print-active .visit-report-print__title-box { box-shadow: 1.5mm 1.5mm 0 #111 !important; }
+}

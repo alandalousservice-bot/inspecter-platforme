@@ -58,6 +58,7 @@ describe('Inspector Visit Report V1 editor', () => {
     ]) expect(screen.getByRole('heading', { name: title })).toBeTruthy();
     expect(screen.queryByRole('combobox', { name: /نوع التقرير/u })).toBeNull();
     expect(screen.queryByRole('button', { name: /طباعة|PDF/u })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'معاينة الطباعة' })).toBeNull();
     expect(screen.getByText('لم يُحفظ بعد')).toBeTruthy();
     expect(await screen.findByRole('textbox', { name: 'الميدان: التخطيط' })).toBeTruthy();
     expect(screen.getByRole('textbox', { name: 'الوحدة التعليمية (قسم التحضير)' })).toBeTruthy();
@@ -82,6 +83,7 @@ describe('Inspector Visit Report V1 editor', () => {
     const sent = mocks.saveInspectorVisitReport.mock.calls[0][1];
     expect(sent.expectedRevision).toBeNull(); expect(sent.observations).toEqual([{ criterionKey: 'field_planning', valueText: 'ملاحظة ميدانية' }]);
     expect(await screen.findByText('تم حفظ مسودة التقرير.')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'معاينة الطباعة' }).getAttribute('href')).toBe(`/app/visits/${typedVisit.id}/report/print`);
   });
 
   it('shows the promotion mark only for promotion and keeps it optional', async () => {

@@ -254,7 +254,8 @@ export function InspectorVisitReportV1Page({ visit, initialReport }: Props) {
   return <div className="report-page report-workspace v1-report-page" dir="rtl">
     <PageHeader title="تقرير زيارة المفتش — الإصدار الأول" description="نموذج تقرير زيارة معتمد للمنصة"
       breadcrumbs={[{ label: 'الزيارات التربوية', to: '/app/visits' }, { label: 'تفاصيل الزيارة', to: `/app/visits/${encodeURIComponent(visit.id)}` }, { label: 'التقرير' }]}
-      backAction={<Link to={`/app/visits/${encodeURIComponent(visit.id)}`} onClick={navigateBack}>العودة إلى الزيارة</Link>} />
+      backAction={<Link to={`/app/visits/${encodeURIComponent(visit.id)}`} onClick={navigateBack}>العودة إلى الزيارة</Link>}
+      secondaryActions={report ? <Link className="ui-button ui-button--secondary" to={`/app/visits/${encodeURIComponent(visit.id)}/report/print`}>معاينة الطباعة</Link> : null} />
     {notice ? <SuccessState title={notice} /> : null}{error && criteria.length ? <ErrorState title={error} /> : null}
     {visit.status === 'CANCELLED' && !report ? <ErrorState title="الزيارة ملغاة" description="لا يمكن إنشاء تقرير لهذه الزيارة." /> : null}
     <form onSubmit={(event) => void save(event)} aria-busy={busy}>

@@ -15,6 +15,7 @@ import { VisitCreatePage } from './visits/VisitCreatePage';
 import { VisitDetailPage } from './visits/VisitDetailPage';
 import { VisitListPage } from './visits/VisitListPage';
 import { InspectionReportPage } from './visits/InspectionReportPage';
+import { InspectorVisitReportPrintPage } from './visits/InspectorVisitReportPrintPage';
 import { FollowUpsPage } from './followups/FollowUpsPage';
 import { DashboardPage } from './dashboard/DashboardPage';
 import { LandingPage } from './landing/LandingPage';
@@ -39,6 +40,7 @@ export function AppRoutes() {
         <Route path="visits/new" element={<VisitCreatePage />} />
         <Route path="visits/:id" element={<VisitDetailPage />} />
         <Route path="visits/:id/report" element={<InspectionReportPage />} />
+        <Route path="visits/:id/report/print" element={<InspectorVisitReportPrintPage />} />
         <Route path="follow-ups" element={<FollowUpsPage />} />
         <Route path="me/professional-identity" element={<ProfessionalIdentityPage />} />
       </Route>

@@ -6,6 +6,7 @@ import { AppRoutes } from './AppRoutes';
 
 const mocks = vi.hoisted(() => ({
   login: vi.fn(), getCurrentInspector: vi.fn(), getDashboardSummary: vi.fn(), getTeacherInformationCard: vi.fn(),
+  getInspectionReportReadModel: vi.fn(), getInspectorVisitCriteria: vi.fn(),
 }));
 vi.mock('./auth/client', async (importOriginal) => ({ ...(await importOriginal<typeof import('./auth/client')>()), ...mocks }));
 
@@ -28,6 +29,8 @@ beforeEach(() => {
   mocks.getCurrentInspector.mockResolvedValue({ id: 'inspector-1', email: 'inspector@example.invalid' });
   mocks.getDashboardSummary.mockResolvedValue({ data: summary });
   mocks.getTeacherInformationCard.mockRejectedValue(new Error('unavailable'));
+  mocks.getInspectionReportReadModel.mockResolvedValue({ data: { report: null } });
+  mocks.getInspectorVisitCriteria.mockResolvedValue({ data: { criteria: [] } });
 });
 afterEach(cleanup);
 
@@ -79,5 +82,14 @@ describe('application route integration', () => {
     expect(document.querySelector('.app-topbar')).toBeNull();
     expect(document.querySelector('.ui-page')).toBeNull();
     expect(document.querySelector('.dashboard-page')).toBeNull();
+  });
+
+  it('protects the Visit Report print route with the existing inspector session and shell', async () => {
+    renderAt('/app/visits/visit-1/report/print');
+    expect(await screen.findByRole('heading', { name: 'تعذر تحميل تقرير الزيارة' })).toBeTruthy();
+    expect(mocks.getCurrentInspector).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('.app-sidebar')).toBeTruthy();
+    expect(document.querySelector('.app-topbar')).toBeTruthy();
+    expect(document.body.classList.contains('visit-report-print-active')).toBe(true);
   });
 });
