@@ -17,7 +17,9 @@ export type ShellIconName =
   | 'lock'
   | 'arrow-back'
   | 'arrow-down'
-  | 'reports';
+  | 'reports'
+  | 'alert'
+  | 'check-circle';
 
 const shapes: Record<ShellIconName, ReactNode> = {
   dashboard: <><rect x="3.5" y="3.5" width="7" height="7" rx="1.5" /><rect x="13.5" y="3.5" width="7" height="5" rx="1.5" /><rect x="13.5" y="12" width="7" height="8.5" rx="1.5" /><rect x="3.5" y="13" width="7" height="7.5" rx="1.5" /></>,
@@ -37,6 +39,8 @@ const shapes: Record<ShellIconName, ReactNode> = {
   'arrow-back': <><path d="m9 18 6-6-6-6" /><path d="M15 12H4" /></>,
   'arrow-down': <><path d="M12 4v15M6 13l6 6 6-6" /></>,
   reports: <><path d="M6 3.5h8l4 4v13H6z" /><path d="M14 3.5v4h4M9 12h6M9 15.5h6M9 8.5h1" /></>,
+  alert: <><path d="M12 3 2.8 19h18.4L12 3Z" /><path d="M12 9v4M12 16.3h.01" /></>,
+  'check-circle': <><circle cx="12" cy="12" r="9" /><path d="m8 12 2.5 2.5L16.5 9" /></>,
 };
 
 export function ShellIcon({ name, className }: { name: ShellIconName; className?: string }) {

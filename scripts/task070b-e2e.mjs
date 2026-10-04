@@ -60,6 +60,7 @@ let stage = 'preflight';
 const apiStatuses = [];
 const loginStatuses = [];
 const pageErrorKinds = [];
+let focusVisual = null;
 try {
   assert(password.length >= 20, 'Approved local UAT password source is invalid.');
   await db.$connect();
@@ -133,10 +134,24 @@ try {
   evidence.navigation = true;
 
   stage = 'responsive visual geometry';
-  await verifyViewport(1440, 1100, 'dashboard-1440.png');
+  await verifyViewport(1440, 900, 'dashboard-1440.png');
+  await verifyViewport(1280, 800, 'dashboard-1280.png');
   await verifyViewport(768, 1024, 'dashboard-768.png');
   await verifyViewport(390, 844, 'dashboard-390.png');
-  await verifyViewport(720, 900, 'dashboard-200-percent-equivalent.png');
+
+  stage = 'keyboard focus and RTL visual contract';
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('http://127.0.0.1:5173/app');
+  await page.getByRole('heading', { name: 'لوحة المتابعة', level: 1 }).waitFor();
+  await page.evaluate(() => { document.body.tabIndex = -1; document.body.focus(); });
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    await page.keyboard.press('Tab');
+    focusVisual = await page.evaluate(() => ({ insideDashboard: document.activeElement?.closest('.dashboard-page') !== null, tag: document.activeElement?.tagName, className: (document.activeElement instanceof HTMLElement ? document.activeElement.className : ''), focusVisible: document.activeElement?.matches(':focus-visible'), outline: getComputedStyle(document.activeElement).outlineStyle }));
+    if (focusVisual.insideDashboard) break;
+  }
+  assert(focusVisual.insideDashboard, 'Keyboard navigation did not reach Dashboard content.');
+  assert(focusVisual.focusVisible && focusVisual.outline !== 'none', `Keyboard focus indicator is not visible: ${JSON.stringify(focusVisual)}.`);
+  assert(await page.locator('.dashboard-page[dir="rtl"]').count() === 1, 'Dashboard RTL root is missing.');
 
   stage = 'dense response visual';
   const denseSummary = {
@@ -161,10 +176,18 @@ try {
   };
 
   await page.route('**/api/v1/dashboard/summary', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: denseSummary }) }));
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 800 }, { width: 768, height: 1024 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport);
+    await page.goto('http://127.0.0.1:5173/app');
+    await page.getByText('ابتدائية محلية ذات اسم عربي طويل لاختبار الالتفاف — School-ABC 2026-2027').first().waitFor();
+    assert(await page.locator('.dashboard-visit').count() === 3, 'Dense Dashboard did not render all bounded upcoming visits.');
+    const dimensions = await page.evaluate(() => ({ client: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+    assert(dimensions.scroll <= dimensions.client, `Dense Dashboard overflowed at ${viewport.width}px.`);
+    await page.screenshot({ path: join(screenshotDir, `dashboard-dense-${viewport.width}.png`), fullPage: true });
+  }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('http://127.0.0.1:5173/app');
   await page.getByText('ابتدائية محلية ذات اسم عربي طويل لاختبار الالتفاف — School-ABC 2026-2027').first().waitFor();
-  assert(await page.locator('.dashboard-visit').count() === 3, 'Dense Dashboard did not render all bounded upcoming visits.');
   for (const label of ['المتابعات المتأخرة', 'المتابعات المستحقة اليوم', 'طلبات الأساتذة المعلقة', 'مسودات التقارير', 'زيارات مكتملة بلا تقرير']) {
     assert(await page.getByRole('heading', { name: label }).count() === 1, `Missing or merged attention category: ${label}.`);
   }
@@ -179,7 +202,6 @@ try {
   await page.getByRole('heading', { name: 'لوحة المتابعة', level: 1 }).waitFor();
   const denseWidth = await page.evaluate(() => ({ client: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
   assert(denseWidth.scroll <= denseWidth.client, 'Dense Arabic content caused document overflow.');
-  await page.screenshot({ path: join(screenshotDir, 'dashboard-dense-390.png'), fullPage: true });
   evidence.modes.push('DENSE:PASS');
 
   stage = 'empty response visual';
@@ -190,18 +212,29 @@ try {
     upcomingVisits: [],
   };
   await page.route('**/api/v1/dashboard/summary', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: emptySummary }) }));
-  await page.goto('http://127.0.0.1:5173/app');
-  await page.getByText('لا توجد عناصر تحتاج انتباهك حاليًا.').waitFor();
-  await page.screenshot({ path: join(screenshotDir, 'dashboard-empty-390.png'), fullPage: true });
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 800 }, { width: 768, height: 1024 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport);
+    await page.goto('http://127.0.0.1:5173/app');
+    await page.getByText('لا توجد عناصر تحتاج انتباهك حاليًا.').waitFor();
+    const dimensions = await page.evaluate(() => ({ client: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+    assert(dimensions.scroll <= dimensions.client, `Empty Dashboard overflowed at ${viewport.width}px.`);
+    await page.screenshot({ path: join(screenshotDir, `dashboard-empty-${viewport.width}.png`), fullPage: true });
+  }
   evidence.modes.push('EMPTY:PASS');
 
   stage = 'error response visual';
   await page.unroute('**/api/v1/dashboard/summary');
   await page.route('**/api/v1/dashboard/summary', (route) => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: { code: 'INTERNAL_ERROR', message: 'تعذر إكمال العملية.' } }) }));
-  await page.goto('http://127.0.0.1:5173/app');
-  await page.getByRole('alert').waitFor();
-  assert(!(await page.locator('body').innerText()).includes('INTERNAL_ERROR'), 'Internal API error details were exposed.');
-  await page.screenshot({ path: join(screenshotDir, 'dashboard-error-390.png'), fullPage: true });
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 800 }, { width: 768, height: 1024 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport);
+    await page.goto('http://127.0.0.1:5173/app');
+    await page.getByRole('alert').waitFor();
+    assert(await page.getByRole('button', { name: 'إعادة المحاولة' }).count() === 1, 'Error state lost its retry action.');
+    assert(!(await page.locator('body').innerText()).includes('INTERNAL_ERROR'), 'Internal API error details were exposed.');
+    const dimensions = await page.evaluate(() => ({ client: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+    assert(dimensions.scroll <= dimensions.client, `Error Dashboard overflowed at ${viewport.width}px.`);
+    await page.screenshot({ path: join(screenshotDir, `dashboard-error-${viewport.width}.png`), fullPage: true });
+  }
   evidence.modes.push('ERROR:PASS');
 
   stage = 'retry after aggregate error';
@@ -217,12 +250,20 @@ try {
     successfulRetryRequests += 1;
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: emptySummary }) });
   });
-  await page.goto('http://127.0.0.1:5173/app');
-  await page.getByRole('alert').waitFor();
-  assert(failedBeforeRetry > 0, 'The first connected request did not exercise the error state.');
-  retryAllowed = true;
-  await page.getByRole('button', { name: 'إعادة المحاولة' }).click();
-  await page.getByText('لا توجد عناصر تحتاج انتباهك حاليًا.').waitFor();
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 800 }, { width: 768, height: 1024 }, { width: 390, height: 844 }]) {
+    retryAllowed = false;
+    await page.setViewportSize(viewport);
+    await page.goto('http://127.0.0.1:5173/app');
+    await page.getByRole('alert').waitFor();
+    assert(await page.getByRole('button', { name: 'إعادة المحاولة' }).count() === 1, 'Retry control is unavailable.');
+    retryAllowed = true;
+    await page.getByRole('button', { name: 'إعادة المحاولة' }).click();
+    await page.getByText('لا توجد عناصر تحتاج انتباهك حاليًا.').waitFor();
+    const dimensions = await page.evaluate(() => ({ client: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+    assert(dimensions.scroll <= dimensions.client, `Retry success state overflowed at ${viewport.width}px.`);
+    await page.screenshot({ path: join(screenshotDir, `dashboard-retry-${viewport.width}.png`), fullPage: true });
+  }
+  assert(failedBeforeRetry >= 4, 'A failed response was not exercised at every responsive viewport.');
   assert(successfulRetryRequests > 0, 'Retry did not issue a new dashboard summary request.');
   evidence.modes.push('RETRY:PASS');
 
@@ -252,7 +293,7 @@ try {
     loadingVisible: await page.getByText('جارٍ تحميل لوحة المتابعة…').count().catch(() => 0) > 0,
     errorVisible: await page.getByRole('alert').count().catch(() => 0) > 0,
   };
-  console.error(`TASK-070B connected verification failed during ${stage}; path=${new URL(page.url()).pathname}; login_http=${loginStatuses.join(',') || 'none'}; dashboard_http=${apiStatuses.join(',') || 'none'}; page_errors=${pageErrorKinds.join(',') || 'none'}; state=${JSON.stringify(safeState)}${keepScreenshots ? `; evidence=${screenshotDir}` : ''}. No credential or response payload was written to output.`);
+  console.error(`TASK-070B connected verification failed during ${stage}; path=${new URL(page.url()).pathname}; login_http=${loginStatuses.join(',') || 'none'}; dashboard_http=${apiStatuses.join(',') || 'none'}; page_errors=${pageErrorKinds.join(',') || 'none'}; focus=${JSON.stringify(focusVisual)}; state=${JSON.stringify(safeState)}${keepScreenshots ? `; evidence=${screenshotDir}` : ''}. No credential or response payload was written to output.`);
   process.exitCode = 1;
 } finally {
   await context.close();

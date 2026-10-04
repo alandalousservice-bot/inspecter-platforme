@@ -72,6 +72,9 @@ describe('TASK-070B Dashboard presentation', () => {
     renderDashboard();
     const heading = await screen.findByRole('heading', { name: 'لوحة المتابعة', level: 1 });
     expect(heading).toBeTruthy();
+    expect(screen.getByText('مساحة عمل المفتش')).toBeTruthy();
+    expect(heading.closest('.dashboard-hero')).toBeTruthy();
+    expect(heading.closest('.dashboard-page')?.getAttribute('dir')).toBe('rtl');
     expect(screen.getByText('آخر تحديث:')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'طلب وارد' }).getAttribute('href')).toBe('/app/submissions/submission-1');
     expect(screen.getByRole('link', { name: 'فتح مسودة التقرير' }).getAttribute('href')).toBe('/app/visits/visit-draft/report');
@@ -99,6 +102,7 @@ describe('TASK-070B Dashboard presentation', () => {
     renderDashboard();
     expect(await screen.findByRole('status')).toBeTruthy();
     expect(screen.getByText('لا توجد عناصر تحتاج انتباهك حاليًا.')).toBeTruthy();
+    expect(screen.getByText('لا توجد عناصر تحتاج انتباهك حاليًا.').closest('[role="status"]')?.querySelector('svg[aria-hidden="true"]')).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'لا توجد زيارات قادمة' })).toBeTruthy();
     for (const label of ['المتابعات المتأخرة', 'المتابعات المستحقة اليوم', 'طلبات الأساتذة المعلقة', 'مسودات التقارير', 'زيارات مكتملة بلا تقرير']) {
       expect(screen.getByRole('region', { name: `${label}: 0` })).toBeTruthy();
@@ -112,6 +116,7 @@ describe('TASK-070B Dashboard presentation', () => {
     renderDashboard();
     expect(await screen.findByRole('alert')).toBeTruthy();
     expect(screen.getByText('تعذر تحميل لوحة المتابعة')).toBeTruthy();
+    expect(screen.getByRole('alert').parentElement?.querySelector('.dashboard-feedback__icon svg[aria-hidden="true"]')).toBeTruthy();
     expect(screen.queryByText('لا توجد عناصر تحتاج انتباهك حاليًا.')).toBeNull();
     expect(screen.queryByText('private backend details')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'إعادة المحاولة' }));
