@@ -12,7 +12,7 @@ body {
   margin: 0;
   background: var(--color-canvas);
   color: var(--color-text);
-  font-family: var(--font-sans);
+  font-family: var(--font-screen);
   font-size: var(--font-size-body);
   line-height: var(--line-height-body);
   font-variant-numeric: lining-nums;
@@ -31,6 +31,7 @@ a:hover {
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: 3px solid var(--color-focus-ring);
   outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--color-surface);
 }
 
 button,

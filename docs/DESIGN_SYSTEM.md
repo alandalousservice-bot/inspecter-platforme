@@ -1,8 +1,10 @@
 # Design System — accepted visual direction / staged implementation
 
-**Current authority: ADR-016 ACCEPTED, G8-VISUAL-A0 (2026-10-04).** الهوية المعتمدة هي **ArenaSPEX-family Professional Inspector Theme**؛ ArenaSPEX مرجع الهوية وUX الأول، Candidate مرجع هندسة النظام الثانوي، والمفتش مرجع المجال والأمن والطباعة. [المواصفة النهائية](G8-VISUAL-A0-REPORT.md) تشمل palette وtokens ومصفوفة الشاشات وبوابات التنفيذ. الملفات البرمجية الحالية ما زالت تنفّذ الهوية السابقة؛ لا يعني اعتماد الوثيقة تنفيذ G8 أو إعلان تطابق بصري.
+**Current authority: ADR-016 ACCEPTED, G8-VISUAL-A0 (2026-10-04).** الهوية المعتمدة هي **ArenaSPEX-family Professional Inspector Theme**؛ ArenaSPEX مرجع الهوية وUX الأول، Candidate مرجع هندسة النظام الثانوي، والمفتش مرجع المجال والأمن والطباعة. [المواصفة النهائية](G8-VISUAL-A0-REPORT.md) تشمل palette وtokens ومصفوفة الشاشات وبوابات التنفيذ.
 
-الفقرات التالية توثق أساس التنفيذ G6 قبل G8. إشارات ADR-016 OPEN/اللوحة المؤقتة أدناه تاريخية، وتتقدم عليها مواصفة G8 للحالة المستهدفة: خط شاشة Alexandria محلي مع OFL/fallback، Sidebar أخضر عميق، أسطح تشغيل فاتحة، ومدخل/Login أخضر داكن مقيدان بقواعد شاشة مستقلة. لا خدمة خطوط خارجية إلزامية؛ PRINT يحتفظ بخطه وهندسته. تُطوّر tokens/shell/primitives القائمة نفسها دون نظام موازٍ، مع إعادة تحقق التباين والحالات في المتصفح.
+**G8-01 foundation status:** semantic screen tokens, Arabic-oriented font stack, spacing/geometry/elevation/focus/motion roles and shared primitive styling are implemented in `packages/web/src/ui/tokens.css`, `shell.css` and `primitives.css`. No approved local Alexandria binary was available in the project, so the screen stack falls back through Tajawal/Noto Sans Arabic/system fonts without a network font dependency. `--font-sans` remains the legacy print stack; TASK-086's independent typography and layout are unchanged. This foundation is not a full screen redesign or a claim of final visual parity.
+
+الفقرات التالية توثق أساس G6 والعقود المشتركة التي تظل سارية. إشارات ADR-016 OPEN/اللوحة المؤقتة تاريخية، وتتقدم عليها مواصفة G8: Sidebar أخضر عميق، أسطح تشغيل فاتحة، ومدخل/Login أخضر داكن مقيدان بقواعد شاشة مستقلة. يفضل stack الشاشة Alexandria ثم Tajawal/Noto Sans Arabic/system؛ عدم توفر ملف محلي مرخص يعني fallback دون جلب شبكة. PRINT يحتفظ بخطه وهندسته. تُطوّر tokens/shell/primitives القائمة نفسها دون نظام موازٍ.
 
 حالة التنقل الحالية يحددها AppRoutes/AppShell وUI_MAP: `/app` لوحة ADR-037، وليست تحويلًا إلى المؤسسات كما في سجل G6-02 القديم. Landing المستهدفة في G8-02 غير منفذة حاليًا؛ الإعدادات العامة والموارد البيداغوجية غير منفذة ولا تُضاف للقائمة. قيود الفعل/الحقول/الدلالة/الوصول للمكونات أدناه تبقى واجبة؛ يسمح G8 بأسطح brand كبيرة فقط حيث حددها تقريره (Sidebar/hero/public)، دون تعميمها على الطباعة أو البيانات التشغيلية.
 
@@ -21,19 +23,21 @@
 | `--color-border`, `--color-border-strong` | الفصل العادي والحدود التي تحتاج وضوحًا أعلى |
 | `--color-text-primary`, `--color-text-secondary`, `--color-text-muted` | النص الأساسي والسياق والمساعدة |
 | `--color-primary`, `--color-primary-hover`, `--color-primary-subtle`, `--color-on-primary` | الفعل الأساسي والروابط والتحديد |
+| `--color-primary-active`, `--color-navigation*`, `--color-public-*` | درجات الفعل النشط، تنقل/سطح داكن مستقبلي ضمن صفحات G8، ونصوصه |
 | `--color-success`, `--color-success-subtle`, `--color-on-success` | نجاح العملية أو الحالة |
 | `--color-warning`, `--color-warning-subtle`, `--color-on-warning` | تنبيه يحتاج انتباهًا دون معنى الفشل |
 | `--color-danger`, `--color-danger-subtle`, `--color-on-danger` | خطأ أو فعل خطر |
 | `--color-info`, `--color-info-subtle`, `--color-on-info` | معلومة مساعدة |
 | `--color-focus-ring` | تركيز لوحة المفاتيح |
+| `--color-focus-on-dark` | تركيز متباين على الأسطح الداكنة |
 
-الألوان الحالية تحقق WCAG AA للنص على السطوح البيضاء/الخلفية الفاتحة، والنص الأبيض على الألوان الصلبة المستخدمة للأزرار والحالات. يعاد فحص التباين عند تغيير القيم. لا تعبّر الحالة باللون وحده؛ تستخدم تسمية أو نصًا أو رمزًا معه. لا تستخدم أسطحًا كبيرة مشبعة أو تدرجات زخرفية.
+قيم الألوان المحددة في [مواصفة G8-VISUAL-A0](G8-VISUAL-A0-REPORT.md) هي المرجع. اختُبرت نسب النص/الخلفية للأفعال والحالات المختارة عند G8-01؛ حد الحدود غير النصية 3:1، وحد النص 4.5:1. يعاد فحص التباين عند تغيير القيم. لا تعبّر الحالة باللون وحده؛ تستخدم تسمية أو نصًا أو رمزًا معه. استعمال المساحات الداكنة الكبيرة محصور في المواضع التي حددتها المواصفة ومراحل G8 اللاحقة.
 
 Aliases التوافق: `--color-canvas`, `--color-surface-raised`, `--color-text`, `--color-brand`, و`--color-brand-on` تشير إلى الأدوار الجديدة مؤقتًا. `--color-info/success/warning/danger/border/focus-ring` أسماء دلالية قائمة وتبقى المصدر نفسه. حدود الحقول والأزرار المحايدة تستخدم `border-strong` لتباين واجهة قابل للرؤية؛ الفواصل الزخرفية تبقى أخف.
 
 ## الخط والنص المختلط
 
-Stack التنفيذ السابق لـG8 محلي بلا تنزيل أو dependency: `"Segoe UI", Tahoma, Arial, sans-serif`، دون ملفات خطوط مجمعة أو Google Fonts. اختيار Alexandria للشاشة حُسم في ADR-016؛ التحقق من أصل الملف وتسليمه المحلي وترخيصه وأدائه بوابة G8-01، ولا يمس خط الطباعة.
+Stack الشاشة الحالي: `Alexandria, Tajawal, "Noto Sans Arabic", system-ui, sans-serif`. لا ملف خط محلي ضمن المستودع، لذا يستخدم المتصفح أول خط متاح ولا تُطلب خدمة خارجية. يظل `--font-sans` هو stack المستندات المطبوعة، ولا تتغير هندسة الطباعة أو خطها في G8-01.
 
 | العنصر | Token / القاعدة |
 |---|---|
