@@ -19,7 +19,7 @@
 | ADR-013 | OPEN | المرجع البيداغوجي الرسمي وحقوق استعماله وإصداره: تحقق مصدر/سلطة كل وثيقة قبل وسمها OFFICIAL |
 | ADR-014 | OPEN | سياسة الخصوصية والاحتفاظ والأرشفة والحذف، ومن يرى المقترحات ومتى تُنشر للأساتذة: يقررها Product Owner/الجهة المعنية |
 | ADR-015 | ACCEPTED | عقد G3 التاريخي لـPublic Teacher Intake؛ يستبدل ADR-029 شكل مكان العمل للإرسالات الجديدة بعد TASK-041، مع بقاء snapshots القديمة كما أُرسلت |
-| ADR-016 | OPEN | branding/palette النهائية والخط المرخص؛ tokens والأدوار مقررة، القيم لا تُختار اعتباطيًا |
+| ADR-016 | ACCEPTED | Inspector Platform Visual Identity: ArenaSPEX مرجع الهوية وUX الأول، Candidate مرجع هندسة النظام الثانوي؛ عقود المفتش والطباعة مرجعية؛ مواصفة G8 أدناه |
 | ADR-017 | OPEN | سياسة نقل أستاذ بين المقاطعات وتاريخ ملكية السجلات متعددة المفتشين؛ يُحسم قبل تنفيذ النقل |
 | ADR-018 | REJECTED | نسخ teacher-as-user وteacher.schoolId الوحيد من ArenaSPEX؛ يخالف Master ويكسر التاريخ والصلاحيات |
 | ADR-019 | REJECTED | بناء Windows/Mobile/offline sync في MVP؛ كلفة ومخاطر قبل ثبات API |
@@ -44,6 +44,18 @@
 | ADR-038 | ACCEPTED | قرار Product Owner: استيراد JSON واحد كتعبئة محلية للاستمارة العامة فقط، عبر intake الحالي وبلا اعتماد أو مسار تخزين بديل؛ التفاصيل أدناه |
 | ADR-039 | ACCEPTED | قرار Product Owner: موقع المؤسسة بإحداثيي WGS84 يديرهما المفتش يدويًا؛ TASK-076A بلا مزود خرائط أو خريطة مقاطعة، وعرض المزود الصريح لمؤسسة مختارة مؤجل إلى TASK-076B |
 | ADR-040 | ACCEPTED | Product Owner LP-01..LP-04: مقترح موقع المؤسسة الأم على TeacherSubmission، إدخال يدوي وقرار مفتش مستقل؛ لا GPS أو خرائط مضمّنة؛ TASK-077A..077F |
+
+## ADR-016 — Inspector Platform Visual Identity
+
+**Status: ACCEPTED — 2026-10-04, G8-VISUAL-A0 / explicit Product Owner decision.**
+
+Working identity: **ArenaSPEX-family Professional Inspector Theme**. ArenaSPEX هو المرجع الأول للهوية البصرية ولغة تجربة الاستخدام؛ Candidate المرسل سابقًا هو المرجع الثانوي لهندسة tokens والمكونات والوصول والاستجابة. Inspector Platform يبقى المرجع الوحيد للمنتج والمجال والمصادقة والصلاحيات والمقاطعات والتخزين وAPI والخصوصية والتدقيق وسير العمل؛ عقود طباعة المفتش تتقدم على أي مرجع بصري.
+
+الأخضر الزمردي والـSidebar الأخضر العميق والأسطح الهادئة وتسلسل العربية تعتمد على ArenaSPEX `main@48fec90380a5d34244cc43852e4748d59259b457`. المواصفة النهائية والألوان الدلالية ومصفوفة الشاشات ومراحل التنفيذ في [G8-VISUAL-A0-REPORT](G8-VISUAL-A0-REPORT.md). تبقى tokens ومكونات Inspector القائمة نقطة التنفيذ، دون نقل cascade العام أو `!important` من المرجع.
+
+Alexandria هو خط الشاشة الأساسي المستهدف، ثم Tajawal/Noto Sans Arabic/system-ui/sans-serif. التسليم محلي مع OFL وfallback، بلا Google Fonts أو خدمة خطوط إلزامية وقت التشغيل؛ على G8-01 تثبيت مصدر/نسخة الأصل وترخيصه وقياس أداء التحميل. لا تغيير لخط/هندسة PRINT. لا هوية وزارية أو ختم/شعار حكومي أو endorsement مفترض؛ الاسم «منصة مفتش التربية البدنية والرياضية» والفعل العام «دخول فضاء المفتش».
+
+هذا قبول للمواصفة وليس إعلانًا لتطبيقها أو للتطابق البصري. G8-01..08 تحتاج تنفيذًا منفصلًا وتحقق متصفح BEFORE/REFERENCE/AFTER. لا نقل Teacher auth/domain أو Candidate features. TASK-077F يبقى COMPLETED، ADR-013 OPEN وTASK-060 BLOCKED؛ باقي ADRs لا تتغير. الإشارات الأقدم إلى ADR-016 OPEN/DEFERRED في سجلات milestones تصف الحالة التاريخية قبل هذا القرار وتُستبدل به للحالة الحالية فقط.
 
 ## ADR-040 — Teacher-Proposed Institution Location and Explicit Inspector Approval
 
@@ -98,7 +110,7 @@ Status: **ACCEPTED** by Product Owner for TASK-076A.
 
 **التنقل والعرض:** بعد TASK-070B يصبح `/app` صفحة اللوحة بدل التحويل الحالي إلى المؤسسات؛ login يستمر بالتنقل إلى `/app`. «لوحة المتابعة» أول رابط مصادق في Sidebar، نشط عند `/app` فقط، بأيقونة SVG محلية. بطاقات أعداد تشغيلية خاصة باللوحة لا primitive عام؛ الاسم والعدد وسياقه والرابط عند وجود وجهة، والصفر صادق ولا يعني أداءً أو جودةً أو خطرًا. تستخدم G6، رأس/أقسام دلالية و`h1` واحدًا وتركيزًا ولوحة مفاتيح وحالات تحميل/خطأ/إعادة محاولة/خلو واضحة. على 1440/768/390 و200% zoom تبقى فئات الانتباه ظاهرة بلا overflow، وبترتيب انتباه ← زيارات ← إجراءات. الدخول العام والطباعة خارج AppShell كما هما.
 
-**الخصوصية والتنفيذ:** لا ملف Teacher الشخصي أو اتصاله، ولا `personalAddress` أو `administrativeNote` أو JSON التصريح أو duplicate details أو note متابعة أو prose التقرير أو `pedagogicalMark` أو AuditLog أو الأسرار. الاستعلامات counts و`take 3` وإسقاطات دنيا وanti-join لغياب التقرير؛ بلا N+1 أو جلب كامل إلى الذاكرة. فهارس إضافية بعد دليل `EXPLAIN` فقط، لا migration تخمينية. TASK-070A API واختبارات، TASK-070B UI/route/sidebar، TASK-070C E2E/visual/accessibility/print gate؛ كلها NOT_STARTED. يحفظ ADR-022–036 دون تغيير، بما فيها ADR-024/026/027/028/029/030/031/032/033/034/035/036؛ ADR-013 وADR-016 يبقيان OPEN، ولا يبدأ TASK-060. [خطة التنفيذ](IMPLEMENTATION_PLAN.md#phase-7--dashboard-print-and-release-gate-g7) تحدد بوابات الاختبار.
+**الخصوصية والتنفيذ:** لا ملف Teacher الشخصي أو اتصاله، ولا `personalAddress` أو `administrativeNote` أو JSON التصريح أو duplicate details أو note متابعة أو prose التقرير أو `pedagogicalMark` أو AuditLog أو الأسرار. الاستعلامات counts و`take 3` وإسقاطات دنيا وanti-join لغياب التقرير؛ بلا N+1 أو جلب كامل إلى الذاكرة. فهارس إضافية بعد دليل `EXPLAIN` فقط، لا migration تخمينية. TASK-070A API واختبارات، TASK-070B UI/route/sidebar، TASK-070C E2E/visual/accessibility/print gate؛ كلها NOT_STARTED. يحفظ ADR-022–036 دون تغيير، بما فيها ADR-024/026/027/028/029/030/031/032/033/034/035/036؛ ADR-013 يبقى OPEN، وADR-016 أصبح ACCEPTED في G8-VISUAL-A0، ولا يبدأ TASK-060. [خطة التنفيذ](IMPLEMENTATION_PLAN.md#phase-7--dashboard-print-and-release-gate-g7) تحدد بوابات الاختبار.
 
 ### ADR-011 — Potential duplicate candidates for inspector review
 
@@ -336,5 +348,5 @@ Visit type يصف **سبب الزيارة**؛ `InspectionReport.reportType/templ
 | ADR-013 | الجهة المالكة للمرجع البيداغوجي، عبر Product Owner | DEFERRED | قبل وسم أو إدخال أي محتوى OFFICIAL في TASK-060/G6؛ foundation بلا محتوى موثق ممكنة |
 | ADR-014 | Product Owner والجهة المختصة بالخصوصية | DEFERRED | قبل سياسة حذف/احتفاظ الإنتاج في G7، وقبل أي نشر للمقترحات؛ لا مشاركة عامة ضمن المهام الحالية |
 | ADR-015 | Product Owner والجهة صاحبة الاستمارة الإدارية | RESOLVED / ACCEPTED | حُسمت الحقول والتحقق والتوجيه والتصحيح وحدود MVP قبل TASK-030/G3؛ لا يغيّر ذلك حالة TASK-030 |
-| ADR-016 | Product Owner للهوية البصرية والخط المرخص | DEFERRED | قبل اعتماد branding النهائي؛ TASK-011/G1 يستخدم أدوار tokens فقط دون palette نهائية |
+| ADR-016 | Product Owner للهوية البصرية؛ Architect لهندسة النظام | RESOLVED / ACCEPTED | حُسم في G8-VISUAL-A0؛ سجل G0 التاريخي لا يعني أن tokens الحالية طبّقت الهوية الجديدة |
 | ADR-017 | Product Owner والجهة الإدارية المالكة للسجلات | DEFERRED | قبل ميزة نقل الأستاذ بين المقاطعات؛ خارج TASK-010 وMVP المحدد حاليًا |

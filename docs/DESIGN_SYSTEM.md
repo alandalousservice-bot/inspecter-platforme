@@ -1,6 +1,12 @@
-# Design System — working visual foundation
+# Design System — accepted visual direction / staged implementation
 
-الاتجاه الحالي هو **«مساحة عمل تفتيش مهنية هادئة»**: أسطح فاتحة محايدة باردة قليلًا، نص واضح، حدود رصينة ولمسة أزرق-أخضر منخفضة التشبع. عمق البطاقات والقشرة خفيف ويستخدم درجتي elevation المركزيتين. هذه لوحة عمل قابلة للتغيير عبر tokens، وليست branding أو palette رسمية نهائية. **ADR-016 remains OPEN** لاعتماد الهوية النهائية وأي خط خارجي مرخّص.
+**Current authority: ADR-016 ACCEPTED, G8-VISUAL-A0 (2026-10-04).** الهوية المعتمدة هي **ArenaSPEX-family Professional Inspector Theme**؛ ArenaSPEX مرجع الهوية وUX الأول، Candidate مرجع هندسة النظام الثانوي، والمفتش مرجع المجال والأمن والطباعة. [المواصفة النهائية](G8-VISUAL-A0-REPORT.md) تشمل palette وtokens ومصفوفة الشاشات وبوابات التنفيذ. الملفات البرمجية الحالية ما زالت تنفّذ الهوية السابقة؛ لا يعني اعتماد الوثيقة تنفيذ G8 أو إعلان تطابق بصري.
+
+الفقرات التالية توثق أساس التنفيذ G6 قبل G8. إشارات ADR-016 OPEN/اللوحة المؤقتة أدناه تاريخية، وتتقدم عليها مواصفة G8 للحالة المستهدفة: خط شاشة Alexandria محلي مع OFL/fallback، Sidebar أخضر عميق، أسطح تشغيل فاتحة، ومدخل/Login أخضر داكن مقيدان بقواعد شاشة مستقلة. لا خدمة خطوط خارجية إلزامية؛ PRINT يحتفظ بخطه وهندسته. تُطوّر tokens/shell/primitives القائمة نفسها دون نظام موازٍ، مع إعادة تحقق التباين والحالات في المتصفح.
+
+حالة التنقل الحالية يحددها AppRoutes/AppShell وUI_MAP: `/app` لوحة ADR-037، وليست تحويلًا إلى المؤسسات كما في سجل G6-02 القديم. Landing المستهدفة في G8-02 غير منفذة حاليًا؛ الإعدادات العامة والموارد البيداغوجية غير منفذة ولا تُضاف للقائمة. قيود الفعل/الحقول/الدلالة/الوصول للمكونات أدناه تبقى واجبة؛ يسمح G8 بأسطح brand كبيرة فقط حيث حددها تقريره (Sidebar/hero/public)، دون تعميمها على الطباعة أو البيانات التشغيلية.
+
+عند إغلاق G6 كان اتجاه التنفيذ **«مساحة عمل تفتيش مهنية هادئة»**: أسطح فاتحة محايدة باردة قليلًا، نص واضح، حدود رصينة ولمسة أزرق-أخضر منخفضة التشبع. عمق البطاقات والقشرة خفيف ويستخدم درجتي elevation المركزيتين. هذه هي لوحة الكود الحالية السابقة لاعتماد ADR-016، وتُستبدل تدريجيًا بمواصفة G8 دون تغيير دلالة المكونات.
 
 تُحمّل القواعد العامة من `packages/web/src/ui/tokens.css` ثم `shell.css` و`primitives.css`. الشاشات تستخدم الأدوار الدلالية ولا تعرّف theme محليًا. تبقى أسماء tokens القديمة aliases انتقالية خلال نقل الشاشات، ولا تنشأ منظومة token موازية.
 
@@ -27,7 +33,7 @@ Aliases التوافق: `--color-canvas`, `--color-surface-raised`, `--color-tex
 
 ## الخط والنص المختلط
 
-Stack محلي بلا تنزيل أو dependency: `"Segoe UI", Tahoma, Arial, sans-serif`. لا ملفات خطوط مجمعة ولا Google Fonts. يظل اختيار خط مرخّص خارجي قرارًا منفصلًا ضمن ADR-016 بعد فحص الترخيص والتسليم والأداء.
+Stack التنفيذ السابق لـG8 محلي بلا تنزيل أو dependency: `"Segoe UI", Tahoma, Arial, sans-serif`، دون ملفات خطوط مجمعة أو Google Fonts. اختيار Alexandria للشاشة حُسم في ADR-016؛ التحقق من أصل الملف وتسليمه المحلي وترخيصه وأدائه بوابة G8-01، ولا يمس خط الطباعة.
 
 | العنصر | Token / القاعدة |
 |---|---|
@@ -122,6 +128,6 @@ Stack محلي بلا تنزيل أو dependency: `"Segoe UI", Tahoma, Arial, sa
 
 ## G6 closure — final QA
 
-G6 is **COMPLETE** for every currently implemented route. The final gate verified public/authenticated/print isolation, RTL/Bidi, shared tokens, keyboard focus, responsive widths 1440/768/390 and representative 200% zoom, application state/table/form consistency, and the TASK-086 A4 grayscale-safe print contract. Automated and connected regression gates passed; no code fix or dead-code removal was justified. Intentional exceptions are limited to monochrome literal colors in the independent print document, the neutral responsive drawer scrim, and domain-specific layouts/states that preserve existing meaning. No final branding or palette is implied: ADR-016 remains OPEN. Dashboard/TASK-070 and reference-content/TASK-060 remain outside G6.
+G6 is **COMPLETE** for every route implemented at its closure. The final gate verified public/authenticated/print isolation, RTL/Bidi, shared tokens, keyboard focus, responsive widths 1440/768/390 and representative 200% zoom, application state/table/form consistency, and the TASK-086 A4 grayscale-safe print contract. Automated and connected regression gates passed; no code fix or dead-code removal was justified. Intentional exceptions are limited to monochrome literal colors in the independent print document, the neutral responsive drawer scrim, and domain-specific layouts/states that preserve existing meaning. G6 did not approve final branding; the subsequent ADR-016 ACCEPTED / G8-VISUAL-A0 decision now supplies that visual architecture. Dashboard/TASK-070 and reference-content/TASK-060 were outside the G6 visual scope.
 
-هذه تسمية **G6-UI** لمرحلة التصميم، وليست G6 البيداغوجية الموجودة في خطة المرجع والمقترحات. لم تنشئ G6 Dashboard أو تبدأ TASK-070؛ لهما بوابة منتج/عقد مستقلة. ADR-016 يبقى OPEN للهوية النهائية ولا تعني G6-07 اعتماد Branding.
+هذه تسمية **G6-UI** لمرحلة التصميم، وليست G6 البيداغوجية الموجودة في خطة المرجع والمقترحات. لم تنشئ G6 Dashboard أو تبدأ TASK-070؛ لهما بوابة منتج/عقد مستقلة. G6-07 لم يعتمد Branding؛ الهوية النهائية حُسمت لاحقًا في ADR-016 ACCEPTED دون بدء تنفيذ G8.
