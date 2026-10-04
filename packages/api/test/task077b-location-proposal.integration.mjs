@@ -166,19 +166,109 @@ test('public intake persists an optional proposal privately and keeps receipt-on
 });
 
 test('public validation rejects malformed, out-of-range and privileged proposal fields', async () => {
+  const before = await db.teacherSubmission.count();
   const invalid = [
-    { latitude: '91', longitude: '0' }, { latitude: '0', longitude: '181' },
+    { latitude: '91', longitude: '0' }, { latitude: '-90.000001', longitude: '0' },
+    { latitude: '0', longitude: '181' }, { latitude: '0', longitude: '-180.000001' },
     { latitude: '1.1234567', longitude: '0' }, { latitude: '1e1', longitude: '0' },
-    { latitude: 1, longitude: '0' }, { latitude: '0' }, { latitude: '0', longitude: '0', institutionId: randomUUID() },
+    { latitude: 1, longitude: '0' }, { latitude: '0' },
+    { latitude: 'NaN', longitude: '0' }, { latitude: 'Infinity', longitude: '0' },
+    { latitude: '1..2', longitude: '0' }, { latitude: ' ', longitude: '0' },
+    { latitude: '0', longitude: ' ' }, { latitude: '0', longitude: '0', institutionId: randomUUID() },
   ];
   for (const locationProposal of invalid) {
     const response = await publicSubmission(locationProposal); assert.equal(response.status, 400);
+    const errorText = await response.text();
+    for (const value of [locationProposal.latitude, locationProposal.longitude]) {
+      if (typeof value === 'string' && value.length > 4) assert.equal(errorText.includes(value), false);
+    }
+  }
+  assert.equal(await db.teacherSubmission.count(), before, 'invalid coordinates must not create a submission or persisted proposal');
+  for (const locationProposal of [
+    { latitude: '-90', longitude: '-180' },
+    { latitude: '90.000000', longitude: '180.000000' },
+  ]) {
+    const response = await publicSubmission(locationProposal); assert.equal(response.status, 202);
+    const receipt = await response.json();
+    const saved = await db.teacherSubmission.findUniqueOrThrow({ where: { id: receipt.data.receiptId } });
+    assert.equal(saved.locationProposalStatus, 'PENDING');
+    assert.ok(saved.proposedInstitutionLatitude !== null && saved.proposedInstitutionLongitude !== null);
   }
   for (const [field, value] of [['locationProposalStatus', 'ACCEPTED'], ['locationProposalInstitutionId', randomUUID()], ['locationSource', 'MANUAL_INSPECTOR']]) {
     const body = profile(); body.workplace[field] = value;
     const response = await req(`/api/v1/public/districts/${district.id}/submissions`, { method: 'POST', useAuth: false, body });
     assert.equal(response.status, 400);
   }
+  assert.equal(await db.teacherSubmission.count(), before + 2, 'only the two valid boundary payloads should persist');
+});
+
+test('public receipt and anonymous review boundaries expose no personal or canonical location data', async () => {
+  const response = await publicSubmission({ latitude: '0', longitude: '0' });
+  assert.equal(response.status, 202);
+  const body = await response.json();
+  assert.deepEqual(body, { data: { receiptId: body.data.receiptId } });
+  const publicText = JSON.stringify(body);
+  for (const value of [workplace.institutionName, workplace.institutionAddress, '+213555123456', '0.000000']) {
+    assert.equal(publicText.includes(value), false);
+  }
+  const anonymousDetail = await req(`/api/v1/submissions/${body.data.receiptId}`, { useAuth: false });
+  assert.equal(anonymousDetail.status, 401);
+  const anonymousDecision = await req(`/api/v1/submissions/${body.data.receiptId}/location-proposal-decision`, {
+    method: 'POST', useAuth: false, body: { action: 'REJECT' },
+  });
+  assert.equal(anonymousDecision.status, 401);
+  const missingCsrf = await req(`/api/v1/submissions/${body.data.receiptId}/location-proposal-decision`, {
+    method: 'POST', useCsrf: false, body: { action: 'REJECT' },
+  });
+  assert.equal(missingCsrf.status, 403);
+});
+
+test('0,0 is a valid first canonical pair and remains available to the Inspector read model', async () => {
+  const target = await db.institution.create({ data: { districtId: district.id, name: 'Zero zero target' } });
+  const proposal = await makeAcceptedProposal({ latitude: '0', longitude: '0' }, target);
+  assert.equal((await db.institution.findUniqueOrThrow({ where: { id: target.id } })).latitude, null);
+  const response = await req(`/api/v1/submissions/${proposal.id}/location-proposal-decision`, {
+    method: 'POST', body: { action: 'ACCEPT_PROPOSED', expectedCanonicalLocation: null },
+  });
+  assert.equal(response.status, 200);
+  const canonical = await db.institution.findUniqueOrThrow({ where: { id: target.id } });
+  assert.equal(canonical.latitude.toFixed(6), '0.000000');
+  assert.equal(canonical.longitude.toFixed(6), '0.000000');
+  assert.equal(canonical.locationSource, 'TEACHER_PROPOSED_APPROVED');
+  const detail = (await (await req(`/api/v1/submissions/${proposal.id}`)).json()).data.locationProposal;
+  assert.equal(detail.status, 'ACCEPTED');
+  assert.deepEqual(detail.institution.location, { latitude: '0.000000', longitude: '0.000000', source: 'TEACHER_PROPOSED_APPROVED' });
+});
+
+test('submission decisions do not decide locations and unresolved/rejected submissions cannot accept proposals', async () => {
+  const countBefore = await db.institution.count();
+  const pendingResponse = await publicSubmission({ latitude: '12.25', longitude: '4.5' });
+  const pendingId = (await pendingResponse.json()).data.receiptId;
+  assert.equal(await db.institution.count(), countBefore, 'coordinates must not create or choose an Institution');
+  const acceptedSubmission = await req(`/api/v1/submissions/${pendingId}/decision`, {
+    method: 'POST', body: { action: 'ACCEPT', expectedStatus: 'PENDING' },
+  });
+  assert.equal(acceptedSubmission.status, 200);
+  const acceptedRow = await db.teacherSubmission.findUniqueOrThrow({ where: { id: pendingId } });
+  assert.equal(acceptedRow.locationProposalStatus, 'PENDING', 'submission acceptance must not accept its location proposal');
+  const unresolvedTeacher = await db.teacher.findUniqueOrThrow({ where: { id: acceptedRow.acceptedTeacherId } });
+  assert.equal(unresolvedTeacher.institutionId, null, 'acceptance must not infer or link an Institution from coordinates');
+  const unresolvedAccept = await req(`/api/v1/submissions/${pendingId}/location-proposal-decision`, {
+    method: 'POST', body: { action: 'ACCEPT_PROPOSED', expectedCanonicalLocation: null },
+  });
+  assert.equal(unresolvedAccept.status, 409);
+
+  const rejectedSubmissionResponse = await publicSubmission({ latitude: '13', longitude: '5' });
+  const rejectedId = (await rejectedSubmissionResponse.json()).data.receiptId;
+  const rejected = await req(`/api/v1/submissions/${rejectedId}/decision`, {
+    method: 'POST', body: { action: 'REJECT', expectedStatus: 'PENDING' },
+  });
+  assert.equal(rejected.status, 200);
+  const rejectedAccept = await req(`/api/v1/submissions/${rejectedId}/location-proposal-decision`, {
+    method: 'POST', body: { action: 'ACCEPT_PROPOSED', expectedCanonicalLocation: null },
+  });
+  assert.equal(rejectedAccept.status, 409);
+  assert.equal((await db.teacherSubmission.findUniqueOrThrow({ where: { id: rejectedId } })).locationProposalStatus, 'PENDING');
 });
 
 test('Inspector detail scopes proposal and reports absence as null', async () => {
@@ -191,7 +281,20 @@ test('Inspector detail scopes proposal and reports absence as null', async () =>
   assert.equal((await req(`/api/v1/submissions/${randomUUID()}/location-proposal-decision`, { method: 'POST', body: { action: 'REJECT' } })).status, 404);
   const outside = await req(`/api/v1/public/districts/${otherDistrict.id}/submissions`, { method: 'POST', useAuth: false, body: profile({ latitude: '1', longitude: '2' }) });
   const outsideId = (await outside.json()).data.receiptId;
-  assert.equal((await req(`/api/v1/submissions/${outsideId}`)).status, 404);
+  const outsideInstitution = await db.institution.create({ data: {
+    districtId: otherDistrict.id, name: 'Cross district private location', latitude: '67.890123', longitude: '12.345678', locationSource: 'MANUAL_INSPECTOR',
+  } });
+  const outsideTeacher = await db.teacher.create({ data: {
+    districtId: otherDistrict.id, institutionId: outsideInstitution.id, name: 'A', surname: 'B', professionalStatus: 'PERMANENT', recordStatus: 'ACTIVE',
+  } });
+  await db.teacherSubmission.update({ where: { id: outsideId }, data: { status: 'ACCEPTED', acceptedTeacherId: outsideTeacher.id } });
+  const concealedDetail = await req(`/api/v1/submissions/${outsideId}`);
+  assert.equal(concealedDetail.status, 404);
+  const concealedBody = await concealedDetail.text();
+  assert.doesNotMatch(concealedBody, /67\.890123|12\.345678|Cross district private location|locationSource/u);
+  assert.equal((await req(`/api/v1/submissions/${outsideId}/location-proposal-decision`, {
+    method: 'POST', body: { action: 'REJECT' },
+  })).status, 404);
   const initial = cookieParts(await req('/api/v1/auth/me', { useAuth: false }));
   const login = await fetch(`${appUrl}/api/v1/auth/login`, { method: 'POST', headers: {
     cookie: cookieHeader(initial), 'x-csrf-token': cookieValue(initial, 'inspector_csrf'), 'content-type': 'application/json',
@@ -205,6 +308,7 @@ test('Inspector detail returns the linked canonical Institution location indepen
     latitude: '35.125', longitude: '2.5', locationSource: 'MANUAL_INSPECTOR',
   } });
   const proposed = await makeAcceptedProposal({ latitude: '36.5', longitude: '3.25' }, target);
+  const auditCountBeforeRead = await db.auditLog.count();
   let detailResponse = await req(`/api/v1/submissions/${proposed.id}`);
   assert.equal(detailResponse.status, 200);
   let detail = (await detailResponse.json()).data.locationProposal;
@@ -214,6 +318,7 @@ test('Inspector detail returns the linked canonical Institution location indepen
   });
   assert.deepEqual({ latitude: detail.latitude, longitude: detail.longitude }, { latitude: '36.500000', longitude: '3.250000' });
   assert.equal(detail.status, 'PENDING');
+  assert.equal(await db.auditLog.count(), auditCountBeforeRead, 'viewing canonical/proposed locations must not create an audit event');
 
   await db.institution.update({ where: { id: target.id }, data: {
     latitude: '47.75', longitude: '-11.125', locationSource: 'TEACHER_PROPOSED_APPROVED',
@@ -274,6 +379,31 @@ test('ACCEPT sets canonical location, preserves the proposal and writes coordina
   assert.equal(audits.length, 2); assert.ok(audits.every((event) => !JSON.stringify(event.metadata).includes('36.5')));
 });
 
+test('an audit append failure rolls back proposal and canonical Institution mutations atomically', async () => {
+  await db.institution.update({ where: { id: institution.id }, data: { latitude: '21', longitude: '8', locationSource: 'MANUAL_INSPECTOR' } });
+  const proposal = await makeAcceptedProposal({ latitude: '22.123456', longitude: '9.123456' });
+  const before = await db.institution.findUniqueOrThrow({ where: { id: institution.id } });
+  await db.$executeRawUnsafe(`CREATE FUNCTION "${ownedSchema}"."task077_fail_audit"() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW."action" = 'INSTITUTION_UPDATED' THEN RAISE EXCEPTION 'synthetic audit failure'; END IF; RETURN NEW; END; $$`);
+  await db.$executeRawUnsafe(`CREATE TRIGGER "task077_fail_audit" BEFORE INSERT ON "${ownedSchema}"."AuditLog" FOR EACH ROW EXECUTE FUNCTION "${ownedSchema}"."task077_fail_audit"()`);
+  try {
+    const response = await req(`/api/v1/submissions/${proposal.id}/location-proposal-decision`, { method: 'POST', body: {
+      action: 'ACCEPT_PROPOSED', expectedCanonicalLocation: { latitude: '21', longitude: '8', source: 'MANUAL_INSPECTOR' },
+    } });
+    assert.equal(response.status, 500);
+    const errorBody = await response.text();
+    assert.doesNotMatch(errorBody, /synthetic audit failure|22\.123456|9\.123456|stack|AuditLog/u);
+  } finally {
+    await db.$executeRawUnsafe(`DROP TRIGGER IF EXISTS "task077_fail_audit" ON "${ownedSchema}"."AuditLog"`);
+    await db.$executeRawUnsafe(`DROP FUNCTION IF EXISTS "${ownedSchema}"."task077_fail_audit"()`);
+  }
+  const unchanged = await db.institution.findUniqueOrThrow({ where: { id: institution.id } });
+  assert.equal(unchanged.latitude.toFixed(6), before.latitude.toFixed(6));
+  assert.equal(unchanged.longitude.toFixed(6), before.longitude.toFixed(6));
+  assert.equal(unchanged.locationSource, before.locationSource);
+  assert.equal((await db.teacherSubmission.findUniqueOrThrow({ where: { id: proposal.id } })).locationProposalStatus, 'PENDING');
+  assert.equal(await db.auditLog.count({ where: { entityId: proposal.id, action: 'INSTITUTION_LOCATION_PROPOSAL_ACCEPTED' } }), 0);
+});
+
 test('explicit replace is stale-safe; equal-coordinate accept records the proposal without fake Institution update', async () => {
   await db.institution.update({ where: { id: institution.id }, data: { latitude: '40', longitude: '4', locationSource: 'MANUAL_INSPECTOR' } });
   const stale = await makeAcceptedProposal({ latitude: '41', longitude: '5' });
@@ -308,6 +438,18 @@ test('REJECT and KEEP_CURRENT affect only one proposal; repeated or racing decis
   assert.equal((await db.teacherSubmission.findUniqueOrThrow({ where: { id: other.id } })).locationProposalStatus, 'PENDING');
   const after = await db.institution.findUniqueOrThrow({ where: { id: institution.id } }); assert.equal(after.latitude.toFixed(6), before.latitude.toFixed(6));
 
+  const ordinaryReject = await makeAcceptedProposal({ latitude: '43.5', longitude: '7.5' });
+  const rejectCanonicalBefore = await db.institution.findUniqueOrThrow({ where: { id: institution.id } });
+  const rejectAuditBefore = await db.auditLog.count({ where: { entityId: institution.id, action: 'INSTITUTION_UPDATED' } });
+  const rejected = await req(`/api/v1/submissions/${ordinaryReject.id}/location-proposal-decision`, { method: 'POST', body: { action: 'REJECT' } });
+  assert.equal(rejected.status, 200);
+  const rejectCanonicalAfter = await db.institution.findUniqueOrThrow({ where: { id: institution.id } });
+  assert.equal(rejectCanonicalAfter.latitude.toFixed(6), rejectCanonicalBefore.latitude.toFixed(6));
+  assert.equal(rejectCanonicalAfter.longitude.toFixed(6), rejectCanonicalBefore.longitude.toFixed(6));
+  assert.equal(rejectCanonicalAfter.locationSource, rejectCanonicalBefore.locationSource);
+  assert.equal(await db.auditLog.count({ where: { entityId: institution.id, action: 'INSTITUTION_UPDATED' } }), rejectAuditBefore);
+  assert.equal((await db.teacherSubmission.findUniqueOrThrow({ where: { id: ordinaryReject.id } })).locationProposalStatus, 'REJECTED');
+
   const race = await makeAcceptedProposal({ latitude: '45', longitude: '9' });
   const decisions = await Promise.all(['REJECT', 'REJECT'].map(() => req(`/api/v1/submissions/${race.id}/location-proposal-decision`, { method: 'POST', body: { action: 'REJECT' } })));
   assert.deepEqual(decisions.map(({ status }) => status).sort(), [200, 409]);
@@ -320,6 +462,19 @@ test('REJECT and KEEP_CURRENT affect only one proposal; repeated or racing decis
   ]);
   assert.deepEqual(acceptVsReject.map(({ status }) => status).sort(), [200, 409]);
   assert.equal(await db.auditLog.count({ where: { entityId: acceptedRace.id, action: { in: ['INSTITUTION_LOCATION_PROPOSAL_ACCEPTED', 'INSTITUTION_LOCATION_PROPOSAL_REJECTED'] } } }), 1);
+  const raceState = await db.teacherSubmission.findUniqueOrThrow({ where: { id: acceptedRace.id } });
+  const raceInstitution = await db.institution.findUniqueOrThrow({ where: { id: institution.id } });
+  if (raceState.locationProposalStatus === 'ACCEPTED') {
+    assert.equal(raceState.locationProposalInstitutionId, institution.id);
+    assert.equal(raceInstitution.latitude.toFixed(6), '46.000000');
+    assert.equal(raceInstitution.longitude.toFixed(6), '10.000000');
+    assert.equal(raceInstitution.locationSource, 'TEACHER_PROPOSED_APPROVED');
+  } else {
+    assert.equal(raceState.locationProposalStatus, 'REJECTED');
+    assert.equal(raceInstitution.latitude.toFixed(6), '42.000000');
+    assert.equal(raceInstitution.longitude.toFixed(6), '6.000000');
+    assert.equal(raceInstitution.locationSource, 'MANUAL_INSPECTOR');
+  }
 });
 
 test('matching accepted canonical coordinates and source finalize provenance without a fake Institution audit', async () => {
