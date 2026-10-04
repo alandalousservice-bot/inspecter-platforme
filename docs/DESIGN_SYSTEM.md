@@ -4,6 +4,8 @@
 
 **G8-01 foundation status:** semantic screen tokens, Arabic-oriented font stack, spacing/geometry/elevation/focus/motion roles and shared primitive styling are implemented in `packages/web/src/ui/tokens.css`, `shell.css` and `primitives.css`. No approved local Alexandria binary was available in the project, so the screen stack falls back through Tajawal/Noto Sans Arabic/system fonts without a network font dependency. `--font-sans` remains the legacy print stack; TASK-086's independent typography and layout are unchanged. This foundation is not a full screen redesign or a claim of final visual parity.
 
+**G8-03 AppShell status:** the existing Inspector shell now applies the accepted deep-green navigation rail, emerald active state, local shield mark, and light compact TopBar using the existing semantic navigation tokens. The rail/header geometry is 256px/68px; existing routes, session identity/logout, keyboard-accessible collapse, tablet/mobile drawer, public isolation and standalone TASK-086 print route are retained. This is a shell-only presentation change; Dashboard content and business/API behavior are unchanged. Actual browser zoom remains a manual QA item where the execution browser cannot set OS-level page zoom.
+
 الفقرات التالية توثق أساس G6 والعقود المشتركة التي تظل سارية. إشارات ADR-016 OPEN/اللوحة المؤقتة تاريخية، وتتقدم عليها مواصفة G8: Sidebar أخضر عميق، أسطح تشغيل فاتحة، ومدخل/Login أخضر داكن مقيدان بقواعد شاشة مستقلة. يفضل stack الشاشة Alexandria ثم Tajawal/Noto Sans Arabic/system؛ عدم توفر ملف محلي مرخص يعني fallback دون جلب شبكة. PRINT يحتفظ بخطه وهندسته. تُطوّر tokens/shell/primitives القائمة نفسها دون نظام موازٍ.
 
 حالة التنقل الحالية يحددها AppRoutes/AppShell وUI_MAP: `/app` لوحة ADR-037، وليست تحويلًا إلى المؤسسات كما في سجل G6-02 القديم. Landing المستهدفة في G8-02 غير منفذة حاليًا؛ الإعدادات العامة والموارد البيداغوجية غير منفذة ولا تُضاف للقائمة. قيود الفعل/الحقول/الدلالة/الوصول للمكونات أدناه تبقى واجبة؛ يسمح G8 بأسطح brand كبيرة فقط حيث حددها تقريره (Sidebar/hero/public)، دون تعميمها على الطباعة أو البيانات التشغيلية.
@@ -82,13 +84,13 @@ Stack الشاشة الحالي: `Alexandria, Tajawal, "Noto Sans Arabic", syste
 ## AppShell contract — G6-02
 
 - القشرة تملك معلم `<main id="main-content">` واحدًا ورابط تجاوز للمحتوى. محتوى الصفحات لا يضيف معلم `main` متداخلًا؛ يحتفظ بغلافه وفئاته التخطيطية الداخلية.
-- على desktop تكون Sidebar بعرض `--sidebar-width` (232px) قابلة للطي؛ الحالة محلية مؤقتة وتعود موسعة عند إعادة التحميل، ولا تحفظ كتفضيل مستخدم. تظل أسماء الروابط متاحة لقارئ الشاشة، ويظهر tooltip نصي عند hover/focus في الوضع المطوي.
-- يعرض التنقل الرئيسي المساحات المنفذة فقط: المؤسسات، دليل الأساتذة، طلبات الأساتذة، الزيارات، المتابعات. الروابط تستخدم `aria-current="page"` وتظل مساحة المستوى الأعلى نشطة في المسارات المتداخلة. الهوية المهنية في قسم الحساب المنفصل؛ لا عنصر رئيسية/لوحة مؤشرات قبل TASK-070.
-- TopBar بارتفاع `--header-height` (64px) يعرض سياق مساحة العمل وبريد المفتش الموثوق المتاح من Session، وإجراء الخروج القائم. لا يجلب هوية أو بيانات إضافية، ولا يقدم إعدادات/تنبيهات غير موجودة.
+- على desktop تكون Sidebar بعرض `--sidebar-width` (256px) قابلة للطي؛ الحالة محلية مؤقتة وتعود موسعة عند إعادة التحميل، ولا تحفظ كتفضيل مستخدم. تظل أسماء الروابط متاحة لقارئ الشاشة، ويظهر tooltip نصي عند hover/focus في الوضع المطوي. سكة التنقل خضراء عميقة والحالة النشطة زمردية مع نص ومؤشر منطقي واضح.
+- يعرض التنقل الرئيسي المساحات المنفذة فقط: لوحة المتابعة، المؤسسات، دليل الأساتذة، طلبات الأساتذة، الزيارات، والمتابعات. الروابط تستخدم `aria-current="page"` وتظل مساحة المستوى الأعلى نشطة في المسارات المتداخلة. الهوية المهنية في قسم الحساب المنفصل؛ لا تضاف مساحات بلا route منفذ.
+- TopBar بارتفاع `--header-height` (68px) يعرض سياق مساحة العمل وبريد المفتش الموثوق المتاح من Session، وإجراء الخروج القائم. لا يجلب هوية أو بيانات إضافية، ولا يقدم إعدادات/تنبيهات غير موجودة.
 - على tablet/mobile تصبح Sidebar drawer من جهة inline-start. زر فتح/إغلاق صريح، خلفية إغلاق، `Escape`، حصر التركيز، إرجاعه إلى زر الفتح، `inert` للمحتوى الخلفي ومنع تمرير الصفحة أثناء الفتح. CSS يراعي `prefers-reduced-motion`.
 - الأيقونات SVG محلية صغيرة في `ShellIcon.tsx`، stroke موحد و`currentColor`، بلا مكتبة. الأيقونة الزخرفية مخفية عن شجرة الوصول، والاسم النصي/`aria-label` هو الدلالة.
 - MainContent يملك معلم main والإيقاع الرأسي؛ ومن G6-04 يملك PageContainer العرض الأقصى والـgutter الأفقيين. بقية الشاشات تحتفظ مؤقتًا بتنسيقها حتى ترحيلها في G6-05. لا يعاد تنسيق الشاشات في G6-02.
-- `/app` يظل يحول إلى المؤسسات. صفحة الدخول والفورم العام خارج AppShell. مسار طباعة بطاقة المعلومات يتجاوز القشرة بعد فحص Session ويعرض معلمًا مستقلًا؛ لا TopBar أو Sidebar في مسار المستند.
+- `/app` يعرض لوحة المتابعة وفق ADR-037. صفحة الدخول والفورم العام خارج AppShell. مسار طباعة بطاقة المعلومات يتجاوز القشرة بعد فحص Session ويعرض معلمًا مستقلًا؛ لا TopBar أو Sidebar في مسار المستند.
 
 ## نظام تركيب الصفحات والجداول — G6-04
 

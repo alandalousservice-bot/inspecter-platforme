@@ -18,9 +18,9 @@
   min-height: 36rem;
   padding: var(--space-4) var(--space-3);
   overflow: visible;
-  border-inline-end: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
+  border-inline-end: 1px solid color-mix(in srgb, var(--color-navigation-text) 14%, transparent);
+  background: var(--color-navigation);
+  color: var(--color-navigation-text);
 }
 .app-sidebar__brand {
   display: flex;
@@ -29,19 +29,19 @@
   min-height: 3.25rem;
   padding-inline: var(--space-2);
   padding-block-end: var(--space-3);
-  border-block-end: 1px solid var(--color-border);
-  color: var(--color-text-primary);
+  border-block-end: 1px solid color-mix(in srgb, var(--color-navigation-text) 18%, transparent);
+  color: var(--color-navigation-text);
 }
-.app-sidebar__brand-icon { flex: 0 0 auto; width: 1.625rem; height: 1.625rem; color: var(--color-primary); }
+.app-sidebar__brand-icon { flex: 0 0 auto; width: 2.5rem; height: 2.5rem; padding: 0.5rem; border: 1px solid color-mix(in srgb, var(--color-focus-on-dark) 28%, transparent); border-radius: var(--radius-md); background: color-mix(in srgb, var(--color-navigation-active) 36%, transparent); color: var(--color-focus-on-dark); }
 .app-sidebar__brand-copy { display: grid; gap: 0.125rem; min-width: 0; }
 .app-sidebar__brand-copy strong { font-size: var(--font-size-small); line-height: var(--line-height-compact); }
-.app-sidebar__brand-copy span { color: var(--color-text-muted); font-size: var(--font-size-meta); }
+.app-sidebar__brand-copy span { color: var(--color-navigation-text-muted); font-size: var(--font-size-meta); }
 .app-sidebar__close { display: none; }
 .app-sidebar__primary { display: grid; gap: var(--space-1); }
 .app-sidebar__section-label {
   margin: 0;
   padding: 0 var(--space-3) var(--space-2);
-  color: var(--color-text-muted);
+  color: var(--color-navigation-text-muted);
   font-size: var(--font-size-meta);
   font-weight: var(--font-weight-semibold);
 }
@@ -52,23 +52,25 @@
   gap: var(--space-3);
   min-height: 2.875rem;
   padding: var(--space-2) var(--space-3);
+  border-inline-start: 3px solid transparent;
   border-radius: var(--radius-control);
-  color: var(--color-text-secondary);
+  color: var(--color-navigation-text-muted);
   font-size: var(--font-size-small);
   line-height: var(--line-height-compact);
   text-decoration: none;
   transition: color var(--motion-short) ease, background-color var(--motion-short) ease;
 }
 .app-sidebar__link > svg { flex: 0 0 auto; width: 1.25rem; height: 1.25rem; }
-.app-sidebar__link:hover { background: var(--color-surface-subtle); color: var(--color-text-primary); }
+.app-sidebar__link:hover { background: var(--color-navigation-hover); color: var(--color-navigation-text); }
 .app-sidebar__link.is-active {
-  background: var(--color-primary-subtle);
-  color: var(--color-primary-hover);
+  background: var(--color-navigation-active);
+  color: var(--color-on-primary);
   font-weight: var(--font-weight-semibold);
-  border-inline-start: 3px solid var(--color-primary);
+  border-inline-start-color: var(--color-focus-on-dark);
 }
+.app-sidebar :focus-visible { outline-color: var(--color-focus-on-dark); box-shadow: 0 0 0 2px var(--color-navigation); }
 .app-sidebar__link-label { min-width: 0; overflow-wrap: anywhere; }
-.app-sidebar__account { display: grid; gap: var(--space-1); margin-block-start: auto; padding-block-start: var(--space-4); border-block-start: 1px solid var(--color-border); }
+.app-sidebar__account { display: grid; gap: var(--space-1); margin-block-start: auto; padding-block-start: var(--space-4); border-block-start: 1px solid color-mix(in srgb, var(--color-navigation-text) 18%, transparent); }
 .app-shell--collapsed .app-sidebar { align-items: center; padding-inline: var(--space-2); }
 .app-shell--collapsed .app-sidebar__brand { justify-content: center; padding-inline: 0; }
 .app-shell--collapsed .app-sidebar__brand-copy,
@@ -119,13 +121,13 @@
   width: 2.75rem;
   height: 2.75rem;
   padding: 0;
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
+  background: var(--color-surface-subtle);
+  color: var(--color-primary-hover);
   cursor: pointer;
 }
-.app-topbar__menu-button:hover { background: var(--color-surface-subtle); }
+.app-topbar__menu-button:hover { border-color: var(--color-primary); background: var(--color-primary-subtle); }
 .app-topbar__menu-button svg { width: 1.25rem; height: 1.25rem; }
 .app-topbar__menu-button--mobile { display: none; }
 .app-main { min-width: 0; padding-block: var(--space-6); }
@@ -137,6 +139,7 @@
   .app-shell__layout,
   .app-shell--collapsed .app-shell__layout { display: block; min-height: 100vh; }
   .app-shell__drawer-layer { position: relative; z-index: 30; }
+  .app-shell__drawer-layer[data-open] { position: fixed; inset: 0; }
   .app-sidebar {
     position: fixed;
     z-index: 32;
@@ -174,7 +177,7 @@
   .app-shell--collapsed .app-sidebar__link { justify-content: flex-start; padding: var(--space-2) var(--space-3); }
   .app-shell--collapsed .app-sidebar__link:hover::after,
   .app-shell--collapsed .app-sidebar__link:focus-visible::after { display: none; }
-  .app-sidebar__close { display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; margin-inline-start: auto; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-surface); color: var(--color-text-primary); }
+  .app-sidebar__close { display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; margin-inline-start: auto; border: 1px solid color-mix(in srgb, var(--color-navigation-text) 30%, transparent); border-radius: var(--radius-control); background: var(--color-navigation-hover); color: var(--color-navigation-text); cursor: pointer; }
   .app-shell__content { min-height: 100vh; }
   .app-topbar { padding-inline: var(--page-gutter-mobile); }
   .app-topbar__menu-button--mobile { display: inline-flex; }

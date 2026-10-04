@@ -30,7 +30,7 @@ const shapes: Record<ShellIconName, ReactNode> = {
   menu: <><path d="M4 6.5h16M4 12h16M4 17.5h16" /></>,
   close: <><path d="m6 6 12 12M18 6 6 18" /></>,
   collapse: <><path d="m9 5 7 7-7 7" /><path d="M20 4v16" /></>,
-  expand: <><path d="m15 5-7 7 7 7" /><path d="M4 4v16" /></>,
+  expand: <><path d="m15 5-7 7 7 7" /><path d="M20 4v16" /></>,
   shield: <><path d="M12 3 20 6v5c0 5-3.4 8.2-8 10-4.6-1.8-8-5-8-10V6z" /><path d="m9 12 2 2 4-4" /></>,
   login: <><path d="M10 17 15 12 10 7" /><path d="M15 12H3" /><path d="M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6" /></>,
   lock: <><rect x="4.5" y="10" width="15" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3" /></>,

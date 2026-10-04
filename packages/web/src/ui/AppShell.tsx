@@ -118,7 +118,7 @@ export function AppShell({ children, inspector, headerAction }: AppShellProps) {
             aria-label="مساحة العمل والتنقل"
           >
             <div className="app-sidebar__brand">
-              <ShellIcon name="institutions" className="app-sidebar__brand-icon" />
+              <ShellIcon name="shield" className="app-sidebar__brand-icon" />
               <div className="app-sidebar__brand-copy">
                 <strong>منصة مفتش التربية البدنية والرياضية</strong>
                 <span>مساحة العمل المهنية</span>
