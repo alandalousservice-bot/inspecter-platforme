@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type TestInfo } from '@playwright/test';
 
 const apiRequire = createRequire(resolve(process.cwd(), 'packages/api/package.json'));
 const { PrismaClient } = apiRequire('@prisma/client') as typeof import('@prisma/client');
@@ -128,4 +128,111 @@ test('TASK-051 connected list, create/advisory, reschedule, concurrency, complet
   await expect(page.locator('.visit-mobile-list')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   void teacherOutsideId;
+});
+
+test('G8-07 connected Visit visual states at desktop, tablet, mobile and dense widths', async ({ page }, testInfo: TestInfo) => {
+  const inspector = await db.inspector.findUniqueOrThrow({ where: { email: inspectorEmail! }, select: { id: true } });
+  const types = ['GUIDANCE', 'TENURE_CONFIRMATION', 'PROMOTION_EVALUATION', 'MONITORING_FOLLOW_UP', 'EXCEPTIONAL'];
+  const base = Date.UTC(2027, 0, 1, 8, 30);
+  await db.pedagogicalVisit.createMany({ data: Array.from({ length: 30 }, (_, index) => {
+    const start = new Date(base + index * 86_400_000);
+    const end = new Date(start.getTime() + 45 * 60_000);
+    const status = index % 3 === 0 ? 'COMPLETED' : index % 3 === 1 ? 'CANCELLED' : 'PLANNED';
+    return {
+      districtId: districtId!, inspectorId: inspector.id, teacherId: teacherInsideId!, institutionId: institutionId!,
+      institutionNameSnapshot: 'ابتدائية TASK-051 الأصلية', academicYear: '2026-2027', visitType: types[index % types.length],
+      scheduledStartAt: start, scheduledEndAt: end,
+      ...(status === 'COMPLETED' ? { occurredAt: end } : {}),
+      status,
+    };
+  }) });
+
+  await login(page);
+  const widths = [1440, 1280, 768, 390] as const;
+  const plannedVisit = await db.pedagogicalVisit.findFirstOrThrow({ where: { districtId: districtId!, status: 'PLANNED' }, orderBy: { scheduledStartAt: 'desc' }, select: { id: true } });
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: width < 500 ? 844 : 900 });
+    await page.goto(`/app/visits/${plannedVisit.id}`);
+    await expect(page.getByRole('heading', { name: 'تفاصيل الزيارة' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'إعادة جدولة' })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({ path: testInfo.outputPath(`g8-07-detail-${width}.png`), fullPage: true });
+  }
+  const states = [
+    { name: 'dense', path: '/app/visits', heading: 'قائمة الزيارات' },
+    { name: 'upcoming', path: '/app/visits?status=PLANNED', heading: 'قائمة الزيارات' },
+    { name: 'history', path: '/app/visits?status=COMPLETED', heading: 'قائمة الزيارات' },
+    { name: 'filtered-empty', path: '/app/visits?status=PLANNED&fromDate=2040-01-01&toDate=2040-01-02', heading: 'لا توجد زيارات مطابقة' },
+  ];
+  for (const state of states) {
+    for (const width of widths) {
+      await page.setViewportSize({ width, height: width < 500 ? 844 : 900 });
+      await page.goto(state.path);
+      await expect(page.getByRole('heading', { name: state.heading })).toBeVisible();
+      if (state.name === 'dense') {
+        if (width <= 768) await expect(page.locator('.visit-mobile-list')).toBeVisible();
+        else await expect(page.locator('.visit-desktop-list')).toBeVisible();
+        await expect(page.locator('.visit-mobile-card')).toHaveCount(25);
+        if (width > 768) await expect(page.locator('.visit-desktop-list tbody tr')).toHaveCount(25);
+        for (const label of ['زيارة توجيهية / تكوينية', 'زيارة التثبيت / الترسيم', 'زيارة الترقية / التقييم', 'زيارة المراقبة والمتابعة', 'زيارة استثنائية']) {
+          const visibleList = page.locator(width <= 768 ? '.visit-mobile-list' : '.visit-desktop-list');
+          await expect(visibleList.locator('.visit-type-badge').filter({ hasText: label }).first()).toBeVisible();
+        }
+      }
+      if (state.name === 'history') await expect(page.locator(width <= 768 ? '.visit-mobile-list .ui-status-badge' : '.visit-desktop-list .ui-status-badge').filter({ hasText: 'مكتملة' }).first()).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.screenshot({ path: testInfo.outputPath(`g8-07-${state.name}-${width}.png`), fullPage: true });
+    }
+  }
+
+  await page.route('**/api/v1/visits?*', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ data: [], page: { limit: 25, total: 0, nextCursor: null } }),
+  }));
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: width < 500 ? 844 : 900 });
+    await page.goto('/app/visits');
+    await expect(page.getByRole('heading', { name: 'لا توجد زيارات مطابقة' })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({ path: testInfo.outputPath(`g8-07-empty-${width}.png`), fullPage: true });
+  }
+  await page.unroute('**/api/v1/visits?*');
+
+  await page.route('**/api/v1/visits?*', (route) => route.abort());
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: width < 500 ? 844 : 900 });
+    await page.goto('/app/visits');
+    await expect(page.getByRole('heading', { name: 'تعذر تحميل الزيارات' })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({ path: testInfo.outputPath(`g8-07-error-${width}.png`), fullPage: true });
+  }
+  await page.unroute('**/api/v1/visits?*');
+
+  await page.goto('/app/visits/new');
+  await page.getByLabel('البحث عن أستاذ').fill('زيارة داخل الجدول');
+  await page.getByRole('button', { name: /محمد زيارة داخل الجدول/u }).click();
+  await page.getByLabel(/السنة الدراسية/u).fill('2026-2027');
+  await page.getByLabel('نوع الزيارة').selectOption('EXCEPTIONAL');
+  await page.getByLabel(/بداية الزيارة/u).fill('2026-10-13T09:30');
+  await page.getByLabel(/نهاية الزيارة/u).fill('2026-10-13T10:00');
+  await page.getByLabel('مؤسسة الزيارة').selectOption(institutionId!);
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: width < 500 ? 844 : 900 });
+    await expect(page.getByLabel('نوع الزيارة')).toHaveValue('EXCEPTIONAL');
+    await expect(page.getByLabel('مؤسسة الزيارة')).toHaveValue(institutionId!);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({ path: testInfo.outputPath(`g8-07-scheduling-${width}.png`), fullPage: true });
+  }
+  await page.getByLabel(/السنة الدراسية/u).fill('2026-2028');
+  await page.getByRole('button', { name: 'إنشاء الزيارة' }).click();
+  await expect(page.getByRole('alert')).toContainText('أدخل سنة دراسية صحيحة مثل 2026-2027.');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({ path: testInfo.outputPath('g8-07-scheduling-validation-390.png'), fullPage: true });
 });

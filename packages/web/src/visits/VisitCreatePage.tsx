@@ -5,6 +5,7 @@ import { Button, Card, CardContent, CardHeader, Dialog, ErrorState, FormSection,
 import { TeacherPicker } from './VisitPickers';
 import { visitTypeLabels } from './visit-type-labels';
 import { localDateTimeToOffset } from './time';
+import { ShellIcon } from '../ui/ShellIcon';
 import './visits.css';
 
 type CreatePayload = { teacherId: string; institutionId: string; academicYear: string; visitType: PedagogicalVisitType; scheduledStartAt: string; scheduledEndAt: string };
@@ -118,7 +119,7 @@ export function VisitCreatePage() {
     {districtLoading ? <LoadingState label="جارٍ تحميل المقاطعات الحالية…" /> : null}
     {districtError ? <ErrorState title="تعذر تحميل المقاطعات" description="أعد المحاولة قبل التخطيط؛ لا يمكن اختيار مقاطعة يدويًا خارج النطاق." action={<Button variant="secondary" onClick={() => window.location.reload()}>إعادة المحاولة</Button>} /> : null}
     {!districtLoading && !districtError && districts.length === 0 ? <Card><CardContent><h2>لا توجد مقاطعة حالية متاحة</h2><p>لا يمكن إنشاء زيارة قبل توفر عضوية مقاطعة سارية.</p></CardContent></Card> : null}
-    {canCreate ? <Card><CardHeader title="بيانات الزيارة" description="يتحقق الخادم من صلاحية الأستاذ والمؤسسة والموعد عند الحفظ." /><CardContent>
+    {canCreate ? <Card className="visit-card visit-card--create"><CardHeader title="بيانات الزيارة" description="يتحقق الخادم من صلاحية الأستاذ والمؤسسة والموعد عند الحفظ." action={<span className="visit-section-icon"><ShellIcon name="visits" /></span>} /><CardContent>
       <FormSection title="بيانات الزيارة"><form className="visit-form" onSubmit={submit} aria-busy={saving}>
         {districts.length === 1 ? <div className="visit-field"><span className="ui-field__label">المقاطعة</span><p>{districts[0].name}</p></div> : <div className="visit-field"><label className="ui-field__label" htmlFor="visit-create-district">المقاطعة <span aria-hidden="true">*</span></label><select id="visit-create-district" className="ui-input" required value={districtId} disabled={saving} aria-describedby={formError ? 'visit-create-error' : undefined} onChange={(event) => { setDistrictId(event.currentTarget.value); setTeacher(null); setWarning(null); setFormError(''); }}><option value="">اختر المقاطعة</option>{districts.map((district) => <option key={district.id} value={district.id}>{district.name}</option>)}</select></div>}
         {districtId ? <TeacherPicker districtId={districtId} selected={teacher} onSelect={chooseTeacher} disabled={saving} errorDescriptionId={formError ? 'visit-create-error' : undefined} /> : null}

@@ -4,7 +4,9 @@ import { ApiRequestError, getCurrentDistricts, listPedagogicalVisits, type Distr
 import { Button, Card, CardContent, CardHeader, DataTable, EmptyState, ErrorState, FilterBar, Input, LoadingState, PageHeader, type DataTableColumn } from '../ui';
 import { InstitutionPicker, TeacherPicker } from './VisitPickers';
 import { VisitStatusBadge } from './VisitStatusBadge';
-import { visitTypeLabel, visitTypeLabels } from './visit-type-labels';
+import { VisitTypeBadge } from './VisitTypeBadge';
+import { visitTypeLabels } from './visit-type-labels';
+import { ShellIcon } from '../ui/ShellIcon';
 import { formatAlgiers, localDateTimeToOffset, nextLocalDate } from './time';
 import './visits.css';
 
@@ -82,11 +84,11 @@ export function VisitListPage() {
   }, [params, setParams]);
 
   const columns = useMemo<DataTableColumn<PedagogicalVisit>[]>(() => [
-    { id: 'teacher', header: 'الأستاذ', render: (visit) => <Link to={`/app/visits/${encodeURIComponent(visit.id)}${filterKey ? `?${filterKey}` : ''}`}>{visit.teacher.name} {visit.teacher.surname}</Link> },
+    { id: 'teacher', header: 'الأستاذ', render: (visit) => <Link className="visit-identity-link" to={`/app/visits/${encodeURIComponent(visit.id)}${filterKey ? `?${filterKey}` : ''}`}><span className="visit-identity-icon"><ShellIcon name="teachers" /></span><span>{visit.teacher.name} {visit.teacher.surname}</span></Link> },
     ...(districts.length > 1 ? [{ id: 'district', header: 'المقاطعة', render: (visit: PedagogicalVisit) => districts.find((district) => district.id === visit.districtId)?.name ?? 'ضمن النطاق الحالي' }] : []),
-    { id: 'institution', header: 'مؤسسة الزيارة وقت التخطيط', render: (visit) => visit.institution.name },
-    { id: 'visitType', header: 'نوع الزيارة', render: (visit) => visitTypeLabel(visit.visitType) },
-    { id: 'time', header: 'الفترة', render: (visit) => <><small>{visit.intervalKind === 'ACTUAL_RETROSPECTIVE' ? 'الفترة الفعلية للزيارة' : 'الموعد المخطط'}</small><span dir="auto">{intervalLabel(visit)}</span></> },
+    { id: 'institution', header: 'مؤسسة الزيارة وقت التخطيط', render: (visit) => <span className="visit-institution"><ShellIcon name="institutions" /><span>{visit.institution.name}</span></span> },
+    { id: 'visitType', header: 'نوع الزيارة', render: (visit) => <VisitTypeBadge type={visit.visitType} /> },
+    { id: 'time', header: 'الفترة', render: (visit) => <span className="visit-time"><ShellIcon name="visits" /><span><small>{visit.intervalKind === 'ACTUAL_RETROSPECTIVE' ? 'الفترة الفعلية للزيارة' : 'الموعد المخطط'}</small><bdi dir="auto">{intervalLabel(visit)}</bdi></span></span> },
     { id: 'status', header: 'الحالة', render: (visit) => <VisitStatusBadge status={visit.status} /> },
   ], [districts, filterKey]);
 
@@ -105,7 +107,7 @@ export function VisitListPage() {
   return <section className="visit-page" dir="rtl">
     <PageHeader title="الزيارات التربوية" description="متابعة مواعيد الزيارات وحالاتها."
       primaryAction={<Link className="ui-button ui-button--primary" to={`/app/visits/new${filterKey ? `?${filterKey}` : ''}`}>زيارة جديدة</Link>} />
-    <Card><CardHeader title="مرشحات الزيارات" description="تطبق المرشحات على الخادم قبل احتساب النتائج." /><CardContent><FilterBar title="مرشحات الزيارات">
+    <Card className="visit-card visit-card--filters"><CardHeader title="مرشحات الزيارات" description="تطبق المرشحات على الخادم قبل احتساب النتائج." /><CardContent><FilterBar title="مرشحات الزيارات">
       {districtError ? <p role="alert">تعذر تحميل المقاطعات. تبقى صلاحيات البيانات محددة من الخادم.</p> : null}
       {districts.length > 1 ? <div className="visit-filter"><label className="ui-field__label" htmlFor="visit-filter-district">المقاطعة</label><select id="visit-filter-district" className="ui-input" value={selectedDistrict} onChange={(event) => { setTeacher(null); setInstitution(null); updateFilters({ districtId: event.currentTarget.value || undefined, teacherId: undefined, institutionId: undefined }); }}><option value="">كل المقاطعات الحالية</option>{districts.map((district) => <option key={district.id} value={district.id}>{district.name}</option>)}</select></div> : null}
       {teacherScope ? <TeacherPicker districtId={teacherScope} selected={teacher} onSelect={(value) => { setTeacher(value); updateFilters({ teacherId: value?.id }); }} /> : null}
@@ -122,7 +124,7 @@ export function VisitListPage() {
       <Button variant="secondary" onClick={() => { setTeacher(null); setInstitution(null); updateFilters(Object.fromEntries(allowedKeys.map((key) => [key, undefined]))); }}>مسح المرشحات</Button>
       </FilterBar>
     </CardContent></Card>
-    <Card><CardHeader title="قائمة الزيارات" description={`إجمالي النتائج: ${total}`} />
+    <Card className="visit-card visit-card--results"><CardHeader title="قائمة الزيارات" description={`إجمالي النتائج: ${total}`} />
       <CardContent>
         {loading ? <LoadingState label="جارٍ تحميل الزيارات…" /> : null}
         {!loading && loadError ? <ErrorState title="تعذر تحميل الزيارات" description="تحقق من الاتصال ثم أعد المحاولة." action={<Button variant="secondary" onClick={() => setRetry((value) => value + 1)}>إعادة المحاولة</Button>} /> : null}
@@ -130,12 +132,12 @@ export function VisitListPage() {
         {!loading && !loadError && rows.length ? <>
           <div className="visit-desktop-list"><DataTable caption="قائمة الزيارات التربوية" columns={columns} rows={rows} rowKey={(visit) => visit.id} /></div>
           <div className="visit-mobile-list">{rows.map((visit) => <article className="visit-mobile-card" key={visit.id}>
-            <h2><Link to={`/app/visits/${encodeURIComponent(visit.id)}${filterKey ? `?${filterKey}` : ''}`}>{visit.teacher.name} {visit.teacher.surname}</Link></h2>
-            {districts.length > 1 ? <p><strong>المقاطعة:</strong> {districts.find((district) => district.id === visit.districtId)?.name ?? 'ضمن النطاق الحالي'}</p> : null}
-            <p><strong>مؤسسة الزيارة وقت التخطيط:</strong> {visit.institution.name}</p>
-            <p><strong>نوع الزيارة:</strong> {visitTypeLabel(visit.visitType)}</p>
-            <p><strong>{visit.intervalKind === 'ACTUAL_RETROSPECTIVE' ? 'الفترة الفعلية للزيارة:' : 'الموعد المخطط:'}</strong> <span dir="auto">{intervalLabel(visit)}</span></p>
-            <p><strong>الحالة:</strong> <VisitStatusBadge status={visit.status} /></p>
+            <h2><Link className="visit-identity-link" to={`/app/visits/${encodeURIComponent(visit.id)}${filterKey ? `?${filterKey}` : ''}`}><span className="visit-identity-icon"><ShellIcon name="teachers" /></span><span>{visit.teacher.name} {visit.teacher.surname}</span></Link></h2>
+            {districts.length > 1 ? <p className="visit-mobile-card__district"><strong>المقاطعة:</strong> {districts.find((district) => district.id === visit.districtId)?.name ?? 'ضمن النطاق الحالي'}</p> : null}
+            <p className="visit-mobile-card__institution"><ShellIcon name="institutions" /><span><strong>مؤسسة الزيارة وقت التخطيط</strong><span>{visit.institution.name}</span></span></p>
+            <p className="visit-mobile-card__type"><strong>نوع الزيارة</strong><VisitTypeBadge type={visit.visitType} /></p>
+            <p className="visit-mobile-card__time"><strong>{visit.intervalKind === 'ACTUAL_RETROSPECTIVE' ? 'الفترة الفعلية' : 'الموعد المخطط'}</strong><bdi dir="auto">{intervalLabel(visit)}</bdi></p>
+            <p className="visit-mobile-card__status"><strong>الحالة</strong><VisitStatusBadge status={visit.status} /></p>
           </article>)}</div>
           <nav className="visit-pagination" aria-label="صفحات الزيارات"><span>صفحة {pageIndex + 1} — إجمالي النتائج: {total}</span>
             <Button variant="secondary" disabled={pageIndex === 0 || loading} onClick={() => setPageIndex((index) => Math.max(0, index - 1))}>السابق</Button>

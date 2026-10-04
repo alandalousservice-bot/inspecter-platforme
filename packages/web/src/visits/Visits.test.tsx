@@ -6,6 +6,7 @@ import { VisitCreatePage } from './VisitCreatePage';
 import { VisitDetailPage } from './VisitDetailPage';
 import { VisitListPage } from './VisitListPage';
 import { formatAlgiers } from './time';
+import { VisitTypeBadge } from './VisitTypeBadge';
 
 const mocks = vi.hoisted(() => ({
   getCurrentDistricts: vi.fn(), listTeachers: vi.fn(), listInstitutions: vi.fn(), getValidWorkplaces: vi.fn(),
@@ -67,6 +68,20 @@ function chooseVisitType(value: string = 'GUIDANCE') {
 }
 
 describe('TASK-051 visit management UI', () => {
+  it('presents all five canonical visit types distinctly with readable Arabic text', () => {
+    const labels = [
+      ['GUIDANCE', 'زيارة توجيهية / تكوينية'],
+      ['TENURE_CONFIRMATION', 'زيارة التثبيت / الترسيم'],
+      ['PROMOTION_EVALUATION', 'زيارة الترقية / التقييم'],
+      ['MONITORING_FOLLOW_UP', 'زيارة المراقبة والمتابعة'],
+      ['EXCEPTIONAL', 'زيارة استثنائية'],
+    ] as const;
+    const { container } = render(<div dir="rtl">{labels.map(([type]) => <VisitTypeBadge key={type} type={type} />)}</div>);
+    for (const [, label] of labels) expect(screen.getByText(label)).toBeTruthy();
+    expect(container.querySelectorAll('.visit-type-badge')).toHaveLength(5);
+    expect(container.querySelectorAll('.visit-type-badge svg[aria-hidden="true"]')).toHaveLength(5);
+  });
+
   it('renders the minimized server list, historical institution, status and total', async () => {
     renderRoute('/app/visits');
     expect(screen.getByText('جارٍ تحميل الزيارات…')).toBeTruthy();

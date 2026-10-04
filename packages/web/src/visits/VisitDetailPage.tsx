@@ -4,7 +4,8 @@ import { ApiRequestError, getPedagogicalVisit, getValidWorkplaces, patchPedagogi
 import { Button, Card, CardContent, CardHeader, DetailList, Dialog, ErrorState, Input, LoadingState, PageHeader, SuccessState } from '../ui';
 import { formatAlgiers, localDateTimeToOffset, utcToLocalDateTime } from './time';
 import { VisitStatusBadge } from './VisitStatusBadge';
-import { visitTypeLabel, visitTypeLabels } from './visit-type-labels';
+import { VisitTypeBadge } from './VisitTypeBadge';
+import { visitTypeLabels } from './visit-type-labels';
 import './visits.css';
 
 type WarningState = { code: ScheduleWarningCode; payload: Extract<PedagogicalVisitPatch, { operation: 'RESCHEDULE' }> } | { stale: true; payload: Extract<PedagogicalVisitPatch, { operation: 'RESCHEDULE' }> };
@@ -137,9 +138,9 @@ export function VisitDetailPage() {
     {!loading && visit ? <>
       {notice ? <SuccessState title={notice} /> : null}
       {operationError ? <ErrorState title={operationError} action={operationError.includes('تغيّرت الزيارة') ? <Button variant="secondary" onClick={() => { setOperationError(''); setRefresh((value) => value + 1); }}>تحديث البيانات</Button> : undefined} /> : null}
-      <Card><CardHeader title="معلومات الزيارة" description={`السنة الدراسية ${visit.academicYear}`} action={<VisitStatusBadge status={visit.status} />} />
+      <Card className="visit-card visit-card--detail"><CardHeader title="معلومات الزيارة" description={`السنة الدراسية ${visit.academicYear}`} action={<VisitStatusBadge status={visit.status} />} />
         <CardContent><DetailList className="visit-facts" items={[
-          { label: 'نوع الزيارة', value: visitTypeLabel(visit.visitType) },
+          { label: 'نوع الزيارة', value: <VisitTypeBadge type={visit.visitType} /> },
           { label: visit.intervalKind === 'ACTUAL_RETROSPECTIVE' ? 'الفترة الفعلية للزيارة' : 'الموعد المخطط', value: visit.actualStartAt && visit.actualEndAt
             ? `${formatAlgiers(visit.actualStartAt)} — ${formatAlgiers(visit.actualEndAt)}`
             : visit.scheduledStartAt && visit.scheduledEndAt ? `${formatAlgiers(visit.scheduledStartAt)} — ${formatAlgiers(visit.scheduledEndAt)}` : 'الفترة غير متاحة' },
@@ -148,10 +149,10 @@ export function VisitDetailPage() {
           ...(visit.occurredAt ? [{ label: 'وقت الإنجاز الفعلي', value: formatAlgiers(visit.occurredAt) }] : []),
         ]} /></CardContent>
       </Card>
-      {visit.visitTypeEditable ? <Card><CardHeader title="نوع الزيارة" description="يمكن تصحيح النوع حتى إنشاء أي تقرير مرتبط، باستخدام رقم المراجعة الحالي." /><CardContent>
+      {visit.visitTypeEditable ? <Card className="visit-card"><CardHeader title="نوع الزيارة" description="يمكن تصحيح النوع حتى إنشاء أي تقرير مرتبط، باستخدام رقم المراجعة الحالي." /><CardContent>
         {editingVisitType ? <div className="visit-field"><label className="ui-field__label" htmlFor="visit-detail-type">نوع الزيارة</label><select id="visit-detail-type" className="ui-input" value={nextVisitType} disabled={busy} onChange={(event) => setNextVisitType(event.currentTarget.value as PedagogicalVisitType | '')}><option value="">اختر نوع الزيارة</option>{Object.entries(visitTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><div className="visit-actions"><Button disabled={busy || !nextVisitType} onClick={() => void saveVisitType()}>{busy ? 'جارٍ الحفظ…' : 'حفظ نوع الزيارة'}</Button><Button variant="secondary" disabled={busy} onClick={() => { setEditingVisitType(false); setNextVisitType(visit.visitType ?? ''); }}>إلغاء</Button></div></div> : <Button variant="secondary" disabled={busy} onClick={() => setEditingVisitType(true)}>تصحيح نوع الزيارة</Button>}
       </CardContent></Card> : null}
-      {visit.status === 'PLANNED' ? <Card><CardHeader title="إجراءات الزيارة" description="تُحفظ الزيارة التاريخية؛ لا يمكن إعادة فتح الحالة النهائية." /><CardContent>
+      {visit.status === 'PLANNED' ? <Card className="visit-card visit-card--actions"><CardHeader title="إجراءات الزيارة" description="تُحفظ الزيارة التاريخية؛ لا يمكن إعادة فتح الحالة النهائية." /><CardContent>
         {!rescheduling ? <div className="visit-actions"><Button variant="secondary" disabled={busy} onClick={startReschedule}>إعادة جدولة</Button><Button disabled={busy} onClick={() => { setDialogAction('complete'); setFormError(''); }}>إكمال الزيارة</Button><Button variant="danger" disabled={busy} onClick={() => { setDialogAction('cancel'); setFormError(''); }}>إلغاء الزيارة</Button></div> : null}
         {rescheduling ? <form className="visit-form" onSubmit={submitReschedule} aria-busy={busy}>
           <h2>إعادة جدولة الزيارة</h2>
