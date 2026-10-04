@@ -82,8 +82,16 @@ test('TASK-052 connected draft, final snapshots, cancelled draft and stale revis
   await expect(second.getByRole('textbox', { name: /المستوى \/ القسم/u })).toHaveValue('نسخة محفوظة أولى');
   await second.close();
 
-  await page.setViewportSize({ width: 390, height: 844 }); await page.goto(`/app/visits/${cancelledId}/report`);
-  await expect(page.locator('.report-page')).toHaveAttribute('dir', 'rtl');
+  const cancelledVisit = await db.pedagogicalVisit.findUniqueOrThrow({ where: { id: cancelledId }, select: { teacherId: true, institutionId: true } });
+  await db.teacher.update({ where: { id: cancelledVisit.teacherId }, data: { surname: 'الأستاذة صاحبة الاسم العربي الطويل لاختبار التفاف بيانات السياق المهني في شاشة التقرير' } });
+  await db.institution.update({ where: { id: cancelledVisit.institutionId }, data: { name: 'ابتدائية ذات اسم طويل لاختبار عرض السياق دون قص النص العربي عند الشاشات الضيقة' } });
+  for (const width of [1440, 1280, 768, 390]) {
+    await page.setViewportSize({ width, height: width < 500 ? 844 : 900 }); await page.goto(`/app/visits/${cancelledId}/report`);
+    await expect(page.locator('.report-page')).toHaveAttribute('dir', 'rtl');
+    await expect(page.getByRole('heading', { name: 'سياق الزيارة' })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    await page.screenshot({ path: `test-results/g8-08-legacy-cancelled-${width}.png`, fullPage: true });
+  }
   await page.setViewportSize({ width: 768, height: 1000 });
   await page.evaluate(() => { document.documentElement.style.zoom = '2'; });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);

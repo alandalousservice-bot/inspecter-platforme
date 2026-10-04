@@ -58,6 +58,7 @@ describe('Inspector Visit Report V1 editor', () => {
     ]) expect(screen.getByRole('heading', { name: title })).toBeTruthy();
     expect(screen.queryByRole('combobox', { name: /نوع التقرير/u })).toBeNull();
     expect(screen.queryByRole('button', { name: /طباعة|PDF/u })).toBeNull();
+    expect(screen.getByText('لم يُحفظ بعد')).toBeTruthy();
     expect(await screen.findByRole('textbox', { name: 'الميدان: التخطيط' })).toBeTruthy();
     expect(screen.getByRole('textbox', { name: 'الوحدة التعليمية (قسم التحضير)' })).toBeTruthy();
   });
@@ -85,9 +86,17 @@ describe('Inspector Visit Report V1 editor', () => {
 
   it('shows the promotion mark only for promotion and keeps it optional', async () => {
     renderRoute(); await screen.findByRole('heading', { name: 'تقرير زيارة المفتش — الإصدار الأول' });
-    expect(await screen.findByRole('textbox', { name: 'العلامة البيداغوجية (اختيارية من 0 إلى 20)' })).toBeTruthy();
+    const mark = await screen.findByRole('textbox', { name: 'العلامة البيداغوجية (اختيارية من 0 إلى 20)' });
+    expect(mark).toBeTruthy();
+    expect((mark as HTMLInputElement).required).toBe(false);
+    expect(mark.closest('.report-field--mark')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'حفظ المسودة' })).toBeTruthy();
     expect(screen.queryByText(/العلامة مطلوبة/u)).toBeNull();
+    expect(screen.queryByRole('meter')).toBeNull(); expect(screen.queryByRole('progressbar')).toBeNull();
+    for (const value of ['0', '14.5', '20']) {
+      fireEvent.change(mark, { target: { value } });
+      expect(mark).toHaveProperty('value', value);
+    }
   });
 
   it('preserves dirty content and does not auto-retry after a revision conflict', async () => {

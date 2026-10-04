@@ -8,6 +8,7 @@ import {
 import { Button, Card, CardContent, CardHeader, Dialog, ErrorState, LoadingState, PageHeader, SuccessState } from '../ui';
 import { formatAlgiers } from './time';
 import { visitTypeLabels } from './visit-type-labels';
+import { ShellIcon } from '../ui/ShellIcon';
 import './inspection-report.css';
 import './inspector-visit-report.css';
 
@@ -57,13 +58,13 @@ const optionalText = (value: string) => value.trim() ? value : null;
 const studentNumber = (value: string) => value === '' ? null : Number(value);
 const dateLabel = (value: string | null) => value ? new Date(value).toLocaleString('ar-DZ', { timeZone: 'Africa/Algiers' }) : '—';
 
-function Field({ label, value, max, multiline = false, error, onChange, readOnly = false, type = 'text', inputMode }: {
+function Field({ label, value, max, multiline = false, error, onChange, readOnly = false, type = 'text', inputMode, className = '' }: {
   label: string; value: string; max?: number; multiline?: boolean; error?: string; onChange?: (value: string) => void;
-  readOnly?: boolean; type?: string; inputMode?: 'decimal' | 'numeric';
+  readOnly?: boolean; type?: string; inputMode?: 'decimal' | 'numeric'; className?: string;
 }) {
   const id = `v1-${label.replace(/\s+/gu, '-')}`;
   const helpId = `${id}-help`;
-  return <div className="report-field">
+  return <div className={`report-field${className ? ` ${className}` : ''}`}>
     <label htmlFor={id}>{label}</label>
     {multiline
       ? <textarea id={id} className="ui-input report-textarea" value={value} readOnly={readOnly} rows={4}
@@ -77,9 +78,9 @@ function Field({ label, value, max, multiline = false, error, onChange, readOnly
   </div>;
 }
 
-function Section({ number, title, children }: { number: number; title: string; children: ReactNode }) {
+function Section({ number, title, children, action }: { number: number; title: string; children: ReactNode; action?: ReactNode }) {
   return <Card className="v1-report-section" aria-label={`${number}. ${title}`}>
-    <CardHeader title={`${number}. ${title}`} />
+    <CardHeader title={`${number}. ${title}`} action={action ?? <span className="report-context-card__icon"><ShellIcon name="reports" /></span>} />
     <CardContent><div className="v1-report-section__content">{children}</div></CardContent>
   </Card>;
 }
@@ -246,11 +247,11 @@ export function InspectorVisitReportV1Page({ visit, initialReport }: Props) {
     finally { setBusy(false); }
   }
 
-  if (loading) return <div className="report-page" dir="rtl"><PageHeader title="تقرير زيارة المفتش — الإصدار الأول" breadcrumbs={[{ label: 'الزيارات التربوية', to: '/app/visits' }, { label: 'تفاصيل الزيارة', to: `/app/visits/${encodeURIComponent(visit.id)}` }, { label: 'التقرير' }]} /><LoadingState label="جارٍ تحميل نموذج التقرير…" /></div>;
-  if (error && criteria.length === 0) return <div className="report-page" dir="rtl"><PageHeader title="تقرير زيارة المفتش — الإصدار الأول" breadcrumbs={[{ label: 'الزيارات التربوية', to: '/app/visits' }, { label: 'تفاصيل الزيارة', to: `/app/visits/${encodeURIComponent(visit.id)}` }, { label: 'التقرير' }]} /><ErrorState title="تعذر تحميل نموذج التقرير" description={error} action={<Button variant="secondary" onClick={() => window.location.reload()}>إعادة التحميل</Button>} /></div>;
-  if (!visitType) return <div className="report-page" dir="rtl"><PageHeader title="تقرير زيارة المفتش — الإصدار الأول" breadcrumbs={[{ label: 'الزيارات التربوية', to: '/app/visits' }, { label: 'تفاصيل الزيارة', to: `/app/visits/${encodeURIComponent(visit.id)}` }, { label: 'التقرير' }]} /><ErrorState title="نوع الزيارة غير محدد" description="لا يمكن فتح نموذج التقرير قبل تحديد نوع الزيارة." /></div>;
+  if (loading) return <div className="report-page report-workspace" dir="rtl"><PageHeader title="تقرير زيارة المفتش — الإصدار الأول" breadcrumbs={[{ label: 'الزيارات التربوية', to: '/app/visits' }, { label: 'تفاصيل الزيارة', to: `/app/visits/${encodeURIComponent(visit.id)}` }, { label: 'التقرير' }]} /><LoadingState label="جارٍ تحميل نموذج التقرير…" /></div>;
+  if (error && criteria.length === 0) return <div className="report-page report-workspace" dir="rtl"><PageHeader title="تقرير زيارة المفتش — الإصدار الأول" breadcrumbs={[{ label: 'الزيارات التربوية', to: '/app/visits' }, { label: 'تفاصيل الزيارة', to: `/app/visits/${encodeURIComponent(visit.id)}` }, { label: 'التقرير' }]} /><ErrorState title="تعذر تحميل نموذج التقرير" description={error} action={<Button variant="secondary" onClick={() => window.location.reload()}>إعادة التحميل</Button>} /></div>;
+  if (!visitType) return <div className="report-page report-workspace" dir="rtl"><PageHeader title="تقرير زيارة المفتش — الإصدار الأول" breadcrumbs={[{ label: 'الزيارات التربوية', to: '/app/visits' }, { label: 'تفاصيل الزيارة', to: `/app/visits/${encodeURIComponent(visit.id)}` }, { label: 'التقرير' }]} /><ErrorState title="نوع الزيارة غير محدد" description="لا يمكن فتح نموذج التقرير قبل تحديد نوع الزيارة." /></div>;
 
-  return <div className="report-page v1-report-page" dir="rtl">
+  return <div className="report-page report-workspace v1-report-page" dir="rtl">
     <PageHeader title="تقرير زيارة المفتش — الإصدار الأول" description="نموذج تقرير زيارة معتمد للمنصة"
       breadcrumbs={[{ label: 'الزيارات التربوية', to: '/app/visits' }, { label: 'تفاصيل الزيارة', to: `/app/visits/${encodeURIComponent(visit.id)}` }, { label: 'التقرير' }]}
       backAction={<Link to={`/app/visits/${encodeURIComponent(visit.id)}`} onClick={navigateBack}>العودة إلى الزيارة</Link>} />
@@ -258,7 +259,7 @@ export function InspectorVisitReportV1Page({ visit, initialReport }: Props) {
     {visit.status === 'CANCELLED' && !report ? <ErrorState title="الزيارة ملغاة" description="لا يمكن إنشاء تقرير لهذه الزيارة." /> : null}
     <form onSubmit={(event) => void save(event)} aria-busy={busy}>
       <div className="v1-report-sections">
-        <Section number={1} title="هوية الزيارة والتقرير"><dl className="report-context">
+        <Section number={1} title="هوية الزيارة والتقرير" action={<span className={`report-status-pill report-status-pill--${report?.status?.toLowerCase() ?? 'new'}`}><ShellIcon name={report?.status === 'FINAL' ? 'check-circle' : 'reports'} /><span>{report?.status === 'FINAL' ? 'نهائي — للقراءة فقط' : report ? 'مسودة' : 'لم يُحفظ بعد'}</span></span>}><dl className="report-context report-context--v1">
           <div><dt>نوع الزيارة</dt><dd>{visitTypeLabels[visitType]}</dd></div>
           <div><dt>الأستاذ</dt><dd>{visit.teacher.name} {visit.teacher.surname}</dd></div>
           <div><dt>المفتش</dt><dd>{report?.status === 'FINAL' ? `${report.finalizedInspectorNameSnapshot} ${report.finalizedInspectorSurnameSnapshot}` : report?.displayIdentity?.inspector ? `${report.displayIdentity.inspector.name} ${report.displayIdentity.inspector.surname}` : '—'}</dd></div>
@@ -299,7 +300,7 @@ export function InspectorVisitReportV1Page({ visit, initialReport }: Props) {
           <div className="v1-report-grid">
             <Field label="الخلاصة — مطلوبة للإتمام" value={inputText(input.inspectorConclusion)} max={4000} multiline readOnly={readOnly} error={fieldError('inspectorConclusion')} onChange={(value) => updateCore('inspectorConclusion', value)} />
             {visitType === 'TENURE_CONFIRMATION' ? renderProse('tenureConclusionText') : null}
-            {visitType === 'PROMOTION_EVALUATION' ? <Field label="العلامة البيداغوجية (اختيارية من 0 إلى 20)" value={inputText(input.inspectorVisitV1.pedagogicalMark)}
+            {visitType === 'PROMOTION_EVALUATION' ? <Field className="report-field--mark" label="العلامة البيداغوجية (اختيارية من 0 إلى 20)" value={inputText(input.inspectorVisitV1.pedagogicalMark)}
               readOnly={readOnly} inputMode="decimal" error={fieldError('inspectorVisitV1.pedagogicalMark')} onChange={updateMark} /> : null}
             <Field label="التقدير العام" value={inputText(input.inspectorVisitV1.generalAssessmentText)} max={200} readOnly={readOnly} onChange={(value) => updateV1('generalAssessmentText', value)} />
             {visitType !== 'PROMOTION_EVALUATION' ? <>{renderShort('markText')}{renderShort('markWordsText')}</> : null}

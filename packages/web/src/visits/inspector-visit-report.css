@@ -1,17 +1,30 @@
-.v1-report-page > form { display: grid; gap: var(--space-6); }
-.v1-report-sections { display: grid; gap: var(--space-4); }
-.v1-report-section { scroll-margin-block-start: var(--space-6); }
-.v1-report-section__content { display: grid; gap: var(--space-4); }
-.v1-report-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr)); gap: var(--space-4); align-items: start; }
-.v1-report-readonly { display: grid; gap: var(--space-2); min-width: 0; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-surface-raised); }
+@media screen {
+.v1-report-page > form { display: grid; gap: var(--space-5); min-width: 0; }
+.v1-report-sections { display: grid; gap: var(--space-4); min-width: 0; }
+.v1-report-section { min-width: 0; scroll-margin-block-start: var(--space-6); border-color: color-mix(in srgb, var(--color-primary) 13%, var(--color-border)); }
+.v1-report-section .ui-card__header { align-items: center; }
+.v1-report-section .ui-card__title { line-height: var(--line-height-heading); }
+.v1-report-section .ui-card__content { min-width: 0; }
+.v1-report-section__content { display: grid; min-width: 0; gap: var(--space-4); }
+.v1-report-grid { display: grid; min-width: 0; grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr)); gap: var(--space-4); align-items: start; }
+.v1-report-readonly { display: grid; min-width: 0; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-surface-subtle); }
 .v1-report-readonly span { color: var(--color-text-muted); font-size: var(--font-size-small); }
-.v1-report-readonly strong { overflow-wrap: anywhere; font-weight: 600; }
-.v1-report-actions { position: sticky; inset-block-end: var(--space-3); z-index: 1; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface); box-shadow: var(--elevation-low); }
-.v1-report-dirty { margin: 0; color: var(--color-warning); font-weight: 600; }
+.v1-report-readonly strong { overflow-wrap: anywhere; font-weight: var(--font-weight-semibold); line-height: var(--line-height-body); }
+.v1-report-actions { position: sticky; inset-block-end: var(--space-3); z-index: 1; padding: var(--space-3); border: 1px solid color-mix(in srgb, var(--color-primary) 20%, var(--color-border)); border-radius: var(--radius-card); background: var(--color-surface); box-shadow: var(--elevation-card); }
+.v1-report-dirty { margin: 0; padding: var(--space-3); border-inline-start: 3px solid var(--color-warning); border-radius: var(--radius-sm); color: var(--color-text-secondary); background: var(--color-warning-subtle); font-weight: var(--font-weight-semibold); }
 .v1-report-page .report-context > div { min-width: 0; }
 .v1-report-page .report-context dd { overflow-wrap: anywhere; }
-.v1-report-page input[inputmode='decimal'] { direction: ltr; text-align: start; }
+.v1-report-page input[inputmode='decimal'] { direction: ltr; text-align: start; font-variant-numeric: tabular-nums; }
+.v1-report-page .report-field--mark { padding: var(--space-4); border: 1px solid color-mix(in srgb, var(--color-primary) 24%, var(--color-border)); border-radius: var(--radius-card); background: var(--color-primary-subtle); }
+.v1-report-page .report-field--mark input { max-width: 18rem; border-color: color-mix(in srgb, var(--color-primary) 30%, var(--color-border)); background: var(--color-surface); font-size: var(--font-size-section-title); font-weight: var(--font-weight-semibold); }
+.v1-report-page .report-field--mark small { line-height: var(--line-height-body); }
+.v1-report-page .report-field--mark .report-field__error { max-width: 36rem; }
 @media (max-width: 42rem) {
   .v1-report-grid { grid-template-columns: minmax(0, 1fr); }
   .v1-report-actions { position: static; }
+  .v1-report-actions .ui-button { width: 100%; }
+  .v1-report-page .report-status-pill { max-width: 100%; white-space: normal; }
+  .v1-report-page .report-status-pill span { overflow-wrap: anywhere; }
+  .v1-report-page .report-field--mark { padding: var(--space-3); }
+}
 }

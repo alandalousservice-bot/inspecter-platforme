@@ -51,7 +51,9 @@ try {
     process.env.TASK054_E2E_VISIT_ID = visit.id;
   } finally { await db.$disconnect(); }
   process.env.G3_E2E_DATABASE_URL = databaseUrl; process.env.TASK054_E2E = '1';
-  exitCode = run([resolve(root, 'node_modules/@playwright/test/cli.js'), 'test', '--config=playwright.config.ts']);
+  const browserTests = [resolve(root, 'node_modules/@playwright/test/cli.js'), 'test', '--config=playwright.config.ts'];
+  if (process.env.G8_08_HEADFUL === '1') browserTests.push('--headed');
+  exitCode = run(browserTests);
   if (exitCode === 0) {
     const verify = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
     try {
@@ -60,7 +62,7 @@ try {
     } finally { await verify.$disconnect(); }
   }
 } finally {
-  for (const name of ['G3_E2E_DATABASE_URL', 'G3_E2E_INSPECTOR_EMAIL', 'G3_E2E_INSPECTOR_PASSWORD', 'TASK054_E2E', 'TASK054_E2E_VISIT_ID']) delete process.env[name];
+  for (const name of ['G3_E2E_DATABASE_URL', 'G3_E2E_INSPECTOR_EMAIL', 'G3_E2E_INSPECTOR_PASSWORD', 'TASK054_E2E', 'TASK054_E2E_VISIT_ID', 'G8_08_HEADFUL', 'G8_08_MANUAL_ZOOM']) delete process.env[name];
   if (admin && schemaCreated) {
     await admin.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
     const left = await admin.$queryRaw`SELECT to_regnamespace(${schema})::text AS name`;
