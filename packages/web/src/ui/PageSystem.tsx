@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { Button } from './Button';
 
@@ -20,7 +20,7 @@ export function Breadcrumbs({ items, label = 'مسار التنقل' }: { items:
 }
 
 export function PageHeader({
-  title, description, eyebrow, breadcrumbs, primaryAction, secondaryActions, backAction, className = '',
+  title, description, eyebrow, breadcrumbs, primaryAction, secondaryActions, backAction, className = '', variant = 'default',
 }: {
   title: string;
   description?: string;
@@ -30,8 +30,9 @@ export function PageHeader({
   secondaryActions?: ReactNode;
   backAction?: ReactNode;
   className?: string;
+  variant?: 'default' | 'compact';
 }) {
-  return <header className={`ui-page-header${className ? ` ${className}` : ''}`}>
+  return <header className={`ui-page-header${className ? ` ${className}` : ''}`} data-presentation={variant}>
     {breadcrumbs ? <Breadcrumbs items={breadcrumbs} /> : null}
     <div className="ui-page-header__row">
       <div className="ui-page-header__copy">
@@ -48,16 +49,42 @@ export function PageHeader({
   </header>;
 }
 
-export function FilterBar({ title, description, actions, children, className = '' }: {
+export function FilterBar({ title, description, actions, children, className = '', variant = 'default', summary, activeFilters, secondaryControls }: {
   title?: string; description?: string; actions?: ReactNode; children: ReactNode; className?: string;
+  variant?: 'default' | 'workspace'; summary?: ReactNode; activeFilters?: ReactNode; secondaryControls?: ReactNode;
 }) {
-  return <section className={`ui-filter-bar${className ? ` ${className}` : ''}`} aria-label={title ?? 'البحث والمرشحات'}>
+  return <section className={`ui-filter-bar${className ? ` ${className}` : ''}`} data-presentation={variant} aria-label={title ?? 'البحث والمرشحات'}>
     {title || description || actions ? <div className="ui-filter-bar__header">
       <div>{title ? <h2>{title}</h2> : null}{description ? <p>{description}</p> : null}</div>
       {actions ? <div className="ui-filter-bar__actions">{actions}</div> : null}
     </div> : null}
     <div className="ui-filter-bar__controls">{children}</div>
+    {secondaryControls}
+    {summary || activeFilters ? <div className="ui-filter-bar__summary">{activeFilters}{summary}</div> : null}
   </section>;
+}
+
+export type WorkspaceDensity = 'compact' | 'operational' | 'document';
+
+// No page gutter, main landmark, data fetching or business state ownership.
+export function WorkspaceStack({ density, children }: { density: WorkspaceDensity; children: ReactNode }) {
+  return <div className="ui-workspace-stack" data-density={density}>{children}</div>;
+}
+
+export function SecondaryControls({ label, activeIndicator, hasErrors = false, defaultExpanded = false, children }: {
+  label: string; activeIndicator?: ReactNode; hasErrors?: boolean; defaultExpanded?: boolean; children: ReactNode;
+}) {
+  const contentId = useId();
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  const isExpanded = hasErrors || expanded;
+  return <div className="ui-secondary-controls">
+    <div className="ui-secondary-controls__trigger">
+      <Button variant="secondary" aria-expanded={isExpanded} aria-controls={contentId}
+        onClick={() => setExpanded(!isExpanded)} disabled={hasErrors}>{label}</Button>
+      {activeIndicator}
+    </div>
+    <div id={contentId} hidden={!isExpanded} className="ui-secondary-controls__content">{children}</div>
+  </div>;
 }
 
 export function FormSection({ title, description, actions, children, className = '' }: {

@@ -15,6 +15,7 @@ export type DataTableColumn<Row> = {
 
 type DataTableProps<Row> = {
   caption: string;
+  captionVisibility?: 'visible' | 'accessible-only';
   columns: DataTableColumn<Row>[];
   rows: Row[];
   rowKey: (row: Row) => string;
@@ -25,6 +26,7 @@ type DataTableProps<Row> = {
 
 export function DataTable<Row>({
   caption,
+  captionVisibility = 'visible',
   columns,
   rows,
   rowKey,
@@ -48,7 +50,7 @@ export function DataTable<Row>({
       <p className="ui-table__scroll-hint">يمكن تمرير الجدول أفقيًا لعرض بقية الأعمدة.</p>
       <div className="ui-table-wrap" role="region" aria-label={caption} tabIndex={0}>
       <table className="ui-table">
-        <caption>{caption}</caption>
+        <caption className={captionVisibility === 'accessible-only' ? 'ui-table__caption--accessible-only' : undefined}>{caption}</caption>
         <thead>
           <tr>
             {columns.map((column) => (
