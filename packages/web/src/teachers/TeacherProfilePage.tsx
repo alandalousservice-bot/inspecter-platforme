@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, type FormEvent, type SyntheticEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode, type SyntheticEvent } from 'react';
 import { Link, useParams } from 'react-router';
 import {
   ApiRequestError, getTeacherProfile, listInstitutions, patchTeacherProfile, setTeacherCurrentInstitution,
   type Institution, type TeacherCurrentInstitutionInput, type TeacherProfile, type TeacherProfilePatch,
 } from '../auth/client';
-import { Button, Card, CardContent, CardHeader, DetailList, Dialog, EmptyState, ErrorState, FormGrid, FormSection, Input, LoadingState, PageHeader, SuccessState } from '../ui';
+import { Button, Card, CardContent, DetailList, Dialog, EmptyState, ErrorState, FormGrid, FormSection, Input, LoadingState, PageHeader, StatusBadge, SuccessState } from '../ui';
+import { ShellIcon, type ShellIconName } from '../ui/ShellIcon';
 import { TeacherQualificationsSection } from './TeacherQualificationsSection';
 import { TeacherSupplementaryWorkplacesSection } from './TeacherSupplementaryWorkplacesSection';
 import './teacher-profile.css';
@@ -44,6 +45,14 @@ type ReviewedInstitution = { name: string; municipality?: string; address?: stri
 
 function Field({ label, value }: { label: string; value: string | null }) {
   return <div className="teacher-fact"><dt>{label}</dt><dd dir="auto">{value || '—'}</dd></div>;
+}
+
+function ProfileSectionHeader({ title, icon, description, action }: { title: string; icon: ShellIconName; description?: string; action?: ReactNode }) {
+  return <header className="teacher-profile__section-header">
+    <span className="teacher-profile__section-icon"><ShellIcon name={icon} /></span>
+    <div className="teacher-profile__section-copy"><h2 className="ui-card__title">{title}</h2>{description ? <p className="ui-card__description">{description}</p> : null}</div>
+    {action ? <div className="teacher-profile__section-action">{action}</div> : null}
+  </header>;
 }
 
 function initialDraft(profile: TeacherProfile): Record<keyof TeacherProfilePatch, string> {
@@ -333,40 +342,49 @@ export function TeacherProfilePage() {
         : 'اعتماد المؤسسة الحالية';
 
   return <div className="teacher-profile" dir="rtl">
-    <PageHeader title="ملف الأستاذ" description={editing ? 'تعديل الملف المهني' : undefined}
+    <PageHeader className="teacher-profile__page-header" eyebrow="دليل الأساتذة" title="ملف الأستاذ" description={editing ? 'تعديل الملف المهني' : undefined}
       breadcrumbs={[{ label: 'دليل الأساتذة', to: '/app/teachers' }, { label: 'ملف الأستاذ' }]}
       primaryAction={profile && !editing ? <Button onClick={beginEdit}>تعديل الملف</Button> : undefined}
-      secondaryActions={profile && !editing ? <><Link to={`/app/teachers/${encodeURIComponent(profile.id)}/information-card`}>بطاقة معلومات الأستاذ</Link><Link to={`/app/teachers/${encodeURIComponent(profile.id)}/schedules`}>التوزيع الأسبوعي</Link></> : undefined} />
+      secondaryActions={profile && !editing ? <><Link className="teacher-profile__quick-link" to={`/app/teachers/${encodeURIComponent(profile.id)}/information-card`}><ShellIcon name="reports" />بطاقة معلومات الأستاذ</Link><Link className="teacher-profile__quick-link" to={`/app/teachers/${encodeURIComponent(profile.id)}/schedules`}><ShellIcon name="visits" />التوزيع الأسبوعي</Link></> : undefined} />
     {loading ? <LoadingState label="جارٍ تحميل ملف الأستاذ…" /> : null}
     {!loading && loadError ? <ErrorState title="تعذر عرض ملف الأستاذ" description="الملف غير متاح ضمن نطاق الوصول أو تعذر تحميله." action={<Button variant="secondary" onClick={() => setProfileRefreshKey((value) => value + 1)}>إعادة المحاولة</Button>} /> : null}
     {!loading && profile ? <>
       {successMessage ? <SuccessState title={successMessage} /> : null}
       {!editing ? <>
-        <Card><CardHeader title="المعلومات الشخصية" /><CardContent><DetailList className="teacher-profile__facts" items={[
+        <section className="teacher-profile__identity" aria-labelledby="teacher-profile-identity-title">
+          <span className="teacher-profile__identity-icon"><ShellIcon name="teachers" /></span>
+          <div className="teacher-profile__identity-copy"><p>ملف مهني</p><h2 id="teacher-profile-identity-title">{profile.name} {profile.surname}</h2>
+            <div className="teacher-profile__identity-statuses"><StatusBadge tone={profile.recordStatus === 'ACTIVE' ? 'success' : 'neutral'}>{statusLabels[profile.recordStatus] ?? 'حالة غير محددة'}</StatusBadge>
+              {profile.professionalStatus ? <StatusBadge className="teacher-profile__professional-status" tone="neutral">{statusLabels[profile.professionalStatus] ?? 'صفة مهنية غير محددة'}</StatusBadge> : null}</div>
+          </div>
+          <span className="teacher-profile__identity-context"><ShellIcon name="institutions" />{profile.currentInstitution?.name ?? 'لم تُعتمد مؤسسة حالية'}</span>
+        </section>
+        <div className="teacher-profile__sections">
+        <Card className="teacher-profile__personal-card"><ProfileSectionHeader icon="account" title="المعلومات الشخصية" /><CardContent><DetailList className="teacher-profile__facts" items={[
           { label: 'الاسم', value: profile.name, emptyText: '—' }, { label: 'اللقب', value: profile.surname, emptyText: '—' },
           { label: 'تاريخ الميلاد', value: profile.birthDate }, { label: 'مكان الميلاد', value: profile.placeOfBirth },
           { label: 'ولاية الميلاد', value: profile.birthProvince }, { label: 'حالة السجل', value: statusLabels[profile.recordStatus] ?? 'غير محددة' },
         ]} /></CardContent></Card>
-        <Card><CardHeader title="الوضعية المهنية" /><CardContent><dl className="teacher-profile__facts">
+        <Card className="teacher-profile__professional-card"><ProfileSectionHeader icon="shield" title="الوضعية المهنية" /><CardContent><dl className="teacher-profile__facts">
           <Field label="الصفة المهنية" value={profile.professionalStatus ? statusLabels[profile.professionalStatus] ?? 'غير محددة' : null} />
           <Field label="الإطار المهني" value={profile.professionalFramework} />
           <Field label="تاريخ التوظيف" value={profile.employedAt} /><Field label="تاريخ الترسيم/التثبيت" value={profile.confirmedAt} />
           <Field label="مؤهلات سابقة غير مفصلة" value={profile.qualifications} />
         </dl></CardContent></Card>
-        <TeacherQualificationsSection teacherId={profile.id} legacyQualifications={profile.qualifications} />
-        <Card><CardHeader title="بيانات التعيين" /><CardContent><dl className="teacher-profile__facts">
+        <div className="teacher-profile__full-section"><TeacherQualificationsSection teacherId={profile.id} legacyQualifications={profile.qualifications} /></div>
+        <Card className="teacher-profile__appointment-card"><ProfileSectionHeader icon="reports" title="بيانات التعيين" /><CardContent><dl className="teacher-profile__facts">
           {editSections.find((section) => section.title === 'بيانات التعيين')?.fields.map((field) => <Field key={field} label={labels[field]} value={profile[field] as string | null} />)}
         </dl></CardContent></Card>
-        <Card><CardHeader title="التصنيف الإداري" /><CardContent><dl className="teacher-profile__facts">
+        <Card className="teacher-profile__classification-card"><ProfileSectionHeader icon="shield" title="التصنيف الإداري" /><CardContent><dl className="teacher-profile__facts">
           {editSections.find((section) => section.title === 'التصنيف الإداري')?.fields.map((field) => <Field key={field} label={labels[field]} value={profile[field] as string | null} />)}
         </dl></CardContent></Card>
-        <Card><CardHeader title="بيانات الاتصال" /><CardContent><dl className="teacher-profile__facts">
+        <Card className="teacher-profile__contact-card"><ProfileSectionHeader icon="account" title="بيانات الاتصال" /><CardContent><dl className="teacher-profile__facts">
           {editSections.find((section) => section.title === 'بيانات الاتصال')?.fields.map((field) => <Field key={field} label={labels[field]} value={profile[field] as string | null} />)}
         </dl></CardContent></Card>
-        <Card><CardHeader title="ملاحظات إدارية" /><CardContent><dl className="teacher-profile__facts">
+        <Card className="teacher-profile__note-card"><ProfileSectionHeader icon="alert" title="ملاحظات إدارية" /><CardContent><dl className="teacher-profile__facts">
           {editSections.find((section) => section.title === 'ملاحظات إدارية')?.fields.map((field) => <Field key={field} label={labels[field]} value={profile[field] as string | null} />)}
         </dl></CardContent></Card>
-        <Card><CardHeader title="جهة العمل المصرح بها — غير معتمدة" description="تصريح تاريخي وارد من الاستمارة، ولا يمثل اعتمادًا لمؤسسة." />
+        <Card className="teacher-profile__declared-card"><ProfileSectionHeader icon="institutions" title="جهة العمل المصرح بها — غير معتمدة" description="تصريح تاريخي وارد من الاستمارة، ولا يمثل اعتمادًا لمؤسسة." />
           <CardContent>{profile.declaredWorkplace ? <dl className="teacher-profile__facts">
             <Field label="اسم المؤسسة" value={profile.declaredWorkplace.institutionName} />
             <Field label="بلدية العمل" value={profile.declaredWorkplace.municipality ?? 'غير متاحة'} />
@@ -375,8 +393,8 @@ export function TeacherProfilePage() {
             {profile.declaredWorkplace.legacyAdditionalInstitutionNames.length ? <Field label="مؤسسات إضافية — تصريح تاريخي" value={profile.declaredWorkplace.legacyAdditionalInstitutionNames.join('، ')} /> : null}
           </dl> : <p>لا توجد بيانات جهة عمل مصرح بها.</p>}</CardContent>
         </Card>
-        <Card>
-          <CardHeader
+        <Card className="teacher-profile__home-card">
+          <ProfileSectionHeader icon="institutions"
             title="المؤسسة الحالية المعتمدة"
             description="المؤسسة الحالية سجل مستقل عن جهة العمل المصرح بها."
             action={<Button onClick={startApproval}>{profile.currentInstitution ? 'تغيير المؤسسة الحالية' : 'اعتماد المؤسسة'}</Button>}
@@ -388,7 +406,8 @@ export function TeacherProfilePage() {
             <Field label="هاتف المدير" value={profile.currentInstitution.directorPhone} />
           </dl> : <p className="teacher-profile__unassigned">لم تُعتمد مؤسسة حالية</p>}</CardContent>
         </Card>
-        <TeacherSupplementaryWorkplacesSection teacherId={profile.id} districtId={profile.districtId} homeInstitutionId={profile.currentInstitution?.id ?? null} />
+        <div className="teacher-profile__full-section"><TeacherSupplementaryWorkplacesSection teacherId={profile.id} districtId={profile.districtId} homeInstitutionId={profile.currentInstitution?.id ?? null} /></div>
+        </div>
       </> : <form className="teacher-profile__edit-form" onSubmit={(event) => { void saveProfile(event); }} noValidate aria-busy={savingProfile}>
         {successMessage && !success ? <p role="alert">{successMessage}</p> : null}
         {editSections.map((section) => <FormSection key={section.title} title={section.title}>

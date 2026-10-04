@@ -45,6 +45,17 @@ describe('TASK-045 Teacher directory', () => {
     expect(screen.queryByRole('button', { name: /حذف|أرشفة|تعديل/ })).toBeNull();
   });
 
+  it('keeps every professional status distinct and presents identity/status with readable text', async () => {
+    const statuses = ['PERMANENT', 'TRAINEE', 'CONTRACT', 'TEMPORARY_CONTRACT', 'SUBSTITUTE'] as const;
+    mocks.listTeachers.mockResolvedValueOnce(response(statuses.map((professionalStatus, index) => ({
+      ...teacher, id: `teacher-${index}`, professionalStatus, name: `أستاذ ${index}`,
+    }))));
+    renderPage();
+    await screen.findByRole('cell', { name: 'أستاذ 0 علي' });
+    for (const label of ['مرسم', 'متربص', 'متعاقد', 'متعاقد مؤقت', 'مستخلف']) expect(screen.getAllByText(label).length).toBeGreaterThan(0);
+    expect(screen.getByRole('link', { name: 'أستاذ 4 علي' }).querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+  });
+
   it('shows an unassigned current-institution state and never displays phone or email columns', async () => {
     mocks.listTeachers.mockResolvedValueOnce(response([{ ...teacher, currentInstitution: null }]));
     renderPage();

@@ -69,10 +69,26 @@ try {
         districtId: district.id, institutionId: index % 2 === 0 ? institution.id : null,
         name: index === 0 ? 'أمينة' : `أستاذ ${String(index).padStart(2, '0')}`,
         surname: index === 0 ? `دليل ${runId}` : `لقب ${String(index).padStart(2, '0')}`,
-        professionalStatus: ['PERMANENT', 'TRAINEE', 'CONTRACT', 'TEMPORARY_CONTRACT'][index % 4],
+        birthDate: index === 0 ? new Date('1985-03-04T00:00:00.000Z') : null,
+        placeOfBirth: index === 0 ? 'وهران' : null,
+        professionalStatus: ['PERMANENT', 'TRAINEE', 'CONTRACT', 'TEMPORARY_CONTRACT', 'SUBSTITUTE'][index % 5],
         phone: `+213555${String(index).padStart(6, '0')}`, email: `teacher-${index}-${runId}@example.invalid`, recordStatus: 'ACTIVE',
+        ...(index === 0 ? {
+          employedAt: new Date('2005-09-01T00:00:00.000Z'), confirmedAt: new Date('2008-09-01T00:00:00.000Z'),
+          professionalFramework: 'أستاذ التعليم الابتدائي', birthProvince: 'وهران', personalAddress: 'حي النخيل، وهران',
+          administrativeCategory: 'الصنف 12', administrativeSection: 'التربية', administrativeGrade: 'أستاذ رئيسي',
+          administrativeNote: 'ملاحظة إدارية اصطناعية للاختبار المرئي.',
+        } : {}),
       } }));
     }
+    const supplementaryInstitution = await db.institution.create({ data: { districtId: district.id, name: `ملحقة الدليل ${runId}`, municipality: 'وهران' } });
+    await db.teacherSupplementaryWorkplace.create({ data: {
+      teacherId: teachers[0].id, districtId: district.id, institutionId: supplementaryInstitution.id,
+      validFrom: new Date(Date.now() - 86_400_000),
+    } });
+    await db.teacherQualification.create({ data: {
+      teacherId: teachers[0].id, name: 'شهادة مهنية اصطناعية', issuingBody: 'معهد الاختبار', qualificationDate: new Date('2004-06-15T00:00:00.000Z'),
+    } });
     await db.teacher.create({ data: {
       districtId: district.id, name: 'غير نشط', surname: `سجل ${runId}`, recordStatus: 'INACTIVE',
     } });

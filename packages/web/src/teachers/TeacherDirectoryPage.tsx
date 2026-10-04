@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'rea
 import { Link, useSearchParams } from 'react-router';
 import { ApiRequestError, getCurrentDistricts, listInstitutions, listTeachers, type DistrictOption, type Institution, type TeacherDirectoryFilters, type TeacherDirectoryItem } from '../auth/client';
 import { Button, Card, CardContent, CardHeader, DataTable, ErrorState, FilterBar, Input, LoadingState, PageHeader, Pagination, StatusBadge, type DataTableColumn } from '../ui';
+import { ShellIcon } from '../ui/ShellIcon';
 import './teacher-directory.css';
 
 const LIMIT = 25;
@@ -151,12 +152,12 @@ export function TeacherDirectoryPage() {
   }, [searchKey, activeCursor, refreshKey]);
 
   const columns = useMemo<DataTableColumn<TeacherDirectoryItem>[]>(() => [
-    { id: 'teacher', header: 'الأستاذ', render: (row) => <Link to={`/app/teachers/${encodeURIComponent(row.id)}`}>{row.name} {row.surname}</Link> },
+    { id: 'teacher', header: 'الأستاذ', render: (row) => <Link className="teacher-directory__identity-link" to={`/app/teachers/${encodeURIComponent(row.id)}`}><span className="teacher-directory__identity-icon"><ShellIcon name="teachers" /></span><span>{row.name} {row.surname}</span></Link> },
     ...(districts.length > 1 ? [{ id: 'district', header: 'المقاطعة', render: (row: TeacherDirectoryItem) => districts.find((district) => district.id === row.districtId)?.name ?? 'غير متاحة' }] : []),
-    { id: 'professional', header: 'الصفة المهنية', render: (row) => row.professionalStatus ? PROFESSIONAL_LABELS[row.professionalStatus] : 'غير محددة' },
-    { id: 'institution', header: 'المؤسسة الحالية المعتمدة', render: (row) => row.currentInstitution ? <span>{row.currentInstitution.name}{row.currentInstitution.municipality ? <small className="teacher-directory__municipality">{row.currentInstitution.municipality}</small> : null}</span> : 'لم تُعتمد مؤسسة حالية' },
+    { id: 'professional', header: 'الصفة المهنية', render: (row) => row.professionalStatus ? <StatusBadge className="teacher-directory__professional-badge" tone="neutral">{PROFESSIONAL_LABELS[row.professionalStatus]}</StatusBadge> : 'غير محددة' },
+    { id: 'institution', header: 'المؤسسة الحالية المعتمدة', render: (row) => row.currentInstitution ? <span className="teacher-directory__institution"><span className="teacher-directory__institution-name"><ShellIcon name="institutions" />{row.currentInstitution.name}</span>{row.currentInstitution.municipality ? <small className="teacher-directory__municipality">{row.currentInstitution.municipality}</small> : null}</span> : 'لم تُعتمد مؤسسة حالية' },
     { id: 'status', header: 'حالة السجل', render: (row) => <StatusBadge tone={row.recordStatus === 'ACTIVE' ? 'success' : 'neutral'}>{displayStatus(row.recordStatus)}</StatusBadge> },
-    { id: 'actions', header: 'الإجراءات', render: (row) => <span className="teacher-directory__actions"><Link className="teacher-directory__schedule-link" to={`/app/teachers/${encodeURIComponent(row.id)}/information-card`}>بطاقة معلومات الأستاذ</Link><Link className="teacher-directory__schedule-link" to={`/app/teachers/${encodeURIComponent(row.id)}/schedules`}>التوزيع الأسبوعي</Link></span> },
+    { id: 'actions', header: 'الإجراءات', render: (row) => <span className="teacher-directory__actions"><Link className="teacher-directory__schedule-link" to={`/app/teachers/${encodeURIComponent(row.id)}/information-card`}><ShellIcon name="reports" />بطاقة معلومات الأستاذ</Link><Link className="teacher-directory__schedule-link" to={`/app/teachers/${encodeURIComponent(row.id)}/schedules`}><ShellIcon name="visits" />التوزيع الأسبوعي</Link></span> },
   ], [districts]);
 
   function handleYearChange(event: ChangeEvent<HTMLInputElement>) {
@@ -198,9 +199,9 @@ export function TeacherDirectoryPage() {
   const timeIsAvailable = yearIsValid && !!params.get('dayOfWeek');
 
   return <section className="teacher-directory" dir="rtl">
-    <PageHeader eyebrow="إدارة ملفات الأستاذ" title="دليل الأساتذة" description="ابحث وتصفح سجلات الأساتذة ضمن نطاق المقاطعات المتاحة لك." />
+    <PageHeader className="teacher-directory__page-header" eyebrow="إدارة ملفات الأستاذ" title="دليل الأساتذة" description="مساحة عمل لمراجعة ملفات الأساتذة والانتقال إلى تفاصيلها ضمن نطاق المقاطعات المتاحة لك." />
 
-    <Card className="teacher-directory__filters-card">
+    <Card className="teacher-directory__filters-card teacher-directory__workspace-card">
       <CardContent>
         <FilterBar title="البحث والمرشحات" description="تُطبّق المرشحات على النتائج في الخادم."
           actions={filtered ? <><Button variant="secondary" onClick={resetFilters}>مسح المرشحات</Button><span>تتغير النتائج وفق المرشحات المحددة.</span></> : null}>
@@ -232,7 +233,7 @@ export function TeacherDirectoryPage() {
       </CardContent>
     </Card>
 
-    <Card>
+    <Card className="teacher-directory__results-card">
       <CardHeader title="النتائج" description="تُعرض بيانات القائمة المصرح بها فقط؛ التفاصيل الشخصية في ملف الأستاذ." />
       <CardContent>
         <p className="teacher-directory__total" aria-live="polite">إجمالي النتائج: {loading ? '…' : total}</p>

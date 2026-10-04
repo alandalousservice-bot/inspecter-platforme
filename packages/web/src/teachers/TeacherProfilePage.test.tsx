@@ -63,18 +63,37 @@ describe('TASK-035 Teacher profile UI', () => {
     resolve({ data: profile });
     expect(await screen.findByRole('heading', { name: 'جهة العمل المصرح بها — غير معتمدة' })).toBeTruthy();
     expect(container.querySelector('[dir="rtl"]')).toBeTruthy();
-    expect(screen.getByText('نشط')).toBeTruthy();
+    expect(screen.getAllByText('نشط').length).toBeGreaterThan(0);
     expect(screen.getByText('تصريح تاريخي وارد من الاستمارة، ولا يمثل اعتمادًا لمؤسسة.')).toBeTruthy();
     expect(screen.getByText('ابتدائية النور')).toBeTruthy();
     expect(screen.getByText('شارع النخيل')).toBeTruthy();
     expect(screen.getByText('ابتدائية الفجر')).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'المؤسسة الحالية المعتمدة' })).toBeTruthy();
-    expect(screen.getByText('لم تُعتمد مؤسسة حالية')).toBeTruthy();
+    expect(screen.getAllByText('لم تُعتمد مؤسسة حالية').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'اعتماد المؤسسة' })).toBeTruthy();
+    const informationCardLink = screen.getByRole('link', { name: 'بطاقة معلومات الأستاذ' });
+    informationCardLink.focus();
+    expect(document.activeElement).toBe(informationCardLink);
+    expect(informationCardLink.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+    expect(container.querySelector('.teacher-profile__identity-context svg')?.getAttribute('aria-hidden')).toBe('true');
+    expect(container.querySelector('.teacher-profile__facts dd bdi[dir="auto"]')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'تغيير المؤسسة الحالية' })).toBeNull();
     expect(screen.queryByText(/نقل الأستاذ|تحويل الأستاذ|سجل الانتقالات/)).toBeNull();
     expect(screen.queryByRole('button', { name: /حذف|أرشفة|إسناد/ })).toBeNull();
     expect(screen.queryByRole('link', { name: /قائمة الأساتذة/ })).toBeNull();
+  });
+
+  it('keeps identity, SUBSTITUTE status, home institution, and supplementary workplaces visibly distinct', async () => {
+    const home = { ...institution, name: 'ابتدائية المؤسسة الأم' };
+    getTeacherProfile.mockResolvedValueOnce({ data: { ...profile, professionalStatus: 'SUBSTITUTE', currentInstitution: home } });
+    const { container } = renderPage();
+    expect(await screen.findByRole('heading', { name: 'أمينة بن صالح' })).toBeTruthy();
+    expect(screen.getAllByText('مستخلف').length).toBeGreaterThan(0);
+    expect(screen.getByRole('heading', { name: 'المؤسسة الحالية المعتمدة' })).toBeTruthy();
+    expect(screen.getAllByText('ابتدائية المؤسسة الأم').length).toBeGreaterThan(0);
+    expect(container.querySelector('.teacher-profile__home-card')).toBeTruthy();
+    expect(container.querySelector('.teacher-profile__full-section .teacher-supplementary')).toBeTruthy();
+    expect(container.querySelector('[dir="rtl"]')).toBeTruthy();
   });
 
   it('edits only allowed fields, cancels and saves actual PATCH without optimistic display', async () => {
@@ -149,7 +168,7 @@ describe('TASK-035 Teacher profile UI', () => {
     getTeacherProfile.mockResolvedValueOnce({ data: { ...profile, currentInstitution: institution } });
     renderPage();
     expect(await screen.findByText('المؤسسة الحالية المعتمدة')).toBeTruthy();
-    expect(screen.getByText('ابتدائية الأمل')).toBeTruthy();
+    expect(screen.getAllByText('ابتدائية الأمل').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'تغيير المؤسسة الحالية' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'اعتماد المؤسسة' })).toBeNull();
   });
@@ -169,7 +188,7 @@ describe('TASK-035 Teacher profile UI', () => {
     fireEvent.click(screen.getByRole('button', { name: 'تأكيد الاعتماد' }));
     await waitFor(() => expect(setTeacherCurrentInstitution).toHaveBeenCalledWith(profile.id, { institutionId: institution.id, expectedInstitutionId: null }));
     expect(await screen.findByText('تم تحديث المؤسسة الحالية بنجاح.')).toBeTruthy();
-    expect(screen.getByText('ابتدائية الأمل')).toBeTruthy();
+    expect(screen.getAllByText('ابتدائية الأمل').length).toBeGreaterThan(0);
     expect(screen.getByText('ابتدائية النور')).toBeTruthy();
   });
 

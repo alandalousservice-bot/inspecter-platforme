@@ -1,20 +1,61 @@
-.teacher-profile { display: grid; gap: var(--space-4); min-width: 0; }
-.teacher-profile__facts, .teacher-profile__form { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: var(--space-4); }
+.teacher-profile { display: grid; gap: var(--section-gap); min-width: 0; }
+.teacher-profile .ui-page-header { margin-block-end: 0; }
+.teacher-profile .ui-page-header__eyebrow { color: var(--color-primary); }
+.teacher-profile__quick-link { display: inline-flex; align-items: center; gap: var(--space-2); min-height: 2.5rem; color: var(--color-primary); font-weight: var(--font-weight-medium); text-underline-offset: 0.2em; }
+.teacher-profile__quick-link svg { width: 1rem; height: 1rem; flex: 0 0 auto; }
+.teacher-profile__quick-link:focus-visible { outline: 3px solid var(--color-focus-ring); outline-offset: 3px; border-radius: var(--radius-sm); }
+.teacher-profile__identity { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(12rem, auto); align-items: center; gap: var(--space-4); min-width: 0; padding: clamp(var(--space-4), 3vw, var(--space-6)); border: 1px solid color-mix(in srgb, var(--color-primary) 22%, var(--color-border)); border-radius: var(--radius-lg); background: linear-gradient(115deg, var(--color-primary-subtle), var(--color-surface) 68%); box-shadow: var(--elevation-low); }
+.teacher-profile__identity-icon { display: grid; place-items: center; width: 4rem; height: 4rem; border: 1px solid color-mix(in srgb, var(--color-primary) 24%, var(--color-border)); border-radius: var(--radius-lg); background: var(--color-surface); color: var(--color-primary); }
+.teacher-profile__identity-icon svg { width: 2rem; height: 2rem; }
+.teacher-profile__identity-copy { min-width: 0; }
+.teacher-profile__identity-copy > p { margin: 0 0 var(--space-1); color: var(--color-text-muted); font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); }
+.teacher-profile__identity-copy h2 { margin: 0; color: var(--color-text-primary); font-size: clamp(1.25rem, 2vw, 1.65rem); line-height: var(--line-height-heading); overflow-wrap: anywhere; }
+.teacher-profile__identity-statuses { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-block-start: var(--space-3); }
+.teacher-profile__professional-status { border-style: dashed; }
+.teacher-profile__identity-context { display: inline-flex; align-items: center; justify-self: end; gap: var(--space-2); max-width: 22rem; color: var(--color-text-secondary); font-size: var(--font-size-control); font-weight: var(--font-weight-medium); overflow-wrap: anywhere; }
+.teacher-profile__identity-context svg { width: 1.15rem; height: 1.15rem; flex: 0 0 auto; color: var(--color-primary); }
+.teacher-profile__sections { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: var(--card-gap); min-width: 0; }
+.teacher-profile__sections > .ui-card,
+.teacher-profile__full-section { min-width: 0; }
+.teacher-profile__full-section { grid-column: 1 / -1; }
+.teacher-profile__sections > .ui-card { height: 100%; border-color: color-mix(in srgb, var(--color-primary) 10%, var(--color-border)); }
+.teacher-profile__sections > .ui-card .ui-card__content { min-width: 0; }
+.teacher-profile__section-header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); min-height: 3.5rem; padding: var(--card-padding); border-block-end: 1px solid var(--color-border); }
+.teacher-profile__section-icon { display: grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: var(--radius-md); background: var(--color-primary-subtle); color: var(--color-primary); }
+.teacher-profile__section-icon svg { width: 1.25rem; height: 1.25rem; }
+.teacher-profile__section-copy { min-width: 0; }
+.teacher-profile__section-copy .ui-card__title { margin: 0; color: var(--color-text-primary); font-size: var(--font-size-card-title); line-height: var(--line-height-heading); }
+.teacher-profile__section-copy .ui-card__description { margin: var(--space-1) 0 0; color: var(--color-text-muted); font-size: var(--font-size-small); }
+.teacher-profile__section-action { min-width: 0; }
+.teacher-profile__facts,
+.teacher-profile__form { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: var(--space-4); min-width: 0; }
 .teacher-profile .teacher-profile__form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .teacher-profile__edit-form { display: grid; gap: var(--space-4); min-width: 0; }
-.teacher-fact { min-width: 0; overflow-wrap: anywhere; }
-.teacher-fact dt { color: var(--color-text-muted); }
-.teacher-fact dd { margin: 0; }
-.teacher-profile__field { min-width: 0; display: grid; gap: var(--space-2); align-content: start; }
+.teacher-fact,
+.teacher-profile .ui-detail-list__item { min-width: 0; overflow-wrap: anywhere; }
+.teacher-fact dt,
+.teacher-profile .ui-detail-list__item dt { margin-block-end: var(--space-1); color: var(--color-text-muted); font-size: var(--font-size-small); font-weight: var(--font-weight-medium); }
+.teacher-fact dd,
+.teacher-profile .ui-detail-list__item dd { margin: 0; color: var(--color-text-primary); font-weight: var(--font-weight-medium); }
+.teacher-profile__personal-card { grid-row: span 1; }
+.teacher-profile .teacher-profile__home-card { grid-column: 1 / -1; border-color: color-mix(in srgb, var(--color-primary) 34%, var(--color-border)); box-shadow: var(--elevation-card); }
+.teacher-profile__home-card .teacher-profile__section-icon { background: var(--color-primary); color: var(--color-on-primary); }
+.teacher-profile__home-card .teacher-profile__unassigned { display: inline-flex; margin: 0; padding: var(--space-3); border-radius: var(--radius-sm); background: var(--color-surface-subtle); color: var(--color-text-secondary); }
+.teacher-profile__declared-card { background: var(--color-surface-subtle); }
+.teacher-profile__declared-card .teacher-profile__section-icon { background: var(--color-surface); color: var(--color-text-secondary); }
+.teacher-profile__note-card .teacher-profile__section-icon { background: var(--color-warning-subtle); color: var(--color-warning); }
 .teacher-profile__actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
-.teacher-profile__unassigned { margin: 0; color: var(--color-text-muted); }
-.teacher-workplace__choice-list, .teacher-workplace__selection, .teacher-workplace__create-form, .teacher-workplace__review { display: grid; gap: var(--space-4); min-width: 0; }
+.teacher-profile__unassigned { color: var(--color-text-muted); }
+.teacher-workplace__choice-list,
+.teacher-workplace__selection,
+.teacher-workplace__create-form,
+.teacher-workplace__review { display: grid; gap: var(--space-4); min-width: 0; }
 .teacher-workplace__choice-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); }
 .teacher-workplace__search { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--space-3); }
 .teacher-workplace__institution-list { display: grid; gap: var(--space-2); list-style: none; margin: 0; padding: 0; }
 .teacher-workplace__institution-list li { min-width: 0; }
 .teacher-workplace__institution-option { width: 100%; display: grid; justify-items: start; gap: var(--space-1); text-align: start; white-space: normal; }
-.teacher-workplace__institution-name { font-weight: 600; }
+.teacher-workplace__institution-name { font-weight: var(--font-weight-semibold); }
 .teacher-workplace__institution-detail { color: var(--color-text-muted); font-size: var(--font-size-small); }
 .teacher-workplace__workflow-error { display: grid; gap: var(--space-3); }
 .teacher-workplace__workflow-error p { margin: 0; }
@@ -22,7 +63,9 @@
 .teacher-qualifications__item { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); padding-block: var(--space-3); border-block-end: 1px solid var(--color-border); }
 .teacher-qualifications__item:last-child { border-block-end: 0; }
 .teacher-qualifications__details { min-width: 0; overflow-wrap: anywhere; }
-.teacher-qualifications__details h3, .teacher-qualifications__details p { margin: 0; }
+.teacher-qualifications__details h3,
+.teacher-qualifications__details p { margin: 0; }
+.teacher-qualifications__details h3 { color: var(--color-text-primary); font-size: var(--font-size-body); }
 .teacher-qualifications__details p { margin-block-start: var(--space-2); }
 .teacher-qualifications__details p span { color: var(--color-text-muted); }
 .teacher-qualifications__form { display: grid; gap: var(--space-4); }
@@ -33,11 +76,25 @@
 .teacher-supplementary__archived { color: var(--color-text-muted); }
 .teacher-supplementary__editor { display: grid; gap: var(--space-4); margin-block-start: var(--space-4); padding-block-start: var(--space-4); border-block-start: 1px solid var(--color-border); }
 .teacher-supplementary__dates { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); align-items: end; gap: var(--space-3); }
+
 @media (max-width: 48rem) {
+  .teacher-profile__identity { grid-template-columns: auto minmax(0, 1fr); }
+  .teacher-profile__identity-context { grid-column: 2; justify-self: start; }
+  .teacher-profile__sections { grid-template-columns: minmax(0, 1fr); }
+  .teacher-profile__full-section,
+  .teacher-profile__home-card { grid-column: auto; }
   .teacher-profile .teacher-profile__form { grid-template-columns: minmax(0, 1fr); }
-  .teacher-workplace__search { grid-template-columns: 1fr; }
-  .teacher-workplace__choice-list { grid-template-columns: 1fr; }
+  .teacher-workplace__search,
+  .teacher-workplace__choice-list { grid-template-columns: minmax(0, 1fr); }
   .teacher-workplace__institution-option { min-height: 3.25rem; }
-  .teacher-qualifications__item { flex-direction: column; }
+  .teacher-qualifications__item,
   .teacher-supplementary__list li { flex-direction: column; }
+}
+
+@media (max-width: 35rem) {
+  .teacher-profile__identity { grid-template-columns: minmax(0, 1fr); justify-items: start; gap: var(--space-3); }
+  .teacher-profile__identity-context { grid-column: auto; max-width: 100%; }
+  .teacher-profile__section-header { grid-template-columns: auto minmax(0, 1fr); gap: var(--space-2); }
+  .teacher-profile__section-action { grid-column: 1 / -1; }
+  .teacher-profile__section-action .ui-button { width: 100%; }
 }

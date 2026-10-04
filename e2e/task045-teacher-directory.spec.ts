@@ -33,6 +33,7 @@ test('TASK-045 connected Arabic directory filters, cursor pages, profile and sch
   const primary = await db.teacher.findFirst({ where: { surname: { startsWith: 'دليل ' } }, include: { institution: true } });
   expect(primary).toBeTruthy();
   await login(page);
+  await page.screenshot({ path: 'test-results/g8-05-dashboard-continuity.png', fullPage: true });
   await page.goto('/app/teachers');
   await expect(page.getByRole('heading', { name: 'دليل الأساتذة' })).toBeVisible();
   await expect(page.getByText('إجمالي النتائج: 32')).toBeVisible();
@@ -88,4 +89,54 @@ test('TASK-045 connected Arabic directory filters, cursor pages, profile and sch
   await page.getByRole('link', { name: 'التوزيع الأسبوعي' }).first().click();
   await expect(page).toHaveURL(/\/app\/teachers\/[0-9a-f-]+\/schedules$/u);
   await expect(page.getByRole('heading', { name: 'التوزيع الأسبوعي' })).toBeVisible();
+});
+
+test('G8-05 directory and profile states remain composed at desktop, tablet, and mobile widths', async ({ page }) => {
+  const primary = await db.teacher.findFirstOrThrow({ where: { surname: { startsWith: 'دليل ' } }, include: { institution: true } });
+  const optional = await db.teacher.findFirstOrThrow({ where: { surname: { startsWith: 'لقب ' }, districtId: primary.districtId, professionalStatus: 'TRAINEE' } });
+  const widths = [1440, 1280, 768, 390] as const;
+  const capture = async (name: string) => {
+    for (const width of widths) {
+      await page.setViewportSize({ width, height: width < 500 ? 844 : 900 });
+      await page.waitForTimeout(100);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `${name} page overflow at ${width}px`).toBe(true);
+      await page.screenshot({ path: `test-results/g8-05-${name}-${width}.png`, fullPage: true });
+    }
+  };
+
+  await login(page);
+  await page.goto('/app/teachers');
+  await expect(page.getByRole('cell', { name: `${primary.name} ${primary.surname}` })).toBeVisible();
+  await capture('directory-populated');
+
+  const search = page.getByRole('textbox', { name: 'البحث عن أستاذ' });
+  await search.fill(primary.surname);
+  await expect(page.getByRole('cell', { name: `${primary.name} ${primary.surname}` })).toBeVisible();
+  await expect(page.getByText('إجمالي النتائج: 1')).toBeVisible();
+  await capture('directory-filtered');
+
+  await search.fill('لا توجد مطابقة لهذا البحث');
+  await expect(page.getByRole('heading', { name: 'لا توجد نتائج مطابقة' })).toBeVisible();
+  await capture('directory-empty');
+
+  await page.unrouteAll();
+  await page.route('**/api/v1/teachers*', (route) => route.fulfill({
+    status: 500, contentType: 'application/json', body: JSON.stringify({ error: { code: 'INTERNAL_ERROR', message: 'تعذر تحميل البيانات.' } }),
+  }));
+  await page.goto('/app/teachers');
+  await expect(page.getByRole('heading', { name: 'تعذر تحميل دليل الأساتذة' })).toBeVisible();
+  await capture('directory-error');
+  await page.unrouteAll();
+
+  await page.goto(`/app/teachers/${primary.id}`);
+  await expect(page.getByRole('heading', { name: `${primary.name} ${primary.surname}` })).toBeVisible();
+  await expect(page.getByText('شهادة مهنية اصطناعية')).toBeVisible();
+  await expect(page.getByRole('heading', { name: /الحالية \(1\)/u })).toBeVisible();
+  await capture('profile-dense');
+
+  await page.goto(`/app/teachers/${optional.id}`);
+  await expect(page.getByRole('heading', { name: `${optional.name} ${optional.surname}` })).toBeVisible();
+  await expect(page.getByText('غير متوفر').first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'مؤسسات تكملة النصاب' })).toBeVisible();
+  await capture('profile-optional');
 });
