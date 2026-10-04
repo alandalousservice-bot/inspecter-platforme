@@ -71,11 +71,72 @@ test('real Chrome 200% zoom keeps the pending Inspector review RTL and within th
     expect(focus.outline).toBeGreaterThanOrEqual(2);
     expect(focus.style).not.toBe('none');
     await page.screenshot({ path: test.info().outputPath('inspector-review-200-percent.png'), fullPage: true });
+    await page.goto('http://127.0.0.1:5173/app/institutions');
+    await expect(page.getByRole('heading', { name: 'المؤسسات', exact: true })).toBeVisible();
+    await expect(page.locator('.institutions-page')).toHaveAttribute('dir', 'rtl');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    await page.getByRole('textbox', { name: 'البحث عن مؤسسة' }).focus();
+    const institutionFocus = await page.evaluate(() => ({ outline: parseFloat(getComputedStyle(document.activeElement!).outlineWidth), style: getComputedStyle(document.activeElement!).outlineStyle }));
+    expect(institutionFocus.outline).toBeGreaterThanOrEqual(2);
+    expect(institutionFocus.style).not.toBe('none');
+    await page.screenshot({ path: test.info().outputPath('institutions-200-percent.png'), fullPage: true });
     await zoom.selectOption({ label: '100%' });
   } finally {
     await context.close();
     rmSync(profile, { recursive: true, force: true });
   }
+});
+
+test('G8-06 Institution directory visual states stay usable across desktop, tablet, and mobile', async ({ page }) => {
+  const institution = await db.institution.findUniqueOrThrow({ where: { id: institutionId! } });
+  const widths = [1440, 1280, 768, 390] as const;
+  const capture = async (state: string) => {
+    for (const width of widths) {
+      await page.setViewportSize({ width, height: width < 500 ? 844 : 900 });
+      await page.waitForTimeout(100);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `${state} overflow at ${width}px`).toBe(true);
+      if (width <= 768 && state === 'populated') {
+        await expect(page.getByText('يمكن تمرير الجدول أفقيًا لعرض بقية الأعمدة.')).toBeVisible();
+        const tableRegion = await page.locator('.institutions-card .ui-table-wrap').evaluate((element) => ({ clientWidth: element.clientWidth, scrollWidth: element.scrollWidth }));
+        expect(tableRegion.scrollWidth).toBeGreaterThan(tableRegion.clientWidth);
+      }
+      await page.screenshot({ path: `test-results/g8-06-institutions-${state}-${width}.png`, fullPage: true });
+    }
+  };
+
+  await login(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(page.getByRole('heading', { name: 'لوحة المتابعة', exact: true })).toBeVisible();
+  await page.screenshot({ path: 'test-results/g8-06-dashboard-continuity.png', fullPage: true });
+  await page.goto('/app/institutions');
+  await expect(page.getByRole('heading', { name: 'المؤسسات', exact: true })).toBeVisible();
+  await expect(page.getByRole('row', { name: new RegExp(institution.name.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u') })).toBeVisible();
+  await expect(page.getByText('وهران').first()).toBeVisible();
+  await expect(page.getByText('الموقع المعتمد للمؤسسة').first()).toBeVisible();
+  await expect(page.getByText('35.123456, -0.123456')).toBeVisible();
+  await expect(page.getByText('35.654321')).toHaveCount(0);
+  await capture('populated');
+
+  const search = page.getByRole('textbox', { name: 'البحث عن مؤسسة' });
+  await search.fill(institution.name);
+  await page.getByRole('button', { name: 'بحث' }).click();
+  await expect(page.getByText('إجمالي المؤسسات: 1')).toBeVisible();
+  await expect(page.getByRole('row', { name: new RegExp(institution.name.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u') })).toBeVisible();
+  await capture('filtered');
+
+  await search.fill('لا توجد مؤسسة بهذا الاسم');
+  await page.getByRole('button', { name: 'بحث' }).click();
+  await expect(page.getByRole('heading', { name: 'لا توجد نتائج مطابقة' })).toBeVisible();
+  await capture('empty');
+
+  await page.unrouteAll();
+  await page.route('**/api/v1/institutions**', (route) => route.fulfill({
+    status: 500, contentType: 'application/json', body: JSON.stringify({ error: { code: 'INTERNAL_ERROR', message: 'private transport details' } }),
+  }));
+  await page.goto('/app/institutions');
+  await expect(page.getByRole('heading', { name: 'تعذر تحميل المؤسسات' })).toBeVisible();
+  await expect(page.getByText('private transport details')).toHaveCount(0);
+  await capture('error');
 });
 
 test('Inspector reviews and accepts proposed Institution coordinates with explicit confirmation and authoritative refresh', async ({ page }) => {

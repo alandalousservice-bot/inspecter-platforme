@@ -19,7 +19,11 @@ export type ShellIconName =
   | 'arrow-down'
   | 'reports'
   | 'alert'
-  | 'check-circle';
+  | 'check-circle'
+  | 'search'
+  | 'phone'
+  | 'email'
+  | 'location';
 
 const shapes: Record<ShellIconName, ReactNode> = {
   dashboard: <><rect x="3.5" y="3.5" width="7" height="7" rx="1.5" /><rect x="13.5" y="3.5" width="7" height="5" rx="1.5" /><rect x="13.5" y="12" width="7" height="8.5" rx="1.5" /><rect x="3.5" y="13" width="7" height="7.5" rx="1.5" /></>,
@@ -41,6 +45,10 @@ const shapes: Record<ShellIconName, ReactNode> = {
   reports: <><path d="M6 3.5h8l4 4v13H6z" /><path d="M14 3.5v4h4M9 12h6M9 15.5h6M9 8.5h1" /></>,
   alert: <><path d="M12 3 2.8 19h18.4L12 3Z" /><path d="M12 9v4M12 16.3h.01" /></>,
   'check-circle': <><circle cx="12" cy="12" r="9" /><path d="m8 12 2.5 2.5L16.5 9" /></>,
+  search: <><circle cx="10.8" cy="10.8" r="6.8" /><path d="m16 16 4.5 4.5" /></>,
+  phone: <><path d="M7 3.5h3l1.4 4-2 1.4a14 14 0 0 0 5.7 5.7l1.4-2 4 1.4v3a2 2 0 0 1-2.2 2A16 16 0 0 1 5 5.7 2 2 0 0 1 7 3.5Z" /></>,
+  email: <><rect x="3.5" y="5.5" width="17" height="13" rx="2" /><path d="m4.5 7 7.5 5.5L19.5 7" /></>,
+  location: <><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" /></>,
 };
 
 export function ShellIcon({ name, className }: { name: ShellIconName; className?: string }) {

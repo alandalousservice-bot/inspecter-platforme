@@ -31,6 +31,7 @@ export type Institution = {
   municipality: string | null;
   address: string | null;
   directorPhone: string | null;
+  location?: CanonicalInstitutionLocation | null;
   email: string | null;
   archivedAt: string | null;
   createdAt: string;

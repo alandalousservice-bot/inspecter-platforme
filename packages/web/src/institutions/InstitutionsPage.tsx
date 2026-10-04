@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { useSearchParams } from 'react-router';
 import { Button, Card, CardContent, CardHeader, DataTable, Dialog, EmptyState, ErrorState, FilterBar, Input, LoadingState, PageHeader, Pagination, Select, SuccessState, type DataTableColumn } from '../ui';
 import { ApiRequestError, createInstitution, getCurrentDistricts, listInstitutions, updateInstitution, type DistrictOption, type Institution } from '../auth/client';
+import { ShellIcon } from '../ui/ShellIcon';
 import './institutions.css';
 
 const PAGE_SIZE = 25;
@@ -71,11 +72,25 @@ export function InstitutionsPage() {
   useEffect(() => { setSearchText(activeQuery); }, [activeQuery]);
 
   const columns = useMemo<DataTableColumn<Institution>[]>(() => [
-    { id: 'name', header: 'اسم المؤسسة', render: (row) => row.name },
-    { id: 'externalCode', header: 'الرمز الخارجي', render: (row) => row.externalCode || '—' },
-    { id: 'email', header: 'البريد الإلكتروني', render: (row) => row.email || '—' },
-    { id: 'actions', header: 'إجراء', render: (row) => <Button variant="secondary" onClick={() => { setEditingInstitution(row); setEmailDraft(row.email ?? ''); setEmailError(''); }}>تعديل البريد</Button> },
-  ], []);
+    { id: 'identity', header: 'المؤسسة', render: (row) => <span className="institutions-identity">
+      <span className="institutions-identity__icon"><ShellIcon name="institutions" /></span>
+      <span className="institutions-identity__copy"><strong>{row.name}</strong>{row.externalCode ? <small>الرمز الخارجي: <bdi dir="auto">{row.externalCode}</bdi></small> : null}</span>
+    </span> },
+    { id: 'location', header: 'الموقع الإداري', render: (row) => {
+      const districtName = districts.length > 1 ? districts.find((district) => district.id === row.districtId)?.name : undefined;
+      return <span className="institutions-location">
+        <strong>{row.municipality || 'البلدية غير متاحة'}</strong>
+        {districtName ? <small>المقاطعة: {districtName}</small> : null}
+        {row.address ? <small>{row.address}</small> : null}
+        {row.location ? <span className="institutions-location__canonical"><ShellIcon name="location" /><span><small>الموقع المعتمد للمؤسسة</small><bdi dir="ltr">{row.location.latitude}, {row.location.longitude}</bdi></span></span> : <small>لا يوجد موقع معتمد مسجل</small>}
+      </span>;
+    } },
+    { id: 'contact', header: 'بيانات الاتصال', render: (row) => <span className="institutions-contact">
+      {row.email ? <span><ShellIcon name="email" /><bdi dir="ltr">{row.email}</bdi></span> : <small>لا يوجد بريد مسجل</small>}
+      {row.directorPhone ? <span><ShellIcon name="phone" /><bdi dir="ltr">{row.directorPhone}</bdi></span> : null}
+    </span> },
+    { id: 'actions', header: 'الإجراء المتاح', render: (row) => <Button variant="secondary" onClick={() => { setEditingInstitution(row); setEmailDraft(row.email ?? ''); setEmailError(''); }}><ShellIcon name="email" />تعديل البريد</Button> },
+  ], [districts]);
 
   function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -195,16 +210,19 @@ export function InstitutionsPage() {
       ) : null}
 
       <Card className="institutions-card">
-        <CardHeader title="قائمة المؤسسات" description="ابحث في المؤسسات المتاحة لك، وتصفح النتائج من الخادم." />
+        <CardHeader title="قائمة المؤسسات" description="معلومات المؤسسات المتاحة ضمن نطاق المقاطعات المسندة إليك." />
         <CardContent>
-          <FilterBar title="البحث في المؤسسات">
+          <FilterBar className="institutions-filter" title="البحث في المؤسسات" description="تُطبّق عبارة البحث على النتائج في الخادم.">
           <form className="institutions-search" onSubmit={submitSearch} role="search">
             <Input id="institution-search" label="البحث عن مؤسسة" value={searchText} onChange={(event) => setSearchText(event.currentTarget.value)} placeholder="اكتب اسم المؤسسة" />
-            <Button type="submit">بحث</Button>
+            <Button type="submit"><ShellIcon name="search" />بحث</Button>
           </form>
           </FilterBar>
 
-          <p className="institutions-result-count" aria-live="polite">إجمالي النتائج: {listLoading ? '…' : total}</p>
+          <div className="institutions-results-heading">
+            <span className="institutions-results-heading__icon" aria-hidden="true"><ShellIcon name="institutions" /></span>
+            <div><h2>النتائج</h2><p aria-live="polite">إجمالي المؤسسات: {listError ? 'غير متاح' : listLoading ? '…' : total}</p></div>
+          </div>
 
           {listLoading ? <LoadingState label="جارٍ تحميل المؤسسات…" /> : null}
           {!listLoading && listError ? <ErrorState title="تعذر تحميل المؤسسات" description="حدثت مشكلة أثناء جلب القائمة. أعد المحاولة." action={<Button variant="secondary" onClick={() => setRefreshKey((value) => value + 1)}>إعادة المحاولة</Button>} /> : null}

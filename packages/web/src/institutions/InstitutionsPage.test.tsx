@@ -17,7 +17,7 @@ vi.mock('../auth/client', async (importOriginal) => ({
 
 const districtOne = { id: 'district-1', name: 'مقاطعة الشمال' };
 const districtTwo = { id: 'district-2', name: 'مقاطعة الجنوب' };
-const rowOne = { id: 'institution-1', districtId: districtOne.id, name: 'مدرسة النور', externalCode: null, municipality: null, address: null, directorPhone: null, email: null, archivedAt: null, createdAt: '', updatedAt: '' };
+const rowOne = { id: 'institution-1', districtId: districtOne.id, name: 'مدرسة النور', externalCode: 'INS-104', municipality: 'وهران', address: 'حي النخيل، شارع المدرسة', directorPhone: '021234567', location: { latitude: '35.123456', longitude: '-0.123456', source: 'MANUAL_INSPECTOR' as const }, email: 'school@example.dz', archivedAt: null, createdAt: '', updatedAt: '' };
 const page = (data: Institution[] = [], nextCursor: string | null = null, total = data.length) => ({ data, page: { limit: 25, nextCursor, total } });
 
 beforeAll(() => {
@@ -67,9 +67,28 @@ describe('TASK-024 Institution list and create UI', () => {
   it('renders populated rows and server-reported total accessibly', async () => {
     listInstitutions.mockResolvedValueOnce(page([rowOne], null, 47));
     renderPage();
-    expect(await screen.findByRole('cell', { name: 'مدرسة النور' })).toBeTruthy();
-    expect(screen.getByText('إجمالي النتائج: 47')).toBeTruthy();
+    expect(await screen.findByRole('row', { name: /مدرسة النور/u })).toBeTruthy();
+    expect(screen.getByText('إجمالي المؤسسات: 47')).toBeTruthy();
     expect(screen.getByRole('table', { name: 'قائمة المؤسسات' })).toBeTruthy();
+    expect(screen.getByText('INS-104')).toBeTruthy();
+    expect(screen.getByText('وهران')).toBeTruthy();
+    expect(screen.getByText('حي النخيل، شارع المدرسة')).toBeTruthy();
+    expect(screen.getByText('الموقع المعتمد للمؤسسة')).toBeTruthy();
+    const coordinates = screen.getByText('35.123456, -0.123456');
+    expect(coordinates.closest('bdi')?.getAttribute('dir')).toBe('ltr');
+    const email = screen.getByText('school@example.dz');
+    expect(email.closest('bdi')?.getAttribute('dir')).toBe('ltr');
+    const phone = screen.getByText('021234567');
+    expect(phone.closest('bdi')?.getAttribute('dir')).toBe('ltr');
+    expect(screen.getByText('مدرسة النور').closest('td')?.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('presents absent canonical coordinates as informational, not an error', async () => {
+    listInstitutions.mockResolvedValueOnce(page([{ ...rowOne, location: null }]));
+    renderPage();
+    await screen.findByRole('row', { name: /مدرسة النور/u });
+    expect(screen.getByText('لا يوجد موقع معتمد مسجل')).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('shows an empty state for an empty server result', async () => {
@@ -82,6 +101,7 @@ describe('TASK-024 Institution list and create UI', () => {
     renderPage();
     expect(await screen.findByRole('alert')).toHaveProperty('textContent', expect.stringContaining('تعذر تحميل المؤسسات'));
     expect(screen.queryByText(/private transport details/)).toBeNull();
+    expect(screen.getByText('إجمالي المؤسسات: غير متاح')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'إعادة المحاولة' }));
     await screen.findByRole('heading', { name: 'لا توجد مؤسسات بعد' });
     expect(listInstitutions).toHaveBeenCalledTimes(2);
@@ -101,13 +121,13 @@ describe('TASK-024 Institution list and create UI', () => {
     listInstitutions.mockResolvedValueOnce(page([{ ...rowOne, id: 'institution-2', name: 'مدرسة أخرى' }], null, 26));
     listInstitutions.mockResolvedValue(page([rowOne], 'cursor-next', 26));
     renderPage();
-    await screen.findByRole('cell', { name: 'مدرسة النور' });
-    expect(screen.getByText('إجمالي النتائج: 26')).toBeTruthy();
+    await screen.findByRole('row', { name: /مدرسة النور/u });
+    expect(screen.getByText('إجمالي المؤسسات: 26')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'التالي' }));
-    expect(await screen.findByRole('cell', { name: 'مدرسة أخرى' })).toBeTruthy();
+    expect(await screen.findByRole('row', { name: /مدرسة أخرى/u })).toBeTruthy();
     await waitFor(() => expect(listInstitutions).toHaveBeenLastCalledWith({ q: '', cursor: 'cursor-next', limit: 25 }));
     fireEvent.click(screen.getByRole('button', { name: 'السابق' }));
-    expect(await screen.findByRole('cell', { name: 'مدرسة النور' })).toBeTruthy();
+    expect(await screen.findByRole('row', { name: /مدرسة النور/u })).toBeTruthy();
   });
 
   it('loads current District context and disables creation while it is pending', async () => {
@@ -139,7 +159,7 @@ describe('TASK-024 Institution list and create UI', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'إنشاء المؤسسة' }));
     await screen.findByRole('heading', { name: 'تم إنشاء المؤسسة بنجاح.' });
     expect(createInstitution).toHaveBeenCalledWith({ districtId: districtOne.id, name: 'مدرسة جديدة' });
-    expect(await screen.findByRole('cell', { name: 'مدرسة النور' })).toBeTruthy();
+    expect(await screen.findByRole('row', { name: /مدرسة النور/u })).toBeTruthy();
     await waitFor(() => expect(listInstitutions).toHaveBeenCalledTimes(2));
   });
 
@@ -152,7 +172,7 @@ describe('TASK-024 Institution list and create UI', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'إنشاء المؤسسة' }));
     await screen.findByRole('heading', { name: 'تم إنشاء المؤسسة بنجاح.' });
     expect(createInstitution).toHaveBeenCalledWith({ districtId: districtOne.id, name: 'مدرسة جديدة', email: 'school@example.dz' });
-    await screen.findByRole('cell', { name: 'school@example.dz' });
+    expect(await screen.findByText('school@example.dz')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'تعديل البريد' }));
     const editDialog = screen.getByRole('dialog', { name: 'تعديل بريد المؤسسة' });
     fireEvent.change(within(editDialog).getByRole('textbox', { name: 'البريد الإلكتروني' }), { target: { value: 'new@example.dz' } });
