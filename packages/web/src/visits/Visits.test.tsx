@@ -11,6 +11,7 @@ import { VisitTypeBadge } from './VisitTypeBadge';
 const mocks = vi.hoisted(() => ({
   getCurrentDistricts: vi.fn(), listTeachers: vi.fn(), listInstitutions: vi.fn(), getValidWorkplaces: vi.fn(),
   listPedagogicalVisits: vi.fn(), getPedagogicalVisit: vi.fn(), createPedagogicalVisit: vi.fn(), patchPedagogicalVisit: vi.fn(),
+  getInspectionReport: vi.fn(),
 }));
 vi.mock('../auth/client', async (importOriginal) => ({ ...(await importOriginal<typeof import('../auth/client')>()), ...mocks }));
 
@@ -44,7 +45,7 @@ beforeEach(() => {
   Object.defineProperty(HTMLDialogElement.prototype, 'showModal', { configurable: true, value() { this.open = true; } });
   Object.defineProperty(HTMLDialogElement.prototype, 'close', { configurable: true, value() { this.open = false; this.dispatchEvent(new Event('close')); } });
 });
-afterEach(() => { cleanup(); vi.clearAllMocks(); vi.useRealTimers(); });
+afterEach(() => { cleanup(); vi.clearAllMocks(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 function renderRoute(path: string) {
   function LocationProbe() { const location = useLocation(); return <output data-testid="current-location">{location.pathname}{location.search}</output>; }
@@ -68,6 +69,77 @@ function chooseVisitType(value: string = 'GUIDANCE') {
 }
 
 describe('TASK-051 visit management UI', () => {
+  it('groups all types with historical context and separate real navigation without report requests', async () => {
+    const types = ['GUIDANCE', 'TENURE_CONFIRMATION', 'PROMOTION_EVALUATION', 'MONITORING_FOLLOW_UP', 'EXCEPTIONAL'] as const;
+    mocks.listPedagogicalVisits.mockResolvedValue(page(types.map((visitType, index) => ({ ...visit, id: String(index), visitType, status: index === 4 ? 'COMPLETED' : 'PLANNED', intervalKind: index === 4 ? 'ACTUAL_RETROSPECTIVE' : 'SCHEDULED', scheduledStartAt: index === 4 ? null : visit.scheduledStartAt, scheduledEndAt: index === 4 ? null : visit.scheduledEndAt, actualStartAt: index === 4 ? '2025-01-15T08:30:00Z' : null, actualEndAt: index === 4 ? '2025-01-15T09:30:00Z' : null }))));
+    renderRoute('/app/visits');
+    await screen.findByRole('table', { name: 'قائمة الزيارات التربوية' });
+    expect(screen.getAllByRole('link', { name: 'محمد علي' })).toHaveLength(5);
+    expect(screen.getAllByRole('link', { name: 'تفاصيل الزيارة — محمد علي' })).toHaveLength(5);
+    expect(screen.getAllByText('المؤسسة كما كانت وقت التخطيط')).toHaveLength(5);
+    expect(document.querySelectorAll('.visit-workspace__context .visit-type-badge')).toHaveLength(5);
+    expect(screen.getByText('الفترة الفعلية للزيارة')).toBeTruthy();
+    expect(screen.getByText(formatAlgiers('2025-01-15T08:30:00Z'))).toBeTruthy();
+    expect(screen.getByText(formatAlgiers('2025-01-15T09:30:00Z'))).toBeTruthy();
+    expect(screen.queryByRole('link', { name: /تقرير/ })).toBeNull();
+    expect(mocks.getPedagogicalVisit).not.toHaveBeenCalled();
+    expect(mocks.getInspectionReport).not.toHaveBeenCalled();
+  });
+
+  it('keeps teacher, institution and inclusive date controls server-side with visible active indicators', async () => {
+    renderRoute('/app/visits'); await screen.findByRole('cell', { name: 'محمد علي' });
+    fireEvent.click(screen.getByRole('button', { name: 'الأستاذ والمؤسسة' }));
+    await chooseTeacher();
+    await waitFor(() => expect(mocks.listPedagogicalVisits).toHaveBeenLastCalledWith({ limit: 25, teacherId: teacher.id }));
+    fireEvent.click(await screen.findByRole('button', { name: institution.name }));
+    await waitFor(() => expect(mocks.listPedagogicalVisits).toHaveBeenLastCalledWith({ limit: 25, teacherId: teacher.id, institutionId: institution.id }));
+    fireEvent.click(screen.getByRole('button', { name: 'فترة الزيارة' }));
+    fireEvent.change(screen.getByLabelText('من تاريخ الموعد'), { target: { value: '2026-10-01' } });
+    fireEvent.change(screen.getByLabelText('إلى تاريخ الموعد (شامل)'), { target: { value: '2026-10-15' } });
+    fireEvent.click(screen.getByRole('button', { name: 'تطبيق التاريخ' }));
+    await waitFor(() => expect(mocks.listPedagogicalVisits).toHaveBeenLastCalledWith({ limit: 25, teacherId: teacher.id, institutionId: institution.id, from: '2026-10-01T00:00:00+01:00', to: '2026-10-16T00:00:00+01:00' }));
+    expect(screen.getByTestId('current-location').textContent).toContain('fromDate=2026-10-01');
+    expect(screen.getByText('مرشح التاريخ مفعّل')).toBeTruthy();
+    expect(screen.getByText('تحديد الأستاذ أو المؤسسة مفعّل')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'مسح المرشحات' }));
+    await waitFor(() => expect(mocks.listPedagogicalVisits).toHaveBeenLastCalledWith({ limit: 25 }));
+  });
+
+  it('mounts one structured operational mobile list, not duplicate table interactions', async () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    renderRoute('/app/visits');
+    expect(await screen.findByRole('list', { name: 'قائمة الزيارات التربوية' })).toBeTruthy();
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.getAllByRole('link', { name: 'محمد علي' })).toHaveLength(1);
+    expect(document.querySelector('.ui-record-row')?.tagName).toBe('LI');
+    expect(document.querySelector('.visit-workspace')?.getAttribute('dir')).toBe('rtl');
+  });
+
+  it('distinguishes filtered empty and unavailable count on failure; date errors stay expanded', async () => {
+    mocks.listPedagogicalVisits.mockResolvedValueOnce(page([], 0));
+    renderRoute('/app/visits?visitType=GUIDANCE');
+    expect(await screen.findByText('لا توجد زيارات مطابقة')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'فترة الزيارة' }));
+    fireEvent.change(screen.getByLabelText('من تاريخ الموعد'), { target: { value: '2026-10-20' } });
+    fireEvent.change(screen.getByLabelText('إلى تاريخ الموعد (شامل)'), { target: { value: '2026-10-01' } });
+    fireEvent.click(screen.getByRole('button', { name: 'تطبيق التاريخ' }));
+    expect(screen.getByRole('alert').textContent).toContain('يجب ألا يسبق');
+    expect(screen.getByRole('button', { name: 'فترة الزيارة' }).getAttribute('aria-expanded')).toBe('true');
+    cleanup(); mocks.listPedagogicalVisits.mockRejectedValueOnce(new Error('transport'));
+    renderRoute('/app/visits'); await screen.findByRole('heading', { name: 'تعذر تحميل الزيارات' });
+    expect(screen.getByText('إجمالي النتائج: غير متاح')).toBeTruthy();
+  });
+
+  it.each(['PLANNED', 'COMPLETED', 'CANCELLED'] as const)('exposes typed report read route for %s without implying automatic creation', async (status) => {
+    mocks.getPedagogicalVisit.mockResolvedValue({ data: { visit: { ...visit, visitType: 'GUIDANCE', status, visitTypeEditable: false } } });
+    renderRoute(`/app/visits/${visit.id}`);
+    expect((await screen.findByRole('link', { name: 'صفحة تقرير الزيارة' })).getAttribute('href')).toBe(`/app/visits/${visit.id}/report`);
+    expect(screen.queryByText(/سيظهر في مرحلة التقرير/)).toBeNull();
+    if (status === 'CANCELLED') expect(screen.getByText('قراءة التقرير الموجود فقط؛ لا يمكن إنشاء تقرير للزيارة الملغاة.')).toBeTruthy();
+    else expect(screen.getByText('التقرير مستقل عن الزيارة؛ لا يُنشأ إلا عند حفظ المسودة صراحة.')).toBeTruthy();
+    expect(mocks.patchPedagogicalVisit).not.toHaveBeenCalled();
+  });
+
   it('presents all five canonical visit types distinctly with readable Arabic text', () => {
     const labels = [
       ['GUIDANCE', 'زيارة توجيهية / تكوينية'],
@@ -86,9 +158,9 @@ describe('TASK-051 visit management UI', () => {
     renderRoute('/app/visits');
     expect(screen.getByText('جارٍ تحميل الزيارات…')).toBeTruthy();
     expect(await screen.findByRole('cell', { name: 'محمد علي' })).toBeTruthy();
-    expect(screen.getByRole('cell', { name: 'المؤسسة كما كانت وقت التخطيط' })).toBeTruthy();
+    expect(screen.getByText('المؤسسة كما كانت وقت التخطيط')).toBeTruthy();
     expect(screen.getByRole('cell', { name: 'مخططة' })).toBeTruthy();
-    expect(screen.getByText('إجمالي النتائج: 1')).toBeTruthy();
+    expect(document.querySelector('.ui-filter-bar__summary')?.textContent).toBe('إجمالي النتائج: 1');
     expect(mocks.listPedagogicalVisits).toHaveBeenCalledWith({ limit: 25 });
     expect(screen.queryByText(/البريد الإلكتروني|رقم الهاتف|تاريخ الميلاد/)).toBeNull();
   });
@@ -112,9 +184,8 @@ describe('TASK-051 visit management UI', () => {
   it('preserves non-sensitive list filters through create, detail and return navigation', async () => {
     renderRoute('/app/visits?status=PLANNED');
     await screen.findByRole('cell', { name: 'محمد علي' });
-    expect(screen.getAllByRole('link', { name: 'محمد علي' }).map((link) => link.getAttribute('href'))).toEqual([
-      `/app/visits/${visit.id}?status=PLANNED`, `/app/visits/${visit.id}?status=PLANNED`,
-    ]);
+    expect(screen.getByRole('link', { name: 'محمد علي' }).getAttribute('href')).toBe(`/app/teachers/${teacher.id}`);
+    expect(screen.getByRole('link', { name: 'تفاصيل الزيارة — محمد علي' }).getAttribute('href')).toBe(`/app/visits/${visit.id}?status=PLANNED`);
     expect(screen.getByRole('link', { name: 'زيارة جديدة' }).getAttribute('href')).toBe('/app/visits/new?status=PLANNED');
 
     cleanup(); renderRoute('/app/visits/new?status=PLANNED'); await chooseTeacher(); chooseVisitType();
@@ -134,7 +205,7 @@ describe('TASK-051 visit management UI', () => {
   it('shows empty and retryable error states', async () => {
     mocks.listPedagogicalVisits.mockResolvedValueOnce(page([], 0));
     renderRoute('/app/visits');
-    expect(await screen.findByText('لا توجد زيارات مطابقة')).toBeTruthy();
+    expect(await screen.findByText('لا توجد زيارات بعد')).toBeTruthy();
     cleanup(); mocks.listPedagogicalVisits.mockRejectedValueOnce(new Error('transport'));
     renderRoute('/app/visits');
     expect(await screen.findByRole('heading', { name: 'تعذر تحميل الزيارات' })).toBeTruthy();

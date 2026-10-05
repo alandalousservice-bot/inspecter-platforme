@@ -169,7 +169,8 @@ export function VisitDetailPage() {
         </form> : null}
       </CardContent></Card> : <Card><CardHeader title="سجل الزيارة" description="هذه الحالة نهائية؛ تبقى تفاصيل الزيارة متاحة للقراءة." /></Card>}
       <p className="visit-inline-note">للاطلاع على المؤسسة الحالية المعتمدة أو بيانات الأستاذ، افتح <Link to={`/app/teachers/${encodeURIComponent(visit.teacher.id)}`}>ملف الأستاذ</Link>. لا يغيّر ذلك مؤسسة الزيارة المحفوظة أعلاه.</p>
-      {visit.visitType === null ? <Link to={`/app/visits/${encodeURIComponent(visit.id)}/report`}>تقرير المرافقة البيداغوجية</Link> : <p className="visit-inline-note">يرتبط مسار التقرير بنوع الزيارة، وسيظهر في مرحلة التقرير المخصصة.</p>}
+      <Link to={`/app/visits/${encodeURIComponent(visit.id)}/report`}>{visit.visitType === null ? 'تقرير المرافقة البيداغوجية' : 'صفحة تقرير الزيارة'}</Link>
+      {visit.visitType !== null ? <p className="visit-inline-note">{visit.status === 'CANCELLED' ? 'قراءة التقرير الموجود فقط؛ لا يمكن إنشاء تقرير للزيارة الملغاة.' : 'التقرير مستقل عن الزيارة؛ لا يُنشأ إلا عند حفظ المسودة صراحة.'}</p> : null}
       <Link to={`/app/teachers/${encodeURIComponent(visit.teacher.id)}/schedules`}>عرض التوزيع الأسبوعي للأستاذ</Link>
     </> : null}
 
