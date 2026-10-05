@@ -57,8 +57,8 @@ beforeEach(() => {
   });
 });
 
-function renderList() {
-  return render(<MemoryRouter initialEntries={['/app/submissions']}><Routes><Route path="/app/submissions" element={<SubmissionsPage />} /></Routes></MemoryRouter>);
+function renderList(entry = '/app/submissions') {
+  return render(<MemoryRouter initialEntries={[entry]}><Routes><Route path="/app/submissions" element={<SubmissionsPage />} /></Routes></MemoryRouter>);
 }
 function renderDetail(result: SubmissionDetail | undefined = detail) {
   getSubmission.mockResolvedValue(result ? { data: result } : { data: { ...detail, potentialDuplicates: [] } });
@@ -68,6 +68,35 @@ function renderDetail(result: SubmissionDetail | undefined = detail) {
 }
 
 describe('TASK-032 submissions list UI', () => {
+  it('G9-06 keeps a single semantic record tree and an explicit review link, with declared context and no per-row fetch', async () => {
+    listSubmissions.mockResolvedValueOnce(page([row('one', true), row('two')], null, 2));
+    const { container } = renderList();
+    const table = await screen.findByRole('table', { name: 'طلبات الأساتذة' });
+    expect(table.querySelectorAll('tbody tr')).toHaveLength(2);
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getAllByText('تصريح غير معتمد')).toHaveLength(2);
+    expect(screen.getByRole('link', { name: 'مراجعة طلب أمينة بن صالح' }).getAttribute('href')).toBe('/app/submissions/one');
+    expect(container.querySelectorAll('td[data-label="هوية المرسل المعلنة"]')).toHaveLength(2);
+    expect(table.querySelector('time')?.getAttribute('datetime')).toBe('2026-09-28T10:00:00Z');
+    expect(getSubmission).not.toHaveBeenCalled();
+    expect(decideSubmission).not.toHaveBeenCalled();
+    expect(screen.queryByText(/ثقة|قرار موصى|دمج تلقائي/)).toBeNull();
+  });
+
+  it('G9-06 restores existing URL filters, distinguishes filtered empty, and never presents failure as zero', async () => {
+    listSubmissions.mockResolvedValueOnce(page());
+    renderList('/app/submissions?q=أمينة&status=REJECTED');
+    expect(await screen.findByRole('heading', { name: 'لا توجد نتائج مطابقة' })).toBeTruthy();
+    expect(listSubmissions).toHaveBeenCalledWith({ q: 'أمينة', status: 'REJECTED', cursor: undefined, limit: 25 });
+    expect(screen.getByRole('combobox')).toHaveProperty('value', 'REJECTED');
+    listSubmissions.mockRejectedValueOnce(new Error('private failure'));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'آخر' } });
+    fireEvent.click(screen.getByRole('button', { name: 'تطبيق' }));
+    await screen.findByRole('alert');
+    expect(screen.getByText('إجمالي النتائج: غير متاح')).toBeTruthy();
+    expect(screen.queryByText('إجمالي النتائج: 0')).toBeNull();
+    expect(screen.queryByRole('navigation', { name: 'صفحات الطلبات' })).toBeNull();
+  });
   it('shows loading then an accessible Arabic RTL G6 table with neutral candidate indicator only when true', async () => {
     let resolve!: (value: ReturnType<typeof page>) => void;
     listSubmissions.mockReturnValueOnce(new Promise((done) => { resolve = done; }));
@@ -122,6 +151,29 @@ describe('TASK-032 submissions list UI', () => {
 });
 
 describe('TASK-032 submission detail UI', () => {
+  it('G9-06 places advisory before explicit decisions and secondary declarations after them without automatic actions', async () => {
+    const { container } = renderDetail();
+    await screen.findByRole('heading', { level: 1 });
+    const advisory = container.querySelector('.submission-candidates-section')!;
+    const decisions = screen.getByRole('region', { name: 'إجراءات مراجعة الطلب' });
+    const administrative = screen.getByRole('heading', { name: 'بيانات إدارية مصرح بها — غير معتمدة' });
+    expect(advisory.compareDocumentPosition(decisions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(decisions.compareDocumentPosition(administrative) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText('amina@example.dz').closest('bdi')).toHaveProperty('dir', 'ltr');
+    expect(decideSubmission).not.toHaveBeenCalled();
+    expect(decideInstitutionLocationProposal).not.toHaveBeenCalled();
+    expect(screen.queryByText(/ثقة|قرار موصى|دمج تلقائي/)).toBeNull();
+  });
+
+  it.each(['ACCEPTED', 'REJECTED'] as const)('G9-06 clearly marks %s read-only and does not reinterpret declaration data', async (status) => {
+    renderDetail({ ...detail, status, acceptedTeacherId: status === 'ACCEPTED' ? 'teacher-result' : null });
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.getByText('قرار نهائي — الطلب للقراءة فقط')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'جهة العمل المصرح بها — غير معتمدة' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'قبول الطلب' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'رفض الطلب' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /إعادة فتح|دمج/ })).toBeNull();
+  });
   it('links only an accepted submission with a linked Teacher to the profile', async () => {
     renderDetail({ ...detail, status: 'ACCEPTED', acceptedTeacherId: 'teacher-1' });
     const link = await screen.findByRole('link', { name: 'فتح ملف الأستاذ' });

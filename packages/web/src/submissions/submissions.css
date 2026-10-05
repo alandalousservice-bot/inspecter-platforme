@@ -142,3 +142,91 @@
   margin-block: 0 var(--space-3);
   font-size: var(--font-size-body);
 }
+
+/* G9-06: request-specific screen presentation; no shared or print overrides. */
+@media screen {
+  .submission-review-table > caption {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .submission-review-table {
+    inline-size: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    background: var(--color-surface);
+    text-align: start;
+  }
+  .submission-review-table :is(th, td) {
+    padding: var(--space-3) var(--space-4);
+    border-block-end: 1px solid var(--color-border);
+    vertical-align: top;
+    overflow-wrap: anywhere;
+    text-align: start;
+  }
+  .submission-review-table th {
+    background: var(--color-surface-subtle);
+    font-size: var(--font-size-small);
+    font-weight: 600;
+  }
+  .submission-review-table th:first-child { inline-size: 25%; }
+  .submission-review-table th:nth-child(2) { inline-size: 23%; }
+  .submission-review-table th:last-child { inline-size: 10rem; }
+  .submission-review-table tbody tr:focus-within,
+  .submission-review-table tbody tr:hover { background: var(--color-surface-subtle); }
+  .submission-record-meta {
+    display: block;
+    margin-block-start: var(--space-1);
+    font-size: var(--font-size-small);
+    color: var(--color-text-muted);
+  }
+  .submission-advisory { color: var(--color-text-secondary); font-size: var(--font-size-small); }
+  .submission-review-context {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3) var(--space-6);
+    padding-block: var(--space-3);
+    border-block-end: 1px solid var(--color-border);
+  }
+  .submission-review-context > span { color: var(--color-text-secondary); }
+  .submission-detail-page .ui-form-section { min-inline-size: 0; }
+  .submission-detail-page .submission-facts { gap: var(--space-3) var(--space-4); }
+  .submission-detail-page .submission-candidate-list { grid-template-columns: 1fr; }
+  .submission-detail-page .submission-candidate .submission-facts { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .submission-detail-page .submission-reasons { margin-block-start: var(--space-3); }
+}
+@media screen and (max-width: 64rem) {
+  .submission-review-table, .submission-review-table :is(tbody, tr, td) { display: block; }
+  .submission-review-table thead {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .submission-review-table tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    padding: var(--space-4);
+    gap: var(--space-3) var(--space-4);
+    border-block-end: 1px solid var(--color-border);
+  }
+  .submission-review-table td { padding: 0; border: 0; min-inline-size: 0; }
+  .submission-review-table td::before {
+    content: attr(data-label);
+    display: block;
+    margin-block-end: var(--space-1);
+    font-size: var(--font-size-small);
+    color: var(--color-text-muted);
+  }
+  .submission-review-table td:last-child { grid-column: 1 / -1; }
+  .submission-detail-page .submission-candidate .submission-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media screen and (max-width: 40rem) {
+  .submission-review-table tbody tr { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .submission-review-table td:is(:first-child, :nth-child(2), :last-child) { grid-column: 1 / -1; }
+  .submission-detail-page .submission-candidate .submission-facts { grid-template-columns: 1fr; }
+}

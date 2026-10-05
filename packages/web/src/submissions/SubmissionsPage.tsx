@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { Button, Card, CardContent, CardHeader, DataTable, EmptyState, ErrorState, FilterBar, Input, LoadingState, PageHeader, Pagination, StatusBadge, type DataTableColumn, type StatusTone } from '../ui';
+import { Button, EmptyState, ErrorState, FilterBar, Input, LoadingState, PageHeader, Pagination, StatusBadge, WorkspaceStack, type StatusTone } from '../ui';
 import { listSubmissions, type SubmissionListItem, type SubmissionStatus } from '../auth/client';
 import './submissions.css';
 
@@ -63,14 +63,6 @@ export function SubmissionsPage() {
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const statusLabels = useMemo(() => new Map(statusOptions.map(({ value, label }) => [value, label])), []);
-  const columns = useMemo<DataTableColumn<SubmissionListItem>[]>(() => [
-    { id: 'teacher', header: 'الأستاذ', render: (row) => <Link to={`/app/submissions/${encodeURIComponent(row.id)}`}>{row.firstName} {row.lastName}</Link> },
-    { id: 'birthDate', header: 'تاريخ الميلاد', render: (row) => formatDate(row.dateOfBirth) },
-    { id: 'institution', header: 'جهة العمل المصرح بها', render: (row) => row.primaryInstitutionName },
-    { id: 'submittedAt', header: 'تاريخ الإرسال', render: (row) => formatDateTime(row.submittedAt) },
-    { id: 'status', header: 'الحالة', render: (row) => <StatusBadge tone={statusTones[row.status]}>{statusLabels.get(row.status) ?? 'غير محددة'}</StatusBadge> },
-    { id: 'duplicates', header: 'التنبيه', render: (row) => row.hasPotentialDuplicates ? 'قد توجد طلبات مشابهة' : '—' },
-  ], [statusLabels]);
 
   function applyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -94,12 +86,9 @@ export function SubmissionsPage() {
 
   return (
     <div className="submissions-page" dir="rtl">
-      <PageHeader eyebrow="استقبال الأساتذة" title="طلبات الأساتذة" description="استعرض الطلبات الواردة ضمن المقاطعات المتاحة لك." />
-
-      <Card>
-        <CardHeader title="قائمة الطلبات" description="تُحدّث النتائج والفلاتر من الخادم." />
-        <CardContent>
-          <FilterBar title="البحث والمرشحات" description="تُحدّث النتائج والفلاتر من الخادم.">
+      <WorkspaceStack density="operational">
+      <PageHeader variant="compact" title="طلبات الأساتذة" description="تصريحات واردة للمراجعة؛ التشابه المحتمل لا يحدد قرار المفتش." />
+          <FilterBar variant="workspace" summary={<span aria-live="polite">إجمالي النتائج: {loading ? '…' : failed ? 'غير متاح' : total}</span>}>
           <form className="submissions-filters" onSubmit={applyFilters} role="search">
             <Input id="submission-search" label="البحث في الطلبات" value={searchText} onChange={(event) => setSearchText(event.currentTarget.value)} placeholder="الاسم أو المؤسسة الأساسية" />
             <div className="ui-field">
@@ -112,21 +101,33 @@ export function SubmissionsPage() {
           </form>
           </FilterBar>
 
-          <p className="submissions-result-count" aria-live="polite">إجمالي النتائج: {loading ? '…' : total}</p>
-          {loading ? <LoadingState label="جارٍ تحميل الطلبات…" /> : null}
-          {!loading && failed ? <ErrorState title="تعذر تحميل الطلبات" description="حدثت مشكلة أثناء جلب القائمة. أعد المحاولة." action={<Button variant="secondary" onClick={() => setRefreshKey((key) => key + 1)}>إعادة المحاولة</Button>} /> : null}
+          {loading ? <LoadingState compact label="جارٍ تحميل الطلبات…" /> : null}
+          {!loading && failed ? <ErrorState compact title="تعذر تحميل الطلبات" description="حدثت مشكلة أثناء جلب القائمة. أعد المحاولة." action={<Button variant="secondary" onClick={() => setRefreshKey((key) => key + 1)}>إعادة المحاولة</Button>} /> : null}
           {!loading && !failed && rows.length === 0 ? (
-            <EmptyState title={activeQuery ? 'لا توجد نتائج مطابقة' : 'لا توجد طلبات في هذه الحالة'} description={activeQuery ? 'جرّب عبارة بحث أخرى.' : 'ستظهر هنا الطلبات الواردة ضمن نطاقك.'} />
+            <EmptyState compact kind={activeQuery ? 'no-results' : 'no-data'} title={activeQuery ? 'لا توجد نتائج مطابقة' : 'لا توجد طلبات في هذه الحالة'} description={activeQuery ? 'جرّب عبارة بحث أخرى.' : 'ستظهر هنا الطلبات الواردة ضمن نطاقك.'} />
           ) : null}
-          {!loading && !failed && rows.length > 0 ? <DataTable caption="طلبات الأساتذة" columns={columns} rows={rows} rowKey={(row) => row.id} /> : null}
+          {!loading && !failed && rows.length > 0 ? (
+            <table className="submission-review-table" role="table">
+              <caption className="ui-table__caption--accessible-only">طلبات الأساتذة</caption>
+              <thead role="rowgroup"><tr role="row">
+                {['هوية المرسل المعلنة', 'جهة العمل المصرح بها', 'الإرسال وحالة المراجعة', 'التشابه المحتمل', 'المراجعة'].map((label) => <th scope="col" role="columnheader" key={label}>{label}</th>)}
+              </tr></thead>
+              <tbody role="rowgroup">{rows.map((row) => <tr role="row" key={row.id}>
+                <td role="cell" data-label="هوية المرسل المعلنة"><strong><Link to={`/app/submissions/${encodeURIComponent(row.id)}`}><bdi>{row.firstName} {row.lastName}</bdi></Link></strong><span className="submission-record-meta">تاريخ الميلاد: <bdi>{formatDate(row.dateOfBirth)}</bdi></span></td>
+                <td role="cell" data-label="جهة العمل المصرح بها"><bdi>{row.primaryInstitutionName}</bdi><span className="submission-record-meta">تصريح غير معتمد</span></td>
+                <td role="cell" data-label="الإرسال وحالة المراجعة"><StatusBadge tone={statusTones[row.status]}>{statusLabels.get(row.status) ?? 'غير محددة'}</StatusBadge><time className="submission-record-meta" dateTime={row.submittedAt}><bdi>{formatDateTime(row.submittedAt)}</bdi></time></td>
+                <td role="cell" data-label="التشابه المحتمل">{row.hasPotentialDuplicates ? <span className="submission-advisory">قد توجد طلبات مشابهة</span> : <span className="submission-record-meta">لا توجد إشارة تشابه</span>}</td>
+                <td role="cell" data-label="المراجعة"><Link className="ui-button ui-button--secondary" aria-label={`مراجعة طلب ${row.firstName} ${row.lastName}`} to={`/app/submissions/${encodeURIComponent(row.id)}`}>مراجعة الطلب</Link></td>
+              </tr>)}</tbody>
+            </table>
+          ) : null}
 
           {!loading && !failed ? (
             <Pagination label="صفحات الطلبات" currentPage={Math.min(pageIndex + 1, pageCount)} rangeStart={total ? pageIndex * PAGE_SIZE + 1 : 0}
               rangeEnd={pageIndex * PAGE_SIZE + rows.length} total={total} hasPrevious={pageIndex > 0} hasNext={Boolean(nextCursor)}
               onPrevious={previousPage} onNext={nextPage} />
           ) : null}
-        </CardContent>
-      </Card>
+      </WorkspaceStack>
     </div>
   );
 }

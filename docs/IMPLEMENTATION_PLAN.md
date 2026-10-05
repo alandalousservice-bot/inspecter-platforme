@@ -207,3 +207,5 @@ TASK-070C completion evidence (2026-10-02): final connected Dashboard E2E passed
 ## G9-05 — Document workspaces closure
 
 G9-05: COMPLETED / PASS — presentation-only Visit Report V1 and legacy accompaniment on existing routes. Scope, responsive/real 200% Chrome evidence, 109 focused UI tests, full web/API gates, isolated Report/FollowUp integrations, bundle delta and unchanged two-page G8-10 print regression are recorded in [G9-05 verification](G9-05-DOCUMENT-WORKSPACES.md). No contract/backend/dependency change. G9-06 was not started; STOP for Product Owner review.
+
+G9-06: COMPLETED / PASS — Teacher Requests list/detail presentation only, HYBRID_LIST_TABLE / OPERATIONAL_REVIEW. Existing server q/status/URL/cursor, advisory-only duplicates, explicit decision eligibility/confirmation and declared-vs-approved semantics preserved. [G9-06 verification](G9-06-REQUESTS-WORKSPACE.md): 145 focused UI, 393 Web, 33 API unit, 31 isolated submission/decision/location DB tests, responsive/real Chrome 200% visual QA, typecheck/lint/build/smoke/diff-check PASS. No API/domain/schema/auth/dependency/shared/print changes. G9-07 NOT_STARTED; STOP for Product Owner review.
