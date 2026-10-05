@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router';
 import { ApiRequestError, createFollowUp, finalizeInspectionReport, getInspectionReport, getPedagogicalVisit, listReportFollowUps, saveInspectionReport, type FollowUp, type InspectionReport, type InspectionReportContent, type PedagogicalVisit } from '../auth/client';
-import { Button, Card, CardContent, CardHeader, Dialog, EmptyState, ErrorState, LoadingState, PageHeader, SuccessState } from '../ui';
+import { Button, Card, CardContent, CardHeader, Dialog, EmptyState, ErrorState, LoadingState, PageHeader, SuccessState, WorkspaceStack } from '../ui';
 import { formatAlgiers } from './time';
 import { InspectorVisitReportV1Page } from './InspectorVisitReportV1Page';
 import { VisitStatusBadge } from './VisitStatusBadge';
@@ -142,24 +142,24 @@ function LegacyInspectionReportPage() {
   }
 
   return <div className="report-page report-workspace accompaniment-workspace" dir="rtl">
-    <PageHeader className="accompaniment-header" eyebrow="وثيقة مهنية من إعداد المفتش" title="تقرير مرافقة بيداغوجية" description="تقرير من إعداد المفتش — غير رسمي"
+    <WorkspaceStack density="document">
+    <PageHeader variant="compact" className="accompaniment-header" eyebrow="وثيقة مهنية من إعداد المفتش" title="تقرير مرافقة بيداغوجية" description="تقرير من إعداد المفتش — غير رسمي"
       breadcrumbs={[{ label: 'الزيارات التربوية', to: '/app/visits' }, { label: 'تفاصيل الزيارة', to: `/app/visits/${encodeURIComponent(id)}` }, { label: 'التقرير' }]}
-      backAction={<Link to={`/app/visits/${encodeURIComponent(id)}`}>العودة إلى الزيارة</Link>} />
+      backAction={<Link to={`/app/visits/${encodeURIComponent(id)}`}>العودة إلى الزيارة</Link>}
+      secondaryActions={!loading && !loadError && visit ? <Link to={`/app/teachers/${encodeURIComponent(visit.teacher.id)}`}>ملف الأستاذ</Link> : null} />
     {loading ? <LoadingState label="جارٍ تحميل التقرير…" /> : null}
     {!loading && loadError ? <ErrorState title="تعذر تحميل التقرير" description="تحقق من الاتصال أو صلاحية الوصول ثم أعد المحاولة." action={<Button variant="secondary" onClick={() => void load()}>إعادة التحميل</Button>} /> : null}
     {!loading && !loadError && visit ? <>
       {notice ? <SuccessState title={notice} /> : null}
       {error ? <ErrorState title={error} /> : null}
       {revisionConflict ? <section className="report-conflict" role="alert"><p>توجد نسخة أحدث محفوظة. بقيت كتابتك الحالية كما هي؛ راجع النسخة الأحدث صراحة قبل تقرير ما ستحتفظ به.</p><Button variant="secondary" onClick={() => setConfirmRefresh(true)}>مراجعة النسخة الأحدث</Button></section> : null}
-      <Card className="report-context-card accompaniment-context-card"><CardHeader title="سياق الزيارة" description={`السنة الدراسية ${visit.academicYear}`} action={<div className="report-context-card__actions"><VisitStatusBadge status={visit.status} /><span className={`report-status-pill report-status-pill--${report?.status?.toLowerCase() ?? 'new'}`}><ShellIcon name={report?.status === 'FINAL' ? 'check-circle' : 'reports'} /><span>{report?.status === 'FINAL' ? 'نهائي — للقراءة فقط' : report ? 'مسودة' : 'لم يُحفظ بعد'}</span></span></div>} />
-        <CardContent><dl className="report-context report-context--legacy"><div><dt>الأستاذ</dt><dd>{report?.displayIdentity.teacher.name ?? visit.teacher.name} {report?.displayIdentity.teacher.surname ?? visit.teacher.surname}</dd></div><div><dt>المؤسسة وقت الزيارة</dt><dd>{visit.institution.name}</dd></div><div><dt>{visit.intervalKind === 'ACTUAL_RETROSPECTIVE' ? 'الفترة الفعلية للزيارة' : 'موعد الزيارة'}</dt><dd dir="auto">{visit.actualStartAt && visit.actualEndAt ? `${formatAlgiers(visit.actualStartAt)} — ${formatAlgiers(visit.actualEndAt)}` : visit.scheduledStartAt && visit.scheduledEndAt ? `${formatAlgiers(visit.scheduledStartAt)} — ${formatAlgiers(visit.scheduledEndAt)}` : 'الفترة غير متاحة'}</dd></div>{visit.occurredAt ? <div><dt>وقت الإنجاز</dt><dd dir="auto">{formatAlgiers(visit.occurredAt)}</dd></div> : null}</dl></CardContent>
+      <Card className="report-context-card accompaniment-context-card"><CardHeader title="سياق الزيارة" action={<div className="report-context-card__actions"><VisitStatusBadge status={visit.status} /><span className={`report-status-pill report-status-pill--${report?.status?.toLowerCase() ?? 'new'}`}><ShellIcon name={report?.status === 'FINAL' ? 'check-circle' : 'reports'} /><span>{report?.status === 'FINAL' ? 'نهائي — للقراءة فقط' : report ? 'مسودة' : 'لم يُحفظ بعد'}</span></span></div>} />
+        <CardContent><dl className="report-context report-context--legacy"><div><dt>السنة الدراسية</dt><dd><bdi dir="ltr">{visit.academicYear}</bdi></dd></div><div><dt>الأستاذ</dt><dd>{report?.displayIdentity.teacher.name ?? visit.teacher.name} {report?.displayIdentity.teacher.surname ?? visit.teacher.surname}</dd></div><div><dt>المؤسسة وقت الزيارة</dt><dd>{visit.institution.name}</dd></div><div><dt>{visit.intervalKind === 'ACTUAL_RETROSPECTIVE' ? 'الفترة الفعلية للزيارة' : 'موعد الزيارة'}</dt><dd dir="auto">{visit.actualStartAt && visit.actualEndAt ? `${formatAlgiers(visit.actualStartAt)} — ${formatAlgiers(visit.actualEndAt)}` : visit.scheduledStartAt && visit.scheduledEndAt ? `${formatAlgiers(visit.scheduledStartAt)} — ${formatAlgiers(visit.scheduledEndAt)}` : 'الفترة غير متاحة'}</dd></div>{visit.occurredAt ? <div><dt>وقت الإنجاز</dt><dd dir="auto">{formatAlgiers(visit.occurredAt)}</dd></div> : null}</dl></CardContent>
       </Card>
       {visit.status === 'CANCELLED' ? <p role="status" className="report-cancelled">الزيارة ملغاة. تبقى المسودة المحفوظة للقراءة فقط.</p> : null}
       {report?.status === 'FINAL' ? <Card className="report-state-card accompaniment-state-card"><CardHeader title="اعتماد التقرير" description="التقرير نهائي وثابت في النسخة الحالية." action={<span className="report-context-card__icon"><ShellIcon name="check-circle" /></span>} />
         <CardContent><p>تاريخ الاعتماد: <time dateTime={report.finalizedAt ?? undefined}>{report.finalizedAt ? new Date(report.finalizedAt).toLocaleString('ar-DZ', { timeZone: 'Africa/Algiers' }) : '—'}</time></p>
           <dl className="report-context"><div><dt>المفتش عند الاعتماد</dt><dd>{report.finalizedInspectorNameSnapshot} {report.finalizedInspectorSurnameSnapshot}</dd></div><div><dt>الأستاذ عند الاعتماد</dt><dd>{report.finalizedTeacherNameSnapshot} {report.finalizedTeacherSurnameSnapshot}</dd></div></dl></CardContent></Card> : null}
-      {report?.status === 'FINAL' ? <Card><CardHeader title="إجراءات المتابعة" description="إجراءات مستقلة مرتبطة بهذا التقرير النهائي." action={<Button onClick={() => { setFollowUpError(''); setShowFollowUpForm(true); }}>إضافة إجراء متابعة</Button>} />
-        <CardContent>{followUps.length ? <ul className="report-followup-list">{followUps.map((item) => <li key={item.id}><strong>{item.note}</strong><span>الاستحقاق: {item.dueDate}</span><span>{item.status === 'OPEN' ? item.alertState === 'OVERDUE' ? 'متأخرة' : item.alertState === 'DUE_TODAY' ? 'مستحقة اليوم' : 'مفتوحة' : 'مكتملة'}</span></li>)}</ul> : <p>لا توجد إجراءات متابعة لهذا التقرير.</p>}<Link to="/app/follow-ups">عرض جميع إجراءات المتابعة</Link></CardContent></Card> : null}
       {visit.visitType !== null ? <EmptyState title="مسار التقرير المرتبط بنوع الزيارة غير متاح بعد" description="لم يُنشأ أو يُعتمد تقرير من هذا المسار. احتفظ بنوع الزيارة كما هو." /> : visit.status === 'CANCELLED' && !report ? <EmptyState title="الزيارة ملغاة ولا توجد مسودة محفوظة" description="لا يمكن إنشاء تقرير لهذه الزيارة." /> : <Card className="report-content-card accompaniment-content-card"><CardHeader title={report?.status === 'FINAL' ? 'محتوى التقرير النهائي' : readOnly ? 'المسودة المحفوظة' : 'محتوى التقرير'} description={readOnly ? 'الحقول للقراءة فقط.' : 'احفظ المسودة صراحة؛ لا يتم الحفظ تلقائيًا.'} action={<span className="report-context-card__icon"><ShellIcon name="reports" /></span>} />
         <CardContent><form className="report-form accompaniment-form" onSubmit={(event) => void save(event)} aria-busy={busy}>
           <section className="report-form-section accompaniment-section" aria-labelledby="legacy-report-context-heading"><h3 id="legacy-report-context-heading"><span>١</span> سياق الحصة</h3><div className="report-form-section__grid">
@@ -176,11 +176,13 @@ function LegacyInspectionReportPage() {
             <small>{codePoints(content[field.key] ?? '')} / {field.max}</small>{fieldErrors[field.key]?.length ? <span id={`report-${field.key}-error`} className="report-field__error" role="alert">{fieldErrors[field.key][0]}</span> : null}
           </div>)}
           </div></section>
-          {!readOnly ? <div className="report-actions"><Button type="submit" disabled={busy}>{busy ? 'جارٍ الحفظ…' : 'حفظ المسودة'}</Button>
+          {!readOnly ? <div className="report-actions"><Button variant={report && visit.status === 'COMPLETED' ? 'secondary' : 'primary'} type="submit" disabled={busy}>{busy ? 'جارٍ الحفظ…' : 'حفظ المسودة'}</Button>
             {report && visit.status === 'COMPLETED' ? <Button disabled={busy || dirty || persistedMinimumMissing.length > 0} onClick={() => setConfirmFinalize(true)}>اعتماد التقرير النهائي</Button> : null}</div> : null}
           {!readOnly && report && visit.status === 'COMPLETED' && minimumMissing.length ? <p className="report-hint">يلزم استكمال: {minimumMissing.map((field) => field.label).join('، ')}.</p> : null}
           {!readOnly && report && visit.status === 'COMPLETED' && dirty && minimumMissing.length === 0 ? <p className="report-hint">احفظ التغييرات أولًا قبل اعتماد النسخة المحفوظة.</p> : null}
         </form></CardContent></Card>}
+      {report?.status === 'FINAL' ? <Card><CardHeader title="إجراءات المتابعة" description="إجراءات مستقلة مرتبطة بهذا التقرير النهائي." action={<Button onClick={() => { setFollowUpError(''); setShowFollowUpForm(true); }}>إضافة إجراء متابعة</Button>} />
+        <CardContent>{followUps.length ? <ul className="report-followup-list">{followUps.map((item) => <li key={item.id}><strong>{item.note}</strong><span>الاستحقاق: {item.dueDate}</span><span>{item.status === 'OPEN' ? item.alertState === 'OVERDUE' ? 'متأخرة' : item.alertState === 'DUE_TODAY' ? 'مستحقة اليوم' : 'مفتوحة' : 'مكتملة'}</span></li>)}</ul> : <p>لا توجد إجراءات متابعة لهذا التقرير.</p>}<Link to="/app/follow-ups">عرض جميع إجراءات المتابعة</Link></CardContent></Card> : null}
       {error.includes('الهوية المهنية') ? <p><Link to="/app/me/professional-identity">إكمال الهوية المهنية</Link></p> : null}
     </> : null}
     <Dialog open={confirmFinalize} title="اعتماد التقرير النهائي" description="بعد الاعتماد يصبح التقرير للقراءة فقط في النسخة الحالية. هذا الإجراء ليس توقيعًا رقميًا." onClose={() => setConfirmFinalize(false)}
@@ -199,5 +201,6 @@ function LegacyInspectionReportPage() {
         {followUpError ? <p role="alert">{followUpError}</p> : null}
       </form>
     </Dialog>
+    </WorkspaceStack>
   </div>;
 }

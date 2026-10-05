@@ -34,6 +34,19 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe('TASK-052 report UI', () => {
+  it('presents a bounded DOCUMENT with historical context, existing navigation and intact long prose', async () => {
+    const long = 'ملاحظة بيداغوجية طويلة للمرافقة دون توليد أو تغيير. '.repeat(40);
+    mocks.getInspectionReport.mockResolvedValue({ data: { report: { ...report, pedagogicalObservations: long } } });
+    const { container } = renderRoute(); await screen.findByRole('heading', { name: 'محتوى التقرير' });
+    expect(container.querySelector('[data-density="document"]')).toBeTruthy();
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByText(visit.institution.name)).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'ملف الأستاذ' }).getAttribute('href')).toBe(`/app/teachers/${visit.teacher.id}`);
+    expect(screen.getByRole('link', { name: 'العودة إلى الزيارة' }).getAttribute('href')).toBe(`/app/visits/${visit.id}`);
+    expect(screen.getByRole('textbox', { name: 'الملاحظات البيداغوجية' })).toHaveProperty('value', long);
+    expect(screen.queryByText(/الوزارة|وزارة|العلامة البيداغوجية/u)).toBeNull();
+    expect(mocks.createFollowUp).not.toHaveBeenCalled();
+  });
   it('keeps the supported loading and safe load-error presentations', async () => {
     mocks.getPedagogicalVisit.mockReturnValueOnce(new Promise(() => undefined)); renderRoute();
     expect(screen.getByText('جارٍ تحميل التقرير…')).toBeTruthy();

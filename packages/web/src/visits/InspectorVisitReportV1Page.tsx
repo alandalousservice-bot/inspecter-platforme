@@ -5,7 +5,7 @@ import {
   patchFollowUp, saveInspectorVisitReport, type FollowUp, type InspectorVisitCriterion,
   type InspectorVisitReport, type InspectorVisitReportInput, type InspectorVisitV1Fields, type PedagogicalVisit,
 } from '../auth/client';
-import { Button, Card, CardContent, CardHeader, Dialog, ErrorState, LoadingState, PageHeader, SuccessState } from '../ui';
+import { Button, Card, CardContent, CardHeader, Dialog, ErrorState, LoadingState, PageHeader, SuccessState, WorkspaceStack } from '../ui';
 import { formatAlgiers } from './time';
 import { visitTypeLabels } from './visit-type-labels';
 import { ShellIcon } from '../ui/ShellIcon';
@@ -64,13 +64,13 @@ function Field({ label, value, max, multiline = false, error, onChange, readOnly
 }) {
   const id = `v1-${label.replace(/\s+/gu, '-')}`;
   const helpId = `${id}-help`;
-  return <div className={`report-field${className ? ` ${className}` : ''}`}>
+  return <div className={`report-field${multiline ? ' report-field--prose' : ''}${className ? ` ${className}` : ''}`}>
     <label htmlFor={id}>{label}</label>
     {multiline
       ? <textarea id={id} className="ui-input report-textarea" value={value} readOnly={readOnly} rows={4}
         aria-invalid={Boolean(error)} aria-describedby={max ? `${helpId}${error ? ` ${helpId}-error` : ''}` : error ? `${helpId}-error` : undefined}
         onChange={(event) => onChange?.(event.currentTarget.value)} />
-      : <input id={id} className="ui-input" value={value} readOnly={readOnly} type={type} inputMode={inputMode}
+      : <input id={id} className="ui-input" value={value} readOnly={readOnly} type={type} inputMode={inputMode} dir={inputMode ? 'ltr' : undefined}
         aria-invalid={Boolean(error)} aria-describedby={max ? `${helpId}${error ? ` ${helpId}-error` : ''}` : error ? `${helpId}-error` : undefined}
         onChange={(event) => onChange?.(event.currentTarget.value)} />}
     {max ? <small id={helpId}>{codePoints(value)} / {max} محرف</small> : null}
@@ -79,10 +79,10 @@ function Field({ label, value, max, multiline = false, error, onChange, readOnly
 }
 
 function Section({ number, title, children, action }: { number: number; title: string; children: ReactNode; action?: ReactNode }) {
-  return <Card className="v1-report-section" aria-label={`${number}. ${title}`}>
-    <CardHeader title={`${number}. ${title}`} action={action ?? <span className="report-context-card__icon"><ShellIcon name="reports" /></span>} />
-    <CardContent><div className="v1-report-section__content">{children}</div></CardContent>
-  </Card>;
+  return <section className="v1-report-section" aria-labelledby={`v1-section-${number}`}>
+    <header className="v1-report-section__heading"><h2 id={`v1-section-${number}`}>{number}. {title}</h2>{action}</header>
+    <div className="v1-report-section__content">{children}</div>
+  </section>;
 }
 
 export function InspectorVisitReportV1Page({ visit, initialReport }: Props) {
@@ -252,10 +252,11 @@ export function InspectorVisitReportV1Page({ visit, initialReport }: Props) {
   if (!visitType) return <div className="report-page report-workspace" dir="rtl"><PageHeader title="تقرير زيارة المفتش — الإصدار الأول" breadcrumbs={[{ label: 'الزيارات التربوية', to: '/app/visits' }, { label: 'تفاصيل الزيارة', to: `/app/visits/${encodeURIComponent(visit.id)}` }, { label: 'التقرير' }]} /><ErrorState title="نوع الزيارة غير محدد" description="لا يمكن فتح نموذج التقرير قبل تحديد نوع الزيارة." /></div>;
 
   return <div className="report-page report-workspace v1-report-page" dir="rtl">
-    <PageHeader title="تقرير زيارة المفتش — الإصدار الأول" description="نموذج تقرير زيارة معتمد للمنصة"
+    <WorkspaceStack density="document">
+    <PageHeader variant="compact" title="تقرير زيارة المفتش — الإصدار الأول" description="نموذج تقرير زيارة معتمد للمنصة"
       breadcrumbs={[{ label: 'الزيارات التربوية', to: '/app/visits' }, { label: 'تفاصيل الزيارة', to: `/app/visits/${encodeURIComponent(visit.id)}` }, { label: 'التقرير' }]}
       backAction={<Link to={`/app/visits/${encodeURIComponent(visit.id)}`} onClick={navigateBack}>العودة إلى الزيارة</Link>}
-      secondaryActions={report ? <Link className="ui-button ui-button--secondary" to={`/app/visits/${encodeURIComponent(visit.id)}/report/print`}>معاينة الطباعة</Link> : null} />
+      secondaryActions={<><Link to={`/app/teachers/${encodeURIComponent(visit.teacher.id)}`} onClick={(event) => { if (dirty) { event.preventDefault(); setPendingNavigation(`/app/teachers/${encodeURIComponent(visit.teacher.id)}`); setDiscardDialog(true); } }}>ملف الأستاذ</Link>{report ? <Link className="ui-button ui-button--secondary" to={`/app/visits/${encodeURIComponent(visit.id)}/report/print`}>معاينة الطباعة</Link> : null}</>} />
     {notice ? <SuccessState title={notice} /> : null}{error && criteria.length ? <ErrorState title={error} /> : null}
     {visit.status === 'CANCELLED' && !report ? <ErrorState title="الزيارة ملغاة" description="لا يمكن إنشاء تقرير لهذه الزيارة." /> : null}
     <form onSubmit={(event) => void save(event)} aria-busy={busy}>
@@ -266,7 +267,7 @@ export function InspectorVisitReportV1Page({ visit, initialReport }: Props) {
           <div><dt>المفتش</dt><dd>{report?.status === 'FINAL' ? `${report.finalizedInspectorNameSnapshot} ${report.finalizedInspectorSurnameSnapshot}` : report?.displayIdentity?.inspector ? `${report.displayIdentity.inspector.name} ${report.displayIdentity.inspector.surname}` : '—'}</dd></div>
           {report?.status === 'FINAL' ? <div><dt>الأستاذ عند الاعتماد</dt><dd>{report.finalizedTeacherNameSnapshot} {report.finalizedTeacherSurnameSnapshot}</dd></div> : null}
           <div><dt>المؤسسة وقت الزيارة</dt><dd>{visit.institution.name}</dd></div>
-          <div><dt>السنة الدراسية</dt><dd>{visit.academicYear}</dd></div>
+          <div><dt>السنة الدراسية</dt><dd><bdi dir="ltr">{visit.academicYear}</bdi></dd></div>
           <div><dt>{visit.intervalKind === 'ACTUAL_RETROSPECTIVE' ? 'الفترة الفعلية' : 'موعد الزيارة'}</dt><dd dir="auto">{formatInterval()}</dd></div>
           {report?.status === 'FINAL' ? <div><dt>تاريخ اعتماد التقرير</dt><dd>{dateLabel(report.finalizedAt)}</dd></div> : null}
         </dl></Section>
@@ -310,7 +311,7 @@ export function InspectorVisitReportV1Page({ visit, initialReport }: Props) {
       </div>
       {fieldErrors._form?.length ? <p role="alert" className="report-field__error">راجع الحقول المطلوبة أو غير الصالحة.</p> : null}
       {!readOnly ? <div className="report-actions v1-report-actions">
-        <Button type="submit" disabled={busy || visit.status === 'CANCELLED'}>{busy ? 'جارٍ الحفظ…' : 'حفظ المسودة'}</Button>
+        <Button variant={report && report.status === 'DRAFT' && visit.status === 'COMPLETED' ? 'secondary' : 'primary'} type="submit" disabled={busy || visit.status === 'CANCELLED'}>{busy ? 'جارٍ الحفظ…' : 'حفظ المسودة'}</Button>
         {report && report.status === 'DRAFT' && visit.status === 'COMPLETED' ? <Button type="button" disabled={busy || dirty || missingRequired.length > 0} onClick={() => setConfirmFinalize(true)}>اعتماد التقرير النهائي</Button> : null}
       </div> : null}
       {report?.status === 'DRAFT' && visit.status === 'COMPLETED' && missingRequired.length ? <p className="report-hint">يلزم قبل الاعتماد: {missingRequired.join('، ')}.</p> : null}
@@ -340,5 +341,6 @@ export function InspectorVisitReportV1Page({ visit, initialReport }: Props) {
         <label htmlFor="v1-followup-date">تاريخ الاستحقاق</label><input id="v1-followup-date" className="ui-input" type="date" required value={followUpDueDate} onChange={(event) => setFollowUpDueDate(event.currentTarget.value)} />
       </form>
     </Dialog>
+    </WorkspaceStack>
   </div>;
 }

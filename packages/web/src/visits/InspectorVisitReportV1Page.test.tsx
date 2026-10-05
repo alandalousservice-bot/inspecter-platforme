@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { ApiRequestError } from '../auth/client';
 import { InspectionReportPage } from './InspectionReportPage';
+import type { InspectorVisitReport } from '../auth/client';
 
 const mocks = vi.hoisted(() => ({
   getInspectionReport: vi.fn(), getPedagogicalVisit: vi.fn(), getInspectorVisitCriteria: vi.fn(),
@@ -30,6 +31,20 @@ function renderRoute() {
   </Routes></MemoryRouter>);
 }
 
+function draftReport(): InspectorVisitReport {
+  return {
+    id: 'report-1', reportType: 'INSPECTOR_VISIT', templateSource: 'PRODUCT_OWNER_ADOPTED', templateVersion: 1,
+    status: 'DRAFT', revision: 1, levelClass: 'السنة الرابعة', lessonTopic: 'التوازن', inspectorConclusion: 'خلاصة عربية طويلة واضحة. '.repeat(30),
+    displayIdentity: { inspector: { name: 'مفتش', surname: 'تجريبي' }, teacher: typedVisit.teacher },
+    inspectorVisitV1: { ...Object.fromEntries([
+      'educationDirectorateText','administrativeDivisionText','teacherClassificationText','teacherGradeText','teacherNationalityText',
+      'teacherEffectiveDateText','teacherLastInspectionText','teacherAppointmentText','teacherProfessionalFrameworkText','actualLessonDurationText',
+      'studentCount','studentsPresentCount','studentsAbsentCount','lessonObjective','pedagogicalGuidanceText','practicalGuidanceText',
+      'visitStrengthsText','visitImprovementAreasText','tenureConclusionText','generalAssessmentText','markText','markWordsText','pedagogicalMark',
+    ].map((key) => [key, null])), observations: [] },
+  } as unknown as InspectorVisitReport;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   if (!HTMLDialogElement.prototype.showModal) {
@@ -44,6 +59,81 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('Inspector Visit Report V1 editor', () => {
+  it('uses DOCUMENT composition and contextual routes without substituting the Visit institution', async () => {
+    mocks.getInspectionReport.mockResolvedValue({ data: { report: draftReport() } });
+    const { container } = renderRoute();
+    await screen.findByRole('textbox', { name: 'الميدان: التخطيط' });
+    expect(container.querySelector('[data-density="document"]')).toBeTruthy();
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(container.querySelectorAll('.v1-report-section')).toHaveLength(11);
+    expect(container.querySelector('.v1-report-section .ui-card')).toBeNull();
+    expect(screen.getByText(typedVisit.institution.name)).toBeTruthy();
+    expect(screen.getByText(`${typedVisit.teacher.name} ${typedVisit.teacher.surname}`)).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'ملف الأستاذ' }).getAttribute('href')).toBe(`/app/teachers/${typedVisit.teacher.id}`);
+    expect(screen.getByRole('link', { name: 'العودة إلى الزيارة' }).getAttribute('href')).toBe(`/app/visits/${typedVisit.id}`);
+    expect(screen.getByRole('textbox', { name: 'الخلاصة — مطلوبة للإتمام' })).toHaveProperty('value', draftReport().inspectorConclusion);
+    expect(mocks.createFollowUp).not.toHaveBeenCalled();
+  });
+
+  it.each(['GUIDANCE', 'TENURE_CONFIRMATION', 'PROMOTION_EVALUATION', 'MONITORING_FOLLOW_UP', 'EXCEPTIONAL'])('preserves the %s type-specific fields', async (visitType) => {
+    mocks.getPedagogicalVisit.mockResolvedValue({ data: { visit: { ...typedVisit, visitType } } });
+    renderRoute(); await screen.findByRole('textbox', { name: 'الميدان: التخطيط' });
+    expect(Boolean(screen.queryByRole('textbox', { name: 'العلامة البيداغوجية (اختيارية من 0 إلى 20)' }))).toBe(visitType === 'PROMOTION_EVALUATION');
+    expect(Boolean(screen.queryByRole('textbox', { name: 'الاستنتاج المهني للتثبيت / الترسيم' }))).toBe(visitType === 'TENURE_CONFIRMATION');
+    expect(screen.queryByRole('button', { name: 'إضافة إجراء متابعة' })).toBeNull();
+  });
+
+  it('requires explicit confirmation, permits no mark, and exposes FINAL read-only with independent follow-up', async () => {
+    const draft = draftReport();
+    mocks.getInspectionReport.mockResolvedValue({ data: { report: draft } });
+    mocks.finalizeInspectorVisitReport.mockResolvedValue({ data: { report: { ...draft, status: 'FINAL', revision: 2,
+      finalizedAt: '2026-10-15T10:00:00Z', finalizedInspectorNameSnapshot: 'مفتش', finalizedInspectorSurnameSnapshot: 'تجريبي',
+      finalizedTeacherNameSnapshot: 'ليلى', finalizedTeacherSurnameSnapshot: 'علي' } } });
+    renderRoute(); await screen.findByRole('textbox', { name: 'الميدان: التخطيط' });
+    expect(screen.getByRole('textbox', { name: 'العلامة البيداغوجية (اختيارية من 0 إلى 20)' })).toHaveProperty('value', '');
+    expect(screen.getByRole('button', { name: 'حفظ المسودة' }).className).toContain('secondary');
+    fireEvent.click(screen.getByRole('button', { name: 'اعتماد التقرير النهائي' }));
+    expect(mocks.finalizeInspectorVisitReport).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'تأكيد الاعتماد النهائي' }));
+    await screen.findByText('نهائي — للقراءة فقط');
+    expect(mocks.finalizeInspectorVisitReport).toHaveBeenCalledWith(draft.id, draft.revision);
+    expect(screen.getByRole('textbox', { name: 'الخلاصة — مطلوبة للإتمام' })).toHaveProperty('readOnly', true);
+    expect(screen.queryByRole('button', { name: 'حفظ المسودة' })).toBeNull();
+    expect(mocks.createFollowUp).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'إضافة إجراء متابعة' }));
+    fireEvent.change(screen.getByLabelText('الإجراء المطلوب'), { target: { value: 'إجراء يدوي' } });
+    fireEvent.change(screen.getByLabelText('تاريخ الاستحقاق'), { target: { value: '2026-10-20' } });
+    mocks.createFollowUp.mockResolvedValue({ data: { followUp: { id: 'fu-1', note: 'إجراء يدوي', dueDate: '2026-10-20', status: 'OPEN' } } });
+    fireEvent.click(screen.getByRole('button', { name: 'حفظ الإجراء' }));
+    await waitFor(() => expect(mocks.createFollowUp).toHaveBeenCalledWith(draft.id, { note: 'إجراء يدوي', dueDate: '2026-10-20' }));
+  });
+
+  it.each(['-0.01', '20.01', '14.257', 'غير رقمي'])('keeps API mark validation feedback accessible for %s', async (value) => {
+    mocks.saveInspectorVisitReport.mockRejectedValue(new ApiRequestError('opaque', { 'inspectorVisitV1.pedagogicalMark': ['invalid'] }, 400, 'VALIDATION_ERROR'));
+    renderRoute(); const mark = await screen.findByRole('textbox', { name: 'العلامة البيداغوجية (اختيارية من 0 إلى 20)' });
+    fireEvent.change(mark, { target: { value } }); fireEvent.click(screen.getByRole('button', { name: 'حفظ المسودة' }));
+    await screen.findByText('القيمة غير صالحة.');
+    expect(mark.getAttribute('aria-invalid')).toBe('true');
+    expect(document.getElementById(mark.getAttribute('aria-describedby')!)).toHaveProperty('textContent', 'القيمة غير صالحة.');
+    expect(mocks.saveInspectorVisitReport.mock.calls[0][1].inspectorVisitV1.pedagogicalMark).toBe(value);
+  });
+
+  it('protects dirty content when navigating to Teacher Profile', async () => {
+    renderRoute(); fireEvent.change(await screen.findByRole('textbox', { name: 'الميدان: التخطيط' }), { target: { value: 'كتابة محلية' } });
+    fireEvent.click(screen.getByRole('link', { name: 'ملف الأستاذ' }));
+    await screen.findByRole('dialog', { name: 'تغييرات غير محفوظة' });
+    fireEvent.click(screen.getByRole('button', { name: 'البقاء في الصفحة' }));
+    expect(screen.getByRole('textbox', { name: 'الميدان: التخطيط' })).toHaveProperty('value', 'كتابة محلية');
+  });
+
+  it('keeps template loading/error separate from an editable document', async () => {
+    mocks.getInspectorVisitCriteria.mockReturnValueOnce(new Promise(() => undefined));
+    renderRoute(); await screen.findByText('جارٍ تحميل نموذج التقرير…');
+    expect(screen.queryByRole('textbox')).toBeNull(); cleanup();
+    mocks.getInspectorVisitCriteria.mockRejectedValueOnce(new Error('private detail'));
+    renderRoute(); await screen.findByText('تعذر تحميل نموذج التقرير');
+    expect(screen.queryByRole('textbox')).toBeNull(); expect(screen.queryByText('private detail')).toBeNull();
+  });
   it('opens V1 without a report-type chooser and presents all source-oriented sections in RTL', async () => {
     renderRoute();
     expect(await screen.findByRole('heading', { name: 'تقرير زيارة المفتش — الإصدار الأول' })).toBeTruthy();

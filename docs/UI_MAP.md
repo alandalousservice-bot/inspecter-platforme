@@ -88,3 +88,7 @@ TASK-035 (منجز في G3) يستخدم عرضًا افتراضيًا ثم وض
 ## TASK-080 profile UI delta (completed)
 
 أُضيفت أقسام ملف Teacher، تحرير بريد المؤسسة، وبند `SUBSTITUTE` وفق [عقد TASK-080](architecture/TASK_080_TEACHER_ADMINISTRATIVE_MASTER_DATA.md) داخل الواجهات الحالية فقط؛ لا صفحة بطاقة معلومات مجمعة، ولا جدول مؤسسات تكملة نصاب أو جدول حصص بموقع، ولا طباعة. `personalAddress` و`administrativeNote` في تفصيل الأستاذ المصرح فقط؛ لا صفوف دليل أو Visit/FollowUp. سطح المؤسسة يستخدم إجراء تحرير البريد المحدود، لا نظام إدارة جديد.
+
+## G9-05 — Document screen presentation
+
+The existing type-aware `/app/visits/:id/report` editor now uses DOCUMENT-family composition for both V1 and legacy inspector-authored accompaniment: compact header, Visit historical context, textual DRAFT/FINAL state, controlled reading width, section separators, explicit save/finalize and existing contextual FollowUp after content. Existing Visit/Teacher links use available IDs; V1 retains dirty navigation confirmation. All fields, validation, lifecycle, ownership and print route remain unchanged. This screen delta does not supersede G8-10 print contracts. [Verification](G9-05-DOCUMENT-WORKSPACES.md).
