@@ -33,6 +33,9 @@ describe('professional identity page', () => {
     fireEvent.change(screen.getByRole('textbox', { name: /الاسم/ }), { target: { value: ' ' } });
     fireEvent.click(screen.getByRole('button', { name: 'حفظ الهوية المهنية' }));
     expect(screen.getByRole('alert').textContent).toContain('أدخل قيمة');
+    const input = screen.getByRole('textbox', { name: /الاسم/ });
+    expect(input.getAttribute('aria-invalid')).toBe('true');
+    expect(input.getAttribute('aria-describedby')).toBeTruthy();
     expect(putProfessionalIdentity).not.toHaveBeenCalled();
   });
 
@@ -46,5 +49,29 @@ describe('professional identity page', () => {
     expect(error.textContent).toContain('تعذر حفظ الهوية المهنية');
     expect(error.textContent).not.toContain('private detail');
     expect(screen.getByRole('button', { name: 'حفظ الهوية المهنية' })).toBeTruthy();
+    putProfessionalIdentity.mockResolvedValueOnce({ name: 'ليلى', surname: 'بن عمر' });
+    fireEvent.click(screen.getByRole('button', { name: 'حفظ الهوية المهنية' }));
+    expect(await screen.findByText('حُفظت الهوية المهنية.')).toBeTruthy();
+    expect(putProfessionalIdentity).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps load failure distinct from incomplete identity and exposes no editable form', async () => {
+    getProfessionalIdentity.mockRejectedValueOnce(new Error('private detail'));
+    render(<ProfessionalIdentityPage />);
+    expect((await screen.findByRole('alert')).textContent).toContain('أعد تحميل الصفحة');
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.queryByText('لم تكتمل الهوية المهنية بعد.')).toBeNull();
+  });
+
+  it('uses one document header and saved context without cards or account expansion', async () => {
+    getProfessionalIdentity.mockResolvedValue({ name: 'ليلى', surname: 'بن عمر' });
+    const { container } = render(<ProfessionalIdentityPage />);
+    await screen.findByDisplayValue('ليلى');
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByText('ليلى بن عمر').closest('bdi')?.getAttribute('dir')).toBe('auto');
+    expect(container.querySelector('.ui-card')).toBeNull();
+    expect(container.querySelector('[data-density="document"]')).toBeTruthy();
+    expect(screen.getAllByRole('textbox')).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: 'إلغاء' })).toBeNull();
   });
 });

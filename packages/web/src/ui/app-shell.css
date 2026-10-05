@@ -38,6 +38,12 @@
 .app-sidebar__brand-copy span { color: var(--color-navigation-text-muted); font-size: var(--font-size-meta); }
 .app-sidebar__close { display: none; }
 .app-sidebar__primary { display: grid; gap: var(--space-1); }
+/* G9 grouping changes screen navigation only; print geometry is untouched. */
+@media screen {
+  .app-sidebar { gap: var(--space-4); }
+  .app-sidebar__primary { gap: var(--space-4); }
+  .app-sidebar__group { display: grid; gap: var(--space-1); min-width: 0; }
+}
 .app-sidebar__section-label {
   margin: 0;
   padding: 0 var(--space-3) var(--space-2);
@@ -79,6 +85,10 @@
 .app-shell--collapsed .app-sidebar__primary,
 .app-shell--collapsed .app-sidebar__account { width: 100%; }
 .app-shell--collapsed .app-sidebar__link { justify-content: center; padding-inline: var(--space-2); }
+@media screen and (min-width: 64rem) {
+  .app-shell--collapsed .app-sidebar__primary { gap: var(--space-1); }
+  .app-shell--collapsed .app-sidebar__account { border: 0; padding-block-start: 0; }
+}
 .app-shell--collapsed .app-sidebar__link:hover::after,
 .app-shell--collapsed .app-sidebar__link:focus-visible::after {
   position: absolute;

@@ -1,14 +1,8 @@
-.professional-identity-page {
-  inline-size: min(100%, 44rem);
-  margin-inline: auto;
-  padding: var(--space-6);
-}
-
-.professional-identity-page form {
-  display: grid;
-  gap: var(--space-4);
-}
-
-@media (max-width: 40rem) {
-  .professional-identity-page { padding: var(--space-3); }
+@media screen {
+  .professional-identity-page { min-inline-size: 0; }
+  .professional-identity-page form { display: grid; gap: var(--space-4); }
+  .professional-identity-context { padding-block-end: var(--space-4); border-block-end: 1px solid var(--color-border); }
+  .professional-identity-context .ui-detail-list { margin: 0; }
+  .professional-identity-context > p { margin-block-end: 0; color: var(--color-text-secondary); }
+  .professional-identity-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 }

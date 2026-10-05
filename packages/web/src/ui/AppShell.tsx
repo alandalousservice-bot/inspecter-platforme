@@ -11,13 +11,19 @@ type AppShellProps = {
   headerAction?: ReactNode;
 };
 
-const navigation: Array<{ to: string; label: string; icon: ShellIconName }> = [
-  { to: '/app', label: 'لوحة المتابعة', icon: 'dashboard' },
-  { to: '/app/institutions', label: 'المؤسسات', icon: 'institutions' },
-  { to: '/app/teachers', label: 'دليل الأساتذة', icon: 'teachers' },
-  { to: '/app/submissions', label: 'طلبات الأساتذة', icon: 'submissions' },
-  { to: '/app/visits', label: 'الزيارات', icon: 'visits' },
-  { to: '/app/follow-ups', label: 'المتابعات', icon: 'follow-ups' },
+const navigation: Array<{ label: string; items: Array<{ to: string; label: string; icon: ShellIconName }> }> = [
+  { label: 'مساحة العمل', items: [
+    { to: '/app', label: 'لوحة المتابعة', icon: 'dashboard' },
+  ] },
+  { label: 'ملفات الإشراف', items: [
+    { to: '/app/teachers', label: 'دليل الأساتذة', icon: 'teachers' },
+    { to: '/app/submissions', label: 'طلبات الأساتذة', icon: 'submissions' },
+    { to: '/app/institutions', label: 'المؤسسات', icon: 'institutions' },
+  ] },
+  { label: 'العمل الميداني والمتابعة', items: [
+    { to: '/app/visits', label: 'الزيارات', icon: 'visits' },
+    { to: '/app/follow-ups', label: 'إجراءات المتابعة', icon: 'follow-ups' },
+  ] },
 ];
 
 export function AppShell({ children, inspector, headerAction }: AppShellProps) {
@@ -129,8 +135,9 @@ export function AppShell({ children, inspector, headerAction }: AppShellProps) {
             </div>
 
             <nav id="app-primary-navigation" className="app-sidebar__primary" aria-label="مساحات العمل">
-              <p className="app-sidebar__section-label">إدارة العمل</p>
-              {navigation.map(({ to, label, icon }) => (
+              {navigation.map((group) => <div className="app-sidebar__group" role="group" aria-label={group.label} key={group.label}>
+                <p className="app-sidebar__section-label">{group.label}</p>
+                {group.items.map(({ to, label, icon }) => (
                 <NavLink
                   key={to}
                   to={to}
@@ -143,7 +150,8 @@ export function AppShell({ children, inspector, headerAction }: AppShellProps) {
                   <ShellIcon name={icon} />
                   <span className="app-sidebar__link-label">{label}</span>
                 </NavLink>
-              ))}
+                ))}
+              </div>)}
             </nav>
 
             <div className="app-sidebar__account">

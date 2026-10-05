@@ -93,6 +93,7 @@ describe('TASK-070B Dashboard presentation', () => {
     ]) {
       const card = screen.getByRole('region', { name: `${name}: ${count}` });
       expect(within(card).getByText(count)).toBeTruthy();
+      expect(within(card).getByRole('link', { name: `عرض القسم: ${name}` })).toBeTruthy();
     }
     expect(getDashboardSummary).toHaveBeenCalledTimes(1);
   });

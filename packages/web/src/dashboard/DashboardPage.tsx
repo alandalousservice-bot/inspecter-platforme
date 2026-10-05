@@ -24,7 +24,7 @@ function CountCard({ title, total, to, icon, tone, children }: CountCardProps) {
         <h3 className="dashboard-count__title">{title}</h3>
       </div>
       <p className="dashboard-count__value" aria-label={`العدد: ${total}`}><bdi dir="ltr">{total}</bdi></p>
-      <Link className="dashboard-count__link" to={to}>عرض القسم <span aria-hidden="true">←</span></Link>
+      <Link className="dashboard-count__link" to={to} aria-label={`عرض القسم: ${title}`}>عرض القسم <span aria-hidden="true">←</span></Link>
       {children ? <ul className="dashboard-count__items">{children}</ul> : null}
     </Card>
   );

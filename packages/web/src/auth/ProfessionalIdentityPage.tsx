@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ApiRequestError, getProfessionalIdentity, putProfessionalIdentity, type ProfessionalIdentity } from './client';
-import { Button, Card, CardContent, CardHeader, ErrorState, Input, LoadingState, PageHeader, SuccessState } from '../ui';
+import { Button, DetailList, ErrorState, FormGrid, FormSection, Input, LoadingState, PageHeader, SuccessState, WorkspaceStack } from '../ui';
 import './professional-identity.css';
 
 type Draft = { name: string; surname: string };
@@ -53,19 +53,28 @@ export function ProfessionalIdentityPage() {
   }
 
   return <div dir="rtl" className="professional-identity-page">
-    <PageHeader title="هويتي المهنية" description="الاسم واللقب المستخدمان في هوية المفتش المهنية." />
-    {loading ? <LoadingState label="جارٍ تحميل الهوية المهنية…" /> : loadError ? <ErrorState description="تعذر تحميل الهوية المهنية. أعد تحميل الصفحة." /> :
-      <Card><CardHeader title="الاسم واللقب المهنيان" description="يُستخدمان لاحقًا لهوية المفتش في التقرير النهائي. لا يُستعمل البريد الإلكتروني اسمًا مهنيًا." />
-        <CardContent>
-          {!saved?.name || !saved?.surname ? <p role="status">لم تكتمل الهوية المهنية بعد.</p> : null}
+    <WorkspaceStack density="document">
+      <PageHeader variant="compact" title="هويتي المهنية" />
+      {loading ? <LoadingState label="جارٍ تحميل الهوية المهنية…" /> : loadError ? <ErrorState description="تعذر تحميل الهوية المهنية. أعد تحميل الصفحة." /> :
+        <>
+          <div className="professional-identity-context">
+            {saved?.name && saved?.surname ? <DetailList items={[{ label: 'الهوية المهنية المحفوظة', value: `${saved.name} ${saved.surname}` }]} /> : null}
+            {!saved?.name || !saved?.surname ? <p role="status">لم تكتمل الهوية المهنية بعد.</p> : null}
+          </div>
           <form onSubmit={(event) => void submit(event)} noValidate>
-            <Input id="inspector-name" label="الاسم" required autoComplete="given-name" maxLength={200} value={draft.name} error={fieldErrors.name} onChange={(event) => { setDraft({ ...draft, name: event.target.value }); setSuccess(false); }} />
-            <Input id="inspector-surname" label="اللقب" required autoComplete="family-name" maxLength={200} value={draft.surname} error={fieldErrors.surname} onChange={(event) => { setDraft({ ...draft, surname: event.target.value }); setSuccess(false); }} />
-            <Button type="submit" disabled={saving}>{saving ? 'جارٍ الحفظ…' : 'حفظ الهوية المهنية'}</Button>
+            <FormSection title="تحرير الاسم واللقب" description="يُستخدمان في هوية المفتش في التقرير النهائي. لا يُستعمل البريد الإلكتروني اسمًا مهنيًا.">
+              <FormGrid>
+                <Input id="inspector-name" label="الاسم" required autoComplete="given-name" maxLength={200} value={draft.name} error={fieldErrors.name} onChange={(event) => { setDraft({ ...draft, name: event.target.value }); setSuccess(false); }} />
+                <Input id="inspector-surname" label="اللقب" required autoComplete="family-name" maxLength={200} value={draft.surname} error={fieldErrors.surname} onChange={(event) => { setDraft({ ...draft, surname: event.target.value }); setSuccess(false); }} />
+              </FormGrid>
+            </FormSection>
+            {error ? <ErrorState compact description={error} /> : null}
+            {success ? <SuccessState title="حُفظت الهوية المهنية." /> : null}
+            <div className="professional-identity-actions">
+              <Button type="submit" disabled={saving}>{saving ? 'جارٍ الحفظ…' : 'حفظ الهوية المهنية'}</Button>
+            </div>
           </form>
-          {error ? <p role="alert">{error}</p> : null}
-          {success ? <SuccessState title="حُفظت الهوية المهنية." /> : null}
-        </CardContent>
-      </Card>}
+        </>}
+    </WorkspaceStack>
   </div>;
 }

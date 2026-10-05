@@ -20,7 +20,7 @@ describe('G6-02 professional application shell', () => {
     renderShell();
     const primary = screen.getByRole('navigation', { name: 'مساحات العمل' });
     expect([...primary.querySelectorAll('a')].map((link) => link.getAttribute('aria-label'))).toEqual([
-      'لوحة المتابعة', 'المؤسسات', 'دليل الأساتذة', 'طلبات الأساتذة', 'الزيارات', 'المتابعات',
+      'لوحة المتابعة', 'دليل الأساتذة', 'طلبات الأساتذة', 'المؤسسات', 'الزيارات', 'إجراءات المتابعة',
     ]);
     expect(screen.queryByRole('link', { name: 'الرئيسية' })).toBeNull();
     expect(screen.queryByRole('link', { name: /المرجع|المقترحات|النشاط/u })).toBeNull();
@@ -42,9 +42,13 @@ describe('G6-02 professional application shell', () => {
     ['/app/institutions', 'المؤسسات'],
     ['/app/submissions/submission-1', 'طلبات الأساتذة'],
     ['/app/teachers/teacher-1/information-card', 'دليل الأساتذة'],
+    ['/app/teachers/teacher-1', 'دليل الأساتذة'],
+    ['/app/teachers/teacher-1/schedules', 'دليل الأساتذة'],
     ['/app/visits/new', 'الزيارات'],
+    ['/app/visits/visit-1', 'الزيارات'],
     ['/app/visits/visit-1/report', 'الزيارات'],
-    ['/app/follow-ups', 'المتابعات'],
+    ['/app/follow-ups', 'إجراءات المتابعة'],
+    ['/app/me/professional-identity', 'هويتي المهنية'],
   ])('preserves the existing active navigation for %s', (path, activeLabel) => {
     renderShell(path);
     expect(screen.getByRole('link', { name: 'لوحة المتابعة' }).hasAttribute('aria-current')).toBe(false);
@@ -59,6 +63,26 @@ describe('G6-02 professional application shell', () => {
     unmount();
     renderShell('/app/visits/visit-1/report');
     expect(screen.getByRole('link', { name: 'الزيارات' }).getAttribute('aria-current')).toBe('page');
+  });
+
+  it('groups existing destinations without interactive headings or new routes', () => {
+    renderShell();
+    const navigation = screen.getByRole('navigation', { name: 'مساحات العمل' });
+    expect([...navigation.querySelectorAll('[role="group"]')].map((group) => group.getAttribute('aria-label'))).toEqual([
+      'مساحة العمل', 'ملفات الإشراف', 'العمل الميداني والمتابعة',
+    ]);
+    expect(navigation.querySelectorAll('button')).toHaveLength(0);
+    expect(navigation.querySelectorAll('a')).toHaveLength(6);
+  });
+
+  it('closes the mobile drawer on route navigation and returns focus', async () => {
+    renderShell('/app');
+    const opener = screen.getByRole('button', { name: 'فتح قائمة التنقل' });
+    fireEvent.click(opener);
+    fireEvent.click(screen.getByRole('link', { name: 'دليل الأساتذة' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(opener));
+    expect(screen.getByRole('link', { name: 'دليل الأساتذة' }).getAttribute('aria-current')).toBe('page');
   });
 
   it('keeps the authenticated print route outside the page system and screen shell', () => {
