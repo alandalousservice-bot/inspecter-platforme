@@ -24,6 +24,7 @@ const rows = Array.from({ length: 25 }, (_, i) => ({
 let context;
 let mode = 'dense';
 let releaseLoading;
+const pendingSearchResponses = [];
 const queries = [];
 const unexpected = [];
 try {
@@ -38,6 +39,7 @@ try {
     if (url.pathname === '/api/v1/teachers') {
       queries.push(Object.fromEntries(url.searchParams));
       if (mode === 'loading') await new Promise((resolve) => { releaseLoading = resolve; });
+      if (mode === 'history' && url.searchParams.has('q')) await new Promise((resolve) => { pendingSearchResponses.push(resolve); });
       if (mode === 'error') return respond({ error: { code: 'INTERNAL_ERROR', message: 'خطأ عام', requestId: 'synthetic' } }, 500);
       const data = mode === 'empty' ? [] : rows;
       return respond({ data, page: { limit: 25, total: mode === 'empty' ? 0 : 205, nextCursor: url.searchParams.has('cursor') || mode === 'empty' ? null : rows.at(-1).id } });
@@ -95,6 +97,58 @@ try {
   await page.goBack(); await page.getByRole('textbox', { name: 'البحث عن أستاذ' }).waitFor();
   await page.waitForFunction(() => document.querySelector('#teacher-directory-search')?.value === '');
   assert.equal(await page.getByRole('textbox', { name: 'البحث عن أستاذ' }).inputValue(), '');
+  // G9-HF01: native history, unresolved search responses and a pending debounce.
+  // No settling wait is inserted before Back; the original assertion above stays.
+  for (const width of [1440, 390]) {
+    mode = 'history';
+    await page.setViewportSize({ width, height: 1100 });
+    await page.goto(`http://127.0.0.1:5190/app/teachers?districtId=${district.id}&professionalStatus=SUBSTITUTE&recordStatus=INACTIVE`);
+    const input = page.getByRole('textbox', { name: 'البحث عن أستاذ' });
+    await input.focus(); await input.fill('بحث عربي A');
+    await page.waitForURL((url) => url.searchParams.get('q') === 'بحث عربي A');
+    assert.equal(await input.inputValue(), 'بحث عربي A');
+    const laterRequest = page.waitForRequest((request) => {
+      const url = new URL(request.url());
+      return url.pathname === '/api/v1/teachers' && url.searchParams.get('q') === 'Latin B';
+    });
+    await input.fill('Latin B');
+    await page.waitForURL((url) => url.searchParams.get('q') === 'Latin B');
+    // Verify the in-flight-response case separately from the uncommitted-router
+    // race above. This request starts but its response remains explicitly held.
+    await laterRequest;
+    for (const [direction, expected] of [['back', 'بحث عربي A'], ['back', ''], ['forward', 'بحث عربي A']]) {
+      if (direction === 'back') await page.goBack(); else await page.goForward();
+      await page.waitForFunction((value) => document.querySelector('#teacher-directory-search')?.value === value, expected);
+      assert.equal(new URL(page.url()).searchParams.get('q') ?? '', expected);
+      assert.equal(await input.inputValue(), expected);
+      assert.equal(await input.evaluate((el) => el === document.activeElement), true);
+    }
+    // Pause only the debounce clock: native Browser Back still traverses real
+    // browser history. Advancing two debounce windows AFTER restoration proves
+    // cancellation, rather than waiting before Back to hide the original race.
+    await page.clock.install(); await page.clock.pauseAt(new Date());
+    await input.fill('stale بحث');
+    await page.goBack();
+    await page.waitForFunction(() => document.querySelector('#teacher-directory-search')?.value === '');
+    await page.clock.runFor(700);
+    assert.equal(new URL(page.url()).searchParams.has('q'), false);
+    assert.equal(await input.inputValue(), '');
+    assert.equal(queries.some((query) => query.q === 'stale بحث'), false);
+    await page.clock.resume();
+    while (pendingSearchResponses.length) pendingSearchResponses.shift()();
+    await page.locator('.teacher-directory__identity-link').first().waitFor();
+    const restored = new URL(page.url()).searchParams;
+    assert.equal(restored.get('professionalStatus'), 'SUBSTITUTE');
+    assert.equal(restored.get('recordStatus'), 'INACTIVE');
+    assert.equal(restored.get('districtId'), district.id);
+    assert(queries.some((query) => query.q === 'Latin B' && query.professionalStatus === 'SUBSTITUTE' && query.recordStatus === 'INACTIVE' && query.districtId === district.id));
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), false);
+    assert.equal(await page.getByRole('table', { name: 'دليل الأساتذة' }).count(), width === 1440 ? 1 : 0);
+    assert.equal(await page.getByRole('list', { name: 'دليل الأساتذة' }).count(), width === 390 ? 1 : 0);
+    await page.screenshot({ path: join(output, `${width}-history-restored.png`) });
+    console.log(`G9_HF01_HISTORY_${width}: PASS; Back/Forward/Arabic/Latin/focus/filters/pending debounce`);
+  }
+  mode = 'dense';
   for (const state of ['loading', 'empty', 'error']) {
     mode = state;
     await page.goto(`http://127.0.0.1:5190/app/teachers${state === 'empty' ? '?q=missing' : ''}`);
@@ -126,4 +180,4 @@ try {
   console.log(`ZOOM_200: PASS; ${before.dpr}->${after.dpr}; ${before.width}->${after.width}`);
   console.log('STATES_SEARCH_PAGINATION_BACK_NO_PER_ROW_REQUESTS: PASS');
   console.log(`VISUAL_EVIDENCE: ${output}`);
-} finally { releaseLoading?.(); await context?.close(); await server.close(); }
+} finally { releaseLoading?.(); while (pendingSearchResponses.length) pendingSearchResponses.shift()(); await context?.close(); await server.close(); }

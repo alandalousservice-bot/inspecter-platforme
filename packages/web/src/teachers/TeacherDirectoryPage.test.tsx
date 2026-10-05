@@ -1,6 +1,7 @@
+import { Suspense } from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { MemoryRouter, Route, Routes } from 'react-router';
+import { BrowserRouter, MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import type { TeacherDirectoryItem } from '../auth/client';
 import { ApiRequestError } from '../auth/client';
 import { TeacherDirectoryPage, parseTimeToMinute } from './TeacherDirectoryPage';
@@ -25,13 +26,133 @@ beforeEach(() => {
   mocks.listInstitutions.mockResolvedValue({ data: [institution], page: { limit: 25, nextCursor: null, total: 1 } });
   mocks.listTeachers.mockResolvedValue(response());
 });
-afterEach(() => { cleanup(); vi.clearAllMocks(); vi.useRealTimers(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.clearAllMocks(); vi.useRealTimers(); vi.unstubAllGlobals(); window.history.replaceState(null, '', '/'); });
 
 function renderPage(path = '/app/teachers') {
   return render(<MemoryRouter initialEntries={[path]}><Routes><Route path="/app/teachers" element={<TeacherDirectoryPage />} /></Routes></MemoryRouter>);
 }
 
 describe('TASK-045 Teacher directory', () => {
+  it('reconciles native Back before a search transition commits, then restores Forward without stale replay', async () => {
+    window.history.replaceState(null, '', '/app/teachers?professionalStatus=SUBSTITUTE&recordStatus=INACTIVE');
+    let releaseTransition!: () => void;
+    let holdTransition = true;
+    const transition = new Promise<void>((resolve) => { releaseTransition = resolve; });
+    function PendingSearch() {
+      const location = useLocation();
+      // Hold the real BrowserRouter's transition before commit, not the draft
+      // input or history APIs. This makes the observed push/POP race deterministic.
+      if (holdTransition && new URLSearchParams(location.search).has('q')) throw transition;
+      return <TeacherDirectoryPage />;
+    }
+    render(<BrowserRouter><Suspense fallback={null}><Routes><Route path="/app/teachers" element={<PendingSearch />} /></Routes></Suspense></BrowserRouter>);
+    await screen.findByRole('link', { name: 'محمد علي' });
+    const input = screen.getByRole('textbox', { name: 'البحث عن أستاذ' }) as HTMLInputElement;
+    input.focus();
+    vi.useFakeTimers();
+    fireEvent.change(input, { target: { value: 'محمد Test' } });
+    expect(input.value).toBe('محمد Test');
+    await act(async () => { vi.advanceTimersByTime(350); });
+    expect(new URLSearchParams(window.location.search).get('q')).toBe('محمد Test');
+    expect(mocks.listTeachers).toHaveBeenCalledTimes(1); // transition still uncommitted
+    vi.useRealTimers();
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        window.addEventListener('popstate', () => resolve(), { once: true });
+        window.history.back();
+      });
+    });
+    expect(new URLSearchParams(window.location.search).has('q')).toBe(false);
+    expect(input.value).toBe('');
+    expect(document.activeElement).toBe(input);
+    vi.useFakeTimers();
+    await act(async () => { vi.advanceTimersByTime(700); });
+    expect(new URLSearchParams(window.location.search).has('q')).toBe(false);
+    expect(input.value).toBe('');
+    vi.useRealTimers();
+    holdTransition = false;
+    await act(async () => { releaseTransition(); });
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        window.addEventListener('popstate', () => resolve(), { once: true });
+        window.history.forward();
+      });
+    });
+    expect(input.value).toBe('محمد Test');
+    expect(new URLSearchParams(window.location.search).get('q')).toBe('محمد Test');
+    expect(mocks.listTeachers).toHaveBeenLastCalledWith({ q: 'محمد Test', professionalStatus: 'SUBSTITUTE', recordStatus: 'INACTIVE', limit: 25 });
+    expect(document.activeElement).toBe(input);
+  });
+
+  it('keeps typing, selection and debounce stable and restores earlier queries without resetting other filters', async () => {
+    const filters = `districtId=${districtA.id}&institutionId=${institution.id}&hasCurrentInstitution=true&professionalStatus=SUBSTITUTE&recordStatus=INACTIVE`;
+    window.history.replaceState(null, '', `/app/teachers?${filters}`);
+    render(<BrowserRouter><Routes><Route path="/app/teachers" element={<TeacherDirectoryPage />} /></Routes></BrowserRouter>);
+    await screen.findByRole('link', { name: 'محمد علي' });
+    const input = screen.getByRole('textbox', { name: 'البحث عن أستاذ' }) as HTMLInputElement;
+    input.focus();
+    vi.useFakeTimers();
+    fireEvent.change(input, { target: { value: 'محمد' } });
+    input.setSelectionRange(2, 2);
+    await act(async () => { vi.advanceTimersByTime(349); });
+    expect(input.value).toBe('محمد'); expect(input.selectionStart).toBe(2);
+    expect(mocks.listTeachers).toHaveBeenCalledTimes(1);
+    fireEvent.change(input, { target: { value: 'محمد A' } });
+    await act(async () => { vi.advanceTimersByTime(349); });
+    expect(input.value).toBe('محمد A'); expect(mocks.listTeachers).toHaveBeenCalledTimes(1);
+    await act(async () => { vi.advanceTimersByTime(1); });
+    expect(new URLSearchParams(window.location.search).get('q')).toBe('محمد A');
+    fireEvent.change(input, { target: { value: 'Test B' } });
+    await act(async () => { vi.advanceTimersByTime(350); });
+    expect(new URLSearchParams(window.location.search).get('q')).toBe('Test B');
+    expect(mocks.listTeachers).toHaveBeenCalledTimes(3);
+    vi.useRealTimers();
+    for (const [delta, query] of [[-1, 'محمد A'], [-1, ''], [1, 'محمد A'], [1, 'Test B']] as const) {
+      await act(async () => {
+        await new Promise<void>((resolve) => {
+          window.addEventListener('popstate', () => resolve(), { once: true });
+          window.history.go(delta);
+        });
+      });
+      expect(input.value).toBe(query);
+      expect(new URLSearchParams(window.location.search).get('q') ?? '').toBe(query);
+      expect(new URLSearchParams(window.location.search).get('institutionId')).toBe(institution.id);
+      expect((screen.getByRole('combobox', { name: 'الصفة المهنية' }) as HTMLSelectElement).value).toBe('SUBSTITUTE');
+      expect(mocks.listTeachers).toHaveBeenLastCalledWith({ districtId: districtA.id, institutionId: institution.id, hasCurrentInstitution: true, professionalStatus: 'SUBSTITUTE', recordStatus: 'INACTIVE', limit: 25, ...(query ? { q: query } : {}) });
+      expect(document.activeElement).toBe(input);
+    }
+  });
+
+  it('does not erase newer typed characters when an earlier search transition commits', async () => {
+    window.history.replaceState(null, '', '/app/teachers');
+    let releaseTransition!: () => void;
+    let holdTransition = true;
+    const transition = new Promise<void>((resolve) => { releaseTransition = resolve; });
+    function PendingSearch() {
+      const location = useLocation();
+      if (holdTransition && new URLSearchParams(location.search).get('q') === 'A') throw transition;
+      return <TeacherDirectoryPage />;
+    }
+    render(<BrowserRouter><Suspense fallback={null}><Routes><Route path="/app/teachers" element={<PendingSearch />} /></Routes></Suspense></BrowserRouter>);
+    await screen.findByRole('link', { name: 'محمد علي' });
+    const input = screen.getByRole('textbox', { name: 'البحث عن أستاذ' }) as HTMLInputElement;
+    input.focus(); vi.useFakeTimers();
+    fireEvent.change(input, { target: { value: 'A' } });
+    await act(async () => { vi.advanceTimersByTime(350); });
+    expect(new URLSearchParams(window.location.search).get('q')).toBe('A');
+    fireEvent.change(input, { target: { value: 'AB عربي' } });
+    input.setSelectionRange(2, 2);
+    holdTransition = false;
+    await act(async () => { releaseTransition(); });
+    expect(input.value).toBe('AB عربي'); expect(input.selectionStart).toBe(2);
+    expect(document.activeElement).toBe(input);
+    await act(async () => { vi.advanceTimersByTime(349); });
+    expect(mocks.listTeachers).toHaveBeenLastCalledWith({ q: 'A', limit: 25 });
+    await act(async () => { vi.advanceTimersByTime(1); });
+    expect(new URLSearchParams(window.location.search).get('q')).toBe('AB عربي');
+    expect(mocks.listTeachers).toHaveBeenLastCalledWith({ q: 'AB عربي', limit: 25 });
+  });
+
   it('uses one compact header and an accessible-only caption without cards or result headings', async () => {
     renderPage(); await screen.findByRole('link', { name: 'محمد علي' });
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);

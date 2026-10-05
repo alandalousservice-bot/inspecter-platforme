@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { ApiRequestError, getCurrentDistricts, listInstitutions, listTeachers, type DistrictOption, type Institution, type TeacherDirectoryFilters, type TeacherDirectoryItem } from '../auth/client';
 import { Button, DataTable, EmptyState, ErrorState, FilterBar, Input, LoadingState, PageHeader, Pagination, RecordList, RecordRow, SecondaryControls, StatusBadge, WorkspaceStack, type DataTableColumn } from '../ui';
@@ -97,6 +97,9 @@ export function TeacherDirectoryPage() {
   }, []);
   const [params, setParams] = useSearchParams();
   const [searchDraft, setSearchDraft] = useState(params.get('q') ?? '');
+  const searchTimer = useRef<number | undefined>(undefined);
+  const searchEditPending = useRef(false);
+  const searchNavigation = useRef<string | null>(null);
   const [yearDraft, setYearDraft] = useState(params.get('academicYear') ?? '');
   const [rows, setRows] = useState<TeacherDirectoryItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -125,13 +128,47 @@ export function TeacherDirectoryPage() {
     setParams(next);
   }, [params, setParams]);
 
-  useEffect(() => { setSearchDraft(params.get('q') ?? ''); }, [params]);
+  useEffect(() => {
+    const query = params.get('q') ?? '';
+    const ownSearchCommit = searchNavigation.current === query;
+    searchNavigation.current = null;
+    // Committing our earlier query must not erase text typed since that push.
+    // A POP explicitly clears this marker and always restores the URL instead.
+    if (ownSearchCommit && searchEditPending.current) return;
+    searchEditPending.current = false;
+    window.clearTimeout(searchTimer.current);
+    setSearchDraft(query);
+  }, [params]);
   useEffect(() => { setYearDraft(params.get('academicYear') ?? ''); }, [params]);
 
   useEffect(() => {
+    // Browser history changes synchronously, but BrowserRouter commits through
+    // a React transition. A rapid push/POP can skip the intermediate params
+    // render entirely. Reconcile from the restored URL at the native POP boundary.
+    const restoreSearch = () => {
+      searchNavigation.current = null;
+      searchEditPending.current = false;
+      window.clearTimeout(searchTimer.current);
+      setSearchDraft(new URLSearchParams(window.location.search).get('q') ?? '');
+    };
+    window.addEventListener('popstate', restoreSearch);
+    return () => {
+      window.removeEventListener('popstate', restoreSearch);
+      window.clearTimeout(searchTimer.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    // Only a user edit may schedule a search, never a history-restored draft.
+    if (!searchEditPending.current) return;
     const normalized = searchDraft.trim().replace(/\s+/gu, ' ');
     if (normalized === (params.get('q') ?? '')) return;
-    const timer = window.setTimeout(() => applyChanges({ q: normalized || undefined }), 350);
+    const timer = window.setTimeout(() => {
+      searchNavigation.current = normalized;
+      searchEditPending.current = false;
+      applyChanges({ q: normalized || undefined });
+    }, 350);
+    searchTimer.current = timer;
     return () => window.clearTimeout(timer);
   }, [searchDraft, params, applyChanges]);
 
@@ -227,7 +264,7 @@ export function TeacherDirectoryPage() {
           activeFilters={filtered ? <span>مرشحات نشطة</span> : null}
           actions={filtered ? <Button variant="secondary" onClick={resetFilters}>مسح المرشحات</Button> : null}>
         <div className="teacher-directory__filters">
-          <Input id="teacher-directory-search" label="البحث عن أستاذ" placeholder="الاسم أو اللقب أو بيانات البحث المتاحة" value={searchDraft} onChange={(event) => setSearchDraft(event.currentTarget.value)} autoComplete="off" />
+          <Input id="teacher-directory-search" label="البحث عن أستاذ" placeholder="الاسم أو اللقب أو بيانات البحث المتاحة" value={searchDraft} onChange={(event) => { searchEditPending.current = true; setSearchDraft(event.currentTarget.value); }} autoComplete="off" />
           {districts.length > 1 ? <div className="ui-field"><label className="ui-field__label" htmlFor="teacher-district-filter">المقاطعة</label><select id="teacher-district-filter" className="ui-input" value={params.get('districtId') ?? ''} onChange={(event) => applyChanges({ districtId: event.currentTarget.value || undefined, institutionId: undefined })}><option value="">كل المقاطعات المتاحة</option>{districts.map((district) => <option key={district.id} value={district.id}>{district.name}</option>)}</select></div> : null}
           {districtError ? <p className="teacher-directory__hint" role="status">تعذر تحميل أسماء المقاطعات؛ تبقى صلاحية النطاق لدى الخادم.</p> : null}
           <div className="teacher-directory__institution-filter"><Input id="teacher-institution-search" label="البحث عن مؤسسة حالية معتمدة" value={institutionDraft} onChange={(event) => { setInstitutionDraft(event.currentTarget.value); setInstitutionQuery(event.currentTarget.value); }} placeholder="اكتب للبحث في المؤسسات المتاحة" autoComplete="off" />
