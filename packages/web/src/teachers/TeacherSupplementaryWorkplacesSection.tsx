@@ -117,19 +117,23 @@ export function TeacherSupplementaryWorkplacesSection({ teacherId, districtId, h
       {loading ? <LoadingState label="جارٍ تحميل مؤسسات تكملة النصاب…" /> : null}
       {!loading && loadError ? <ErrorState title="تعذر تحميل العلاقات" description="أعد المحاولة. لم تتغير بيانات الأستاذ." action={<Button variant="secondary" onClick={() => setRefresh((value) => value + 1)}>إعادة المحاولة</Button>} /> : null}
       {!loading && !loadError && items.length === 0 ? <EmptyState title="لا توجد مؤسسات تكملة نصاب مسجلة" description="يمكن إضافة مؤسسة معتمدة في مقاطعة الأستاذ." /> : null}
-      {!loading && !loadError ? (['CURRENT', 'FUTURE', 'PAST'] as const).map((state) => <section className="teacher-supplementary__group" key={state} aria-labelledby={`supplementary-${state}`}>
+      {!loading && !loadError ? (['CURRENT', 'FUTURE', 'PAST'] as const).map((state) => {
+        if (state !== 'CURRENT' && grouped[state].length === 0) return null;
+        const content = <section className="teacher-supplementary__group" aria-labelledby={`supplementary-${state}`}>
         <h3 id={`supplementary-${state}`}>{labels[state]} ({grouped[state].length})</h3>
         {grouped[state].length ? <ul className="teacher-supplementary__list">{grouped[state].map((item) => <li key={item.id}>
-          <div><strong>{item.institution.name}</strong>{item.institution.municipality ? <span> — {item.institution.municipality}</span> : null}
+          <div><strong><bdi dir="auto">{item.institution.name}</bdi></strong>{item.institution.municipality ? <span> — <bdi dir="auto">{item.institution.municipality}</bdi></span> : null}
             {item.institution.archivedAt ? <span className="teacher-supplementary__archived"> (مؤسسة مؤرشفة)</span> : null}
-            <p>من {item.validFrom} إلى {item.validTo ?? 'مفتوحة'}</p>
+            <p>من <bdi dir="ltr">{item.validFrom}</bdi> إلى <bdi dir="auto">{item.validTo ?? 'مفتوحة'}</bdi></p>
           </div>
           <div className="teacher-profile__actions">
             <Button variant="secondary" onClick={() => openEdit(item, 'EDIT')}>تصحيح التواريخ</Button>
             {item.isCurrent && item.validTo === null ? <Button variant="secondary" onClick={() => openEdit(item, 'CLOSE')}>إنهاء العلاقة</Button> : null}
           </div>
         </li>)}</ul> : <p className="teacher-profile__unassigned">لا توجد علاقات ضمن هذه الفئة.</p>}
-      </section>) : null}
+      </section>;
+        return state === 'CURRENT' ? <div key={state}>{content}</div> : <details key={state} className="teacher-dossier__disclosure"><summary>علاقات تكملة النصاب {labels[state]} ({grouped[state].length})</summary>{content}</details>;
+      }) : null}
     </CardContent>
     {mode ? <div className="teacher-supplementary__editor" role="region" aria-labelledby="supplementary-editor-title">
       <h3 id="supplementary-editor-title">{mode === 'CREATE' ? 'إضافة مؤسسة تكملة النصاب' : mode === 'CLOSE' ? 'إنهاء العلاقة' : 'تصحيح تواريخ العلاقة'}</h3>

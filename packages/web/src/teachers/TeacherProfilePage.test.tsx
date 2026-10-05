@@ -1,16 +1,17 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { ApiRequestError, type Institution, type TeacherProfile } from '../auth/client';
 import { TeacherProfilePage } from './TeacherProfilePage';
 
-const { getTeacherProfile, patchTeacherProfile, listInstitutions, setTeacherCurrentInstitution, listTeacherQualifications, createTeacherQualification, patchTeacherQualification, deleteTeacherQualification } = vi.hoisted(() => ({
+const { getTeacherProfile, patchTeacherProfile, listInstitutions, setTeacherCurrentInstitution, listTeacherQualifications, createTeacherQualification, patchTeacherQualification, deleteTeacherQualification, listSupplementaryWorkplaces } = vi.hoisted(() => ({
   getTeacherProfile: vi.fn(), patchTeacherProfile: vi.fn(), listInstitutions: vi.fn(), setTeacherCurrentInstitution: vi.fn(),
   listTeacherQualifications: vi.fn(), createTeacherQualification: vi.fn(), patchTeacherQualification: vi.fn(), deleteTeacherQualification: vi.fn(),
+  listSupplementaryWorkplaces: vi.fn(),
 }));
 vi.mock('../auth/client', async (importOriginal) => ({
   ...await importOriginal<typeof import('../auth/client')>(), getTeacherProfile, patchTeacherProfile, listInstitutions, setTeacherCurrentInstitution,
-  listTeacherQualifications, createTeacherQualification, patchTeacherQualification, deleteTeacherQualification,
+  listTeacherQualifications, createTeacherQualification, patchTeacherQualification, deleteTeacherQualification, listSupplementaryWorkplaces,
 }));
 
 const profile: TeacherProfile = {
@@ -51,17 +52,115 @@ beforeEach(() => {
   listInstitutions.mockResolvedValue({ data: [institution], page: { limit: 25, nextCursor: null, total: 1 } });
   setTeacherCurrentInstitution.mockResolvedValue({ data: { teacherId: profile.id, currentInstitution: institution } });
   listTeacherQualifications.mockResolvedValue({ items: [] });
+  listSupplementaryWorkplaces.mockResolvedValue({ items: [] });
 });
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 
 describe('TASK-035 Teacher profile UI', () => {
+  it('prioritizes dossier identity/work context and existing supervision links without new fetches', async () => {
+    getTeacherProfile.mockResolvedValueOnce({ data: { ...profile, currentInstitution: institution } });
+    const { container } = renderPage();
+    const title = await screen.findByRole('heading', { level: 1, name: 'أمينة بن صالح' });
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    const identity = screen.getByRole('region', { name: 'الوضعية الحالية للأستاذ' });
+    expect(identity.textContent).toContain('الصفة المهنية: مرسم');
+    expect(identity.textContent).toContain('حالة السجل: نشط');
+    expect(identity.textContent).toContain('ابتدائية الأمل');
+    expect(identity.textContent).toContain('البلدية: وهران');
+    expect(title.compareDocumentPosition(identity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const nav = screen.getByRole('navigation', { name: 'مساحات الإشراف على الأستاذ' });
+    expect(within(nav).getByRole('link', { name: 'زيارات الأستاذ' }).getAttribute('href')).toBe('/app/visits?teacherId=teacher-1&districtId=hidden-district');
+    expect(within(nav).getByRole('link', { name: 'التوزيع الأسبوعي' }).getAttribute('href')).toBe('/app/teachers/teacher-1/schedules');
+    expect(within(nav).getByRole('link', { name: 'بطاقة معلومات الأستاذ' }).getAttribute('href')).toBe('/app/teachers/teacher-1/information-card');
+    const professional = screen.getByRole('heading', { name: 'الوضعية المهنية' });
+    const personal = screen.getByRole('heading', { name: 'المعلومات الشخصية' });
+    expect(identity.compareDocumentPosition(nav) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(nav.compareDocumentPosition(professional) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(professional.compareDocumentPosition(personal) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(container.querySelector('.ui-workspace-stack[data-density="document"]')).toBeTruthy();
+    expect(screen.queryByRole('link', { name: /زيارة جديدة/ })).toBeNull();
+    expect(getTeacherProfile).toHaveBeenCalledOnce();
+    await waitFor(() => expect(listSupplementaryWorkplaces).toHaveBeenCalledOnce());
+    expect(listTeacherQualifications).toHaveBeenCalledOnce();
+    expect(listInstitutions).not.toHaveBeenCalled();
+  });
+
+  it.each([['PERMANENT', 'مرسم'], ['TRAINEE', 'متربص'], ['CONTRACT', 'متعاقد'], ['TEMPORARY_CONTRACT', 'متعاقد مؤقت'], ['SUBSTITUTE', 'مستخلف']])('keeps %s professional status distinct from inactive record state', async (professionalStatus, label) => {
+    getTeacherProfile.mockResolvedValueOnce({ data: { ...profile, professionalStatus, recordStatus: 'INACTIVE' } });
+    renderPage();
+    const identity = await screen.findByRole('region', { name: 'الوضعية الحالية للأستاذ' });
+    expect(identity.textContent).toContain(`الصفة المهنية: ${label}`);
+    expect(identity.textContent).toContain('حالة السجل: غير نشط');
+    expect(identity.textContent).toContain('لم تُعتمد مؤسسة حالية');
+    expect(identity.textContent).not.toContain(profile.declaredWorkplace!.institutionName);
+  });
+
+  it('keeps private notes, appointments and unverified declarations in native closed disclosures', async () => {
+    const longNote = 'ملاحظة خاصة لا تُطبع '.repeat(35);
+    getTeacherProfile.mockResolvedValueOnce({ data: { ...profile, administrativeNote: longNote, firstEducationAppointmentDecisionNumber: 'قرار 12/2020', administrativeGrade: 'رتبة مدخلة' } });
+    const { container } = renderPage();
+    await screen.findByRole('heading', { level: 1, name: 'أمينة بن صالح' });
+    const disclosures = container.querySelectorAll('.teacher-profile__sections > details');
+    expect(disclosures).toHaveLength(3);
+    for (const disclosure of disclosures) {
+      expect(disclosure.hasAttribute('open')).toBe(false);
+      fireEvent.click(disclosure.querySelector('summary')!);
+      expect(disclosure.hasAttribute('open')).toBe(true);
+    }
+    expect(screen.getByRole('heading', { name: 'بيانات التعيين' })).toBeTruthy();
+    expect(screen.getByText('قرار 12/2020')).toBeTruthy();
+    expect(screen.getByText('رتبة مدخلة')).toBeTruthy();
+    expect(screen.getByText('تصريح تاريخي وارد من الاستمارة، ولا يمثل اعتمادًا لمؤسسة.')).toBeTruthy();
+    const privateSection = container.querySelector('.teacher-dossier__private')!;
+    expect(privateSection.textContent).toContain('خاصة بالمفتش');
+    expect(privateSection.querySelector('dd')!.textContent).toBe(longNote);
+    expect(screen.getByRole('navigation', { name: 'مساحات الإشراف على الأستاذ' }).textContent).not.toContain(longNote);
+    expect(screen.getByText(profile.email!)).toBeTruthy();
+    expect(container.querySelector('.teacher-profile__contact-card bdi')).toBeTruthy();
+  });
+
+  it('preserves multiple qualifications and historical workplace relationships as secondary data', async () => {
+    listTeacherQualifications.mockResolvedValueOnce({ items: [
+      { id: 'q1', name: 'شهادة أولى', issuingBody: 'جامعة', qualificationDate: '2020-01-01' },
+      { id: 'q2', name: 'شهادة ثانية', issuingBody: null, qualificationDate: null },
+    ] });
+    listSupplementaryWorkplaces.mockResolvedValueOnce({ items: [
+      { id: 'w1', institution: { id: 'i1', name: 'مؤسسة تكملة حالية', municipality: 'بلدية التكملة', archivedAt: null }, validFrom: '2020-01-01', validTo: null, isCurrent: true },
+      { id: 'w2', institution: { id: 'i2', name: 'مؤسسة تاريخية', municipality: null, archivedAt: null }, validFrom: '2020-01-01', validTo: '2021-01-01', isCurrent: false },
+    ] });
+    const { container } = renderPage();
+    expect(await screen.findByRole('heading', { name: 'شهادة ثانية' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'شهادة أولى' })).toBeTruthy();
+    expect(screen.getByText('مؤسسة تكملة حالية')).toBeTruthy();
+    const historic = screen.getByText('مؤسسة تاريخية').closest('details')!;
+    expect(historic.open).toBe(false);
+    expect(within(historic).queryByRole('button', { name: 'إنهاء العلاقة' })).toBeNull();
+    fireEvent.click(historic.querySelector('summary')!);
+    expect(historic.open).toBe(true);
+    expect(within(historic).getByRole('button', { name: 'تصحيح التواريخ' })).toBeTruthy();
+    expect(container.querySelector('.teacher-profile__identity')!.textContent).not.toContain('مؤسسة تاريخية');
+  });
+
+  it('does not fabricate a dossier after scoped load failure and retries explicitly', async () => {
+    getTeacherProfile.mockRejectedValueOnce(new ApiRequestError('private detail', undefined, 404));
+    renderPage();
+    await screen.findByRole('heading', { name: 'تعذر عرض ملف الأستاذ' });
+    expect(screen.queryByRole('region', { name: 'الوضعية الحالية للأستاذ' })).toBeNull();
+    expect(screen.queryByRole('navigation', { name: 'مساحات الإشراف على الأستاذ' })).toBeNull();
+    expect(listTeacherQualifications).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'إعادة المحاولة' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'أمينة بن صالح' })).toBeTruthy();
+    expect(getTeacherProfile).toHaveBeenCalledTimes(2);
+  });
   it('loads the authorized profile in RTL with read-only status and declared context', async () => {
     let resolve!: (value: { data: TeacherProfile }) => void;
     getTeacherProfile.mockReturnValueOnce(new Promise((done) => { resolve = done; }));
     const { container } = renderPage();
     expect(screen.getByRole('status').textContent).toContain('جارٍ تحميل');
     resolve({ data: profile });
-    expect(await screen.findByRole('heading', { name: 'جهة العمل المصرح بها — غير معتمدة' })).toBeTruthy();
+    await screen.findByRole('heading', { name: 'أمينة بن صالح', level: 1 });
+    fireEvent.click(container.querySelector('.teacher-profile__declared-card')!.closest('details')!.querySelector('summary')!);
+    expect(screen.getByRole('heading', { name: 'جهة العمل المصرح بها — غير معتمدة' })).toBeTruthy();
     expect(container.querySelector('[dir="rtl"]')).toBeTruthy();
     expect(screen.getAllByText('نشط').length).toBeGreaterThan(0);
     expect(screen.getByText('تصريح تاريخي وارد من الاستمارة، ولا يمثل اعتمادًا لمؤسسة.')).toBeTruthy();
@@ -167,7 +266,7 @@ describe('TASK-035 Teacher profile UI', () => {
   it('shows an assigned current institution separately and changes the action label', async () => {
     getTeacherProfile.mockResolvedValueOnce({ data: { ...profile, currentInstitution: institution } });
     renderPage();
-    expect(await screen.findByText('المؤسسة الحالية المعتمدة')).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'المؤسسة الحالية المعتمدة' })).toBeTruthy();
     expect(screen.getAllByText('ابتدائية الأمل').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'تغيير المؤسسة الحالية' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'اعتماد المؤسسة' })).toBeNull();

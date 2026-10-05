@@ -27,6 +27,8 @@ describe('TASK-082 supplementary workplaces profile section', () => {
     render(<TeacherSupplementaryWorkplacesSection teacherId="t" districtId="d" homeInstitutionId="home" />);
     expect(await screen.findByText('مؤسسة now')).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'الحالية (1)' })).toBeTruthy();
+    fireEvent.click(screen.getByText('علاقات تكملة النصاب المستقبلية (1)'));
+    fireEvent.click(screen.getByText('علاقات تكملة النصاب السابقة (1)'));
     expect(screen.getByRole('heading', { name: 'المستقبلية (1)' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'السابقة (1)' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: /حذف/ })).toBeNull();
