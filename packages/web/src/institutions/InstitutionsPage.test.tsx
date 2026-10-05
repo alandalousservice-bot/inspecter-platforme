@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { InstitutionsPage } from './InstitutionsPage';
@@ -35,11 +35,12 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  vi.unstubAllGlobals();
 });
 
-function renderPage() {
+function renderPage(path = '/app/institutions') {
   return render(
-    <MemoryRouter initialEntries={['/app/institutions']}>
+    <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/app/institutions" element={<InstitutionsPage />} />
       </Routes>
@@ -55,6 +56,65 @@ async function openCreate() {
 }
 
 describe('TASK-024 Institution list and create UI', () => {
+  it('uses a compact header and one results surface without redundant headings or detail links', async () => {
+    listInstitutions.mockResolvedValueOnce(page([rowOne]));
+    renderPage(); await screen.findByRole('row', { name: /مدرسة النور/u });
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    for (const title of ['قائمة المؤسسات', 'البحث في المؤسسات', 'النتائج']) expect(screen.queryByRole('heading', { name: title })).toBeNull();
+    expect(screen.queryByText(/في الخادم/)).toBeNull();
+    expect(document.querySelector('.ui-card')).toBeNull();
+    expect(document.querySelector('caption')?.className).toBe('ui-table__caption--accessible-only');
+    expect(screen.queryByRole('link')).toBeNull();
+  });
+
+  it('preserves URL q and distinguishes filtered empty from errors without a zero failure count', async () => {
+    renderPage('/app/institutions?q=النور');
+    expect(await screen.findByRole('heading', { name: 'لا توجد نتائج مطابقة' })).toBeTruthy();
+    expect(screen.getByRole('textbox', { name: 'البحث عن مؤسسة' })).toHaveProperty('value', 'النور');
+    expect(listInstitutions).toHaveBeenCalledWith({ q: 'النور', cursor: undefined, limit: 25 });
+    cleanup(); listInstitutions.mockRejectedValueOnce(new Error('private'));
+    renderPage(); await screen.findByRole('heading', { name: 'تعذر تحميل المؤسسات' });
+    expect(screen.getByText('إجمالي المؤسسات: غير متاح')).toBeTruthy();
+    expect(screen.queryByText('إجمالي المؤسسات: 0')).toBeNull();
+  });
+
+  it('mounts single structured records with long Arabic/bidi metadata and switches without refetching', async () => {
+    let change!: () => void;
+    const media = { matches: true, addEventListener: vi.fn((_event, callback) => { change = callback; }), removeEventListener: vi.fn() };
+    vi.stubGlobal('matchMedia', () => media);
+    const longName = 'ابتدائية ذات اسم عربي طويل جدًا دون قص للهوية';
+    listInstitutions.mockResolvedValueOnce(page([{ ...rowOne, name: longName }, { ...rowOne, id: 'institution-2', name: 'ابتدائية ثانية', email: null, directorPhone: null, location: null }]));
+    renderPage(); await screen.findByRole('list', { name: 'قائمة المؤسسات' });
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.getAllByText(longName)).toHaveLength(1);
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    expect(screen.getByText(longName).closest('a')).toBeNull();
+    expect(screen.getByText('لا يوجد بريد مسجل')).toBeTruthy();
+    expect(screen.getByText(rowOne.email).closest('bdi')).toHaveProperty('dir', 'ltr');
+    expect(screen.getByText(rowOne.directorPhone).closest('bdi')).toHaveProperty('dir', 'ltr');
+    expect(screen.getAllByText(rowOne.address)).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'تعديل البريد' })).toHaveLength(2);
+    act(() => { media.matches = false; change(); });
+    expect(screen.getByRole('table', { name: 'قائمة المؤسسات' })).toBeTruthy();
+    expect(screen.queryByRole('list', { name: 'قائمة المؤسسات' })).toBeNull();
+    expect(listInstitutions).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves email clear and safe save failure behavior in the existing dialog', async () => {
+    listInstitutions.mockResolvedValue(page([rowOne]));
+    renderPage(); fireEvent.click(await screen.findByRole('button', { name: 'تعديل البريد' }));
+    const dialog = screen.getByRole('dialog', { name: 'تعديل بريد المؤسسة' });
+    const emailInput = within(dialog).getByRole('textbox', { name: 'البريد الإلكتروني' });
+    fireEvent.change(emailInput, { target: { value: 'invalid' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'حفظ البريد' }));
+    expect(updateInstitution).not.toHaveBeenCalled();
+    updateInstitution.mockRejectedValueOnce(new Error('private details'));
+    fireEvent.change(emailInput, { target: { value: '' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'حفظ البريد' }));
+    await waitFor(() => expect(within(dialog).getAllByText('تعذر تحديث البريد. تحقق من البيانات والصلاحيات ثم حاول مجددًا.').length).toBeGreaterThan(0));
+    expect(updateInstitution).toHaveBeenCalledWith(rowOne.id, { email: null });
+    expect(screen.queryByText('private details')).toBeNull();
+  });
   it('shows a loading state while the server list is pending', async () => {
     let resolveList!: (value: ReturnType<typeof page>) => void;
     listInstitutions.mockReturnValueOnce(new Promise((resolve) => { resolveList = resolve; }));
@@ -80,7 +140,8 @@ describe('TASK-024 Institution list and create UI', () => {
     expect(email.closest('bdi')?.getAttribute('dir')).toBe('ltr');
     const phone = screen.getByText('021234567');
     expect(phone.closest('bdi')?.getAttribute('dir')).toBe('ltr');
-    expect(screen.getByText('مدرسة النور').closest('td')?.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+    expect(screen.getByText('مدرسة النور').closest('a')).toBeNull();
+    expect(screen.getByText('مدرسة النور').closest('strong')).toBeTruthy();
   });
 
   it('presents absent canonical coordinates as informational, not an error', async () => {

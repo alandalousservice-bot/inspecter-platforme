@@ -1,13 +1,38 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router';
-import { Button, Card, CardContent, CardHeader, DataTable, Dialog, EmptyState, ErrorState, FilterBar, Input, LoadingState, PageHeader, Pagination, Select, SuccessState, type DataTableColumn } from '../ui';
+import { Button, DataTable, Dialog, EmptyState, ErrorState, FilterBar, Input, LoadingState, PageHeader, Pagination, RecordList, RecordRow, Select, SuccessState, WorkspaceStack, type DataTableColumn } from '../ui';
 import { ApiRequestError, createInstitution, getCurrentDistricts, listInstitutions, updateInstitution, type DistrictOption, type Institution } from '../auth/client';
 import { ShellIcon } from '../ui/ShellIcon';
 import './institutions.css';
 
 const PAGE_SIZE = 25;
 
+function InstitutionIdentity({ row }: { row: Institution }) {
+  return <span className="institutions-identity"><strong><bdi dir="auto">{row.name}</bdi></strong>{row.externalCode ? <small>الرمز الخارجي: <bdi dir="auto">{row.externalCode}</bdi></small> : null}</span>;
+}
+
+function InstitutionLocation({ row, districtName }: { row: Institution; districtName?: string }) {
+  return <span className="institutions-location"><span><bdi dir="auto">{row.municipality || 'البلدية غير متاحة'}</bdi></span>
+    {districtName ? <small>المقاطعة: <bdi dir="auto">{districtName}</bdi></small> : null}
+    {row.address ? <small><bdi dir="auto">{row.address}</bdi></small> : null}
+    {row.location ? <small className="institutions-location__canonical">الموقع المعتمد للمؤسسة <bdi dir="ltr">{row.location.latitude}, {row.location.longitude}</bdi></small> : <small>لا يوجد موقع معتمد مسجل</small>}
+  </span>;
+}
+
+function InstitutionContact({ row }: { row: Institution }) {
+  return <span className="institutions-contact">{row.email ? <span><ShellIcon name="email" /><bdi dir="ltr">{row.email}</bdi></span> : <small>لا يوجد بريد مسجل</small>}
+    {row.directorPhone ? <span><ShellIcon name="phone" /><bdi dir="ltr">{row.directorPhone}</bdi></span> : null}</span>;
+}
+
 export function InstitutionsPage() {
+  const [structured, setStructured] = useState(() => window.matchMedia?.('(max-width: 64rem)').matches ?? false);
+  useEffect(() => {
+    const media = window.matchMedia?.('(max-width: 64rem)');
+    if (!media) return;
+    const update = () => setStructured(media.matches);
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
   const [searchParams, setSearchParams] = useSearchParams();
   const activeQuery = searchParams.get('q') ?? '';
   const [searchText, setSearchText] = useState(activeQuery);
@@ -72,23 +97,12 @@ export function InstitutionsPage() {
   useEffect(() => { setSearchText(activeQuery); }, [activeQuery]);
 
   const columns = useMemo<DataTableColumn<Institution>[]>(() => [
-    { id: 'identity', header: 'المؤسسة', render: (row) => <span className="institutions-identity">
-      <span className="institutions-identity__icon"><ShellIcon name="institutions" /></span>
-      <span className="institutions-identity__copy"><strong>{row.name}</strong>{row.externalCode ? <small>الرمز الخارجي: <bdi dir="auto">{row.externalCode}</bdi></small> : null}</span>
-    </span> },
+    { id: 'identity', header: 'المؤسسة', render: (row) => <InstitutionIdentity row={row} /> },
     { id: 'location', header: 'الموقع الإداري', render: (row) => {
       const districtName = districts.length > 1 ? districts.find((district) => district.id === row.districtId)?.name : undefined;
-      return <span className="institutions-location">
-        <strong>{row.municipality || 'البلدية غير متاحة'}</strong>
-        {districtName ? <small>المقاطعة: {districtName}</small> : null}
-        {row.address ? <small>{row.address}</small> : null}
-        {row.location ? <span className="institutions-location__canonical"><ShellIcon name="location" /><span><small>الموقع المعتمد للمؤسسة</small><bdi dir="ltr">{row.location.latitude}, {row.location.longitude}</bdi></span></span> : <small>لا يوجد موقع معتمد مسجل</small>}
-      </span>;
+      return <InstitutionLocation row={row} districtName={districtName} />;
     } },
-    { id: 'contact', header: 'بيانات الاتصال', render: (row) => <span className="institutions-contact">
-      {row.email ? <span><ShellIcon name="email" /><bdi dir="ltr">{row.email}</bdi></span> : <small>لا يوجد بريد مسجل</small>}
-      {row.directorPhone ? <span><ShellIcon name="phone" /><bdi dir="ltr">{row.directorPhone}</bdi></span> : null}
-    </span> },
+    { id: 'contact', header: 'بيانات الاتصال', render: (row) => <InstitutionContact row={row} /> },
     { id: 'actions', header: 'الإجراء المتاح', render: (row) => <Button variant="secondary" onClick={() => { setEditingInstitution(row); setEmailDraft(row.email ?? ''); setEmailError(''); }}><ShellIcon name="email" />تعديل البريد</Button> },
   ], [districts]);
 
@@ -197,7 +211,8 @@ export function InstitutionsPage() {
 
   return (
     <div className="institutions-page" dir="rtl">
-      <PageHeader eyebrow="دليل المؤسسات" title="المؤسسات" description="استعرض المؤسسات ضمن المقاطعات المتاحة لك، أو أضف مؤسسة جديدة."
+      <WorkspaceStack density="compact">
+      <PageHeader variant="compact" title="المؤسسات" description="ابحث عن مؤسسة وراجع بياناتها المعتمدة."
         primaryAction={<Button disabled={!canCreate} onClick={openCreateDialog}>إضافة مؤسسة</Button>} />
 
       {successMessage ? <SuccessState title={successMessage} /> : null}
@@ -209,35 +224,28 @@ export function InstitutionsPage() {
         <EmptyState title="لا توجد مقاطعة حالية متاحة" description="لا يمكن إنشاء مؤسسة قبل توفر عضوية سارية في مقاطعة." />
       ) : null}
 
-      <Card className="institutions-card">
-        <CardHeader title="قائمة المؤسسات" description="معلومات المؤسسات المتاحة ضمن نطاق المقاطعات المسندة إليك." />
-        <CardContent>
-          <FilterBar className="institutions-filter" title="البحث في المؤسسات" description="تُطبّق عبارة البحث على النتائج في الخادم.">
+          <FilterBar variant="workspace" className="institutions-filter" summary={<span aria-live="polite">إجمالي المؤسسات: {listError ? 'غير متاح' : listLoading ? '…' : total}</span>}>
           <form className="institutions-search" onSubmit={submitSearch} role="search">
             <Input id="institution-search" label="البحث عن مؤسسة" value={searchText} onChange={(event) => setSearchText(event.currentTarget.value)} placeholder="اكتب اسم المؤسسة" />
             <Button type="submit"><ShellIcon name="search" />بحث</Button>
           </form>
           </FilterBar>
 
-          <div className="institutions-results-heading">
-            <span className="institutions-results-heading__icon" aria-hidden="true"><ShellIcon name="institutions" /></span>
-            <div><h2>النتائج</h2><p aria-live="polite">إجمالي المؤسسات: {listError ? 'غير متاح' : listLoading ? '…' : total}</p></div>
-          </div>
-
-          {listLoading ? <LoadingState label="جارٍ تحميل المؤسسات…" /> : null}
-          {!listLoading && listError ? <ErrorState title="تعذر تحميل المؤسسات" description="حدثت مشكلة أثناء جلب القائمة. أعد المحاولة." action={<Button variant="secondary" onClick={() => setRefreshKey((value) => value + 1)}>إعادة المحاولة</Button>} /> : null}
+          <div className="institutions-results">
+          {listLoading ? <LoadingState compact label="جارٍ تحميل المؤسسات…" /> : null}
+          {!listLoading && listError ? <ErrorState compact title="تعذر تحميل المؤسسات" description="حدثت مشكلة أثناء جلب القائمة. أعد المحاولة." action={<Button variant="secondary" onClick={() => setRefreshKey((value) => value + 1)}>إعادة المحاولة</Button>} /> : null}
           {!listLoading && !listError && rows.length === 0 ? (
-            <EmptyState title={activeQuery ? 'لا توجد نتائج مطابقة' : 'لا توجد مؤسسات بعد'} description={activeQuery ? 'جرّب عبارة بحث أخرى.' : 'يمكنك إضافة أول مؤسسة من المقاطعات المتاحة لك.'} />
+            <EmptyState compact kind={activeQuery ? 'no-results' : 'no-data'} title={activeQuery ? 'لا توجد نتائج مطابقة' : 'لا توجد مؤسسات بعد'} description={activeQuery ? 'جرّب عبارة بحث أخرى.' : 'يمكنك إضافة أول مؤسسة من المقاطعات المتاحة لك.'} />
           ) : null}
-          {!listLoading && !listError && rows.length > 0 ? <DataTable caption="قائمة المؤسسات" columns={columns} rows={rows} rowKey={(row) => row.id} /> : null}
+          {!listLoading && !listError && rows.length > 0 ? structured ? <RecordList label="قائمة المؤسسات" density="compact">{rows.map((row) => <RecordRow key={row.id} identity={<InstitutionIdentity row={row} />} context={<InstitutionLocation row={row} districtName={districts.length > 1 ? districts.find((district) => district.id === row.districtId)?.name : undefined} />} metadata={<InstitutionContact row={row} />} actions={<Button variant="secondary" onClick={() => { setEditingInstitution(row); setEmailDraft(row.email ?? ''); setEmailError(''); }}><ShellIcon name="email" />تعديل البريد</Button>} />)}</RecordList> : <DataTable caption="قائمة المؤسسات" captionVisibility="accessible-only" columns={columns} rows={rows} rowKey={(row) => row.id} /> : null}
 
           {!listLoading && !listError ? (
             <Pagination label="صفحات المؤسسات" currentPage={pageIndex + 1} rangeStart={total ? pageIndex * PAGE_SIZE + 1 : 0}
               rangeEnd={pageIndex * PAGE_SIZE + rows.length} total={total} hasPrevious={pageIndex > 0} hasNext={Boolean(nextCursor)}
               onPrevious={goToPreviousPage} onNext={goToNextPage} />
           ) : null}
-        </CardContent>
-      </Card>
+          </div>
+      </WorkspaceStack>
 
       <Dialog open={dialogOpen} title="إضافة مؤسسة" onClose={() => setDialogOpen(false)} actions={null}>
         <form className="institution-form" onSubmit={(event) => void submitCreate(event)} noValidate>
