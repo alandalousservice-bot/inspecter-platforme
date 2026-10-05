@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { ApiRequestError, getCurrentDistricts, listInstitutions, listTeachers, type DistrictOption, type Institution, type TeacherDirectoryFilters, type TeacherDirectoryItem } from '../auth/client';
-import { Button, Card, CardContent, CardHeader, DataTable, ErrorState, FilterBar, Input, LoadingState, PageHeader, Pagination, StatusBadge, type DataTableColumn } from '../ui';
-import { ShellIcon } from '../ui/ShellIcon';
+import { Button, DataTable, EmptyState, ErrorState, FilterBar, Input, LoadingState, PageHeader, Pagination, RecordList, RecordRow, SecondaryControls, StatusBadge, WorkspaceStack, type DataTableColumn } from '../ui';
 import './teacher-directory.css';
 
 const LIMIT = 25;
@@ -71,7 +70,31 @@ function displayStatus(status: TeacherDirectoryItem['recordStatus']) {
   return status === 'ACTIVE' ? 'نشط' : 'غير نشط';
 }
 
+function TeacherIdentity({ row, includeRecordState = false }: { row: TeacherDirectoryItem; includeRecordState?: boolean }) {
+  return <div className="teacher-directory__identity"><Link className="teacher-directory__identity-link" to={`/app/teachers/${encodeURIComponent(row.id)}`}><bdi dir="auto">{row.name} {row.surname}</bdi></Link>
+    <div className="teacher-directory__record-context"><span className="teacher-directory__professional">{row.professionalStatus ? PROFESSIONAL_LABELS[row.professionalStatus] : 'غير محددة'}</span>{includeRecordState ? <span role="group" aria-label="حالة السجل"><StatusBadge tone={row.recordStatus === 'ACTIVE' ? 'success' : 'neutral'}>{displayStatus(row.recordStatus)}</StatusBadge></span> : null}</div></div>;
+}
+
+function TeacherActions({ row }: { row: TeacherDirectoryItem }) {
+  return <span className="teacher-directory__actions"><Link to={`/app/teachers/${encodeURIComponent(row.id)}/schedules`} aria-label={`التوزيع الأسبوعي — ${row.name} ${row.surname}`}>التوزيع الأسبوعي</Link>
+    <Link to={`/app/teachers/${encodeURIComponent(row.id)}/information-card`} aria-label={`بطاقة معلومات الأستاذ — ${row.name} ${row.surname}`}>بطاقة المعلومات</Link></span>;
+}
+
+function TeacherWorkplace({ row }: { row: TeacherDirectoryItem }) {
+  return row.currentInstitution ? <span className="teacher-directory__institution"><bdi dir="auto">{row.currentInstitution.name}</bdi>{row.currentInstitution.municipality ? <small className="teacher-directory__municipality"><bdi dir="auto">{row.currentInstitution.municipality}</bdi></small> : null}</span> : <span className="teacher-directory__unassigned">لم تُعتمد مؤسسة حالية</span>;
+}
+
 export function TeacherDirectoryPage() {
+  // Mount one representation only, including at real browser zoom. No duplicate
+  // interactive records or off-screen desktop links in the accessibility tree.
+  const [structured, setStructured] = useState(() => window.matchMedia?.('(max-width: 64rem)').matches ?? false);
+  useEffect(() => {
+    const media = window.matchMedia?.('(max-width: 64rem)');
+    if (!media) return;
+    const update = () => setStructured(media.matches);
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
   const [params, setParams] = useSearchParams();
   const [searchDraft, setSearchDraft] = useState(params.get('q') ?? '');
   const [yearDraft, setYearDraft] = useState(params.get('academicYear') ?? '');
@@ -152,12 +175,10 @@ export function TeacherDirectoryPage() {
   }, [searchKey, activeCursor, refreshKey]);
 
   const columns = useMemo<DataTableColumn<TeacherDirectoryItem>[]>(() => [
-    { id: 'teacher', header: 'الأستاذ', render: (row) => <Link className="teacher-directory__identity-link" to={`/app/teachers/${encodeURIComponent(row.id)}`}><span className="teacher-directory__identity-icon"><ShellIcon name="teachers" /></span><span>{row.name} {row.surname}</span></Link> },
-    ...(districts.length > 1 ? [{ id: 'district', header: 'المقاطعة', render: (row: TeacherDirectoryItem) => districts.find((district) => district.id === row.districtId)?.name ?? 'غير متاحة' }] : []),
-    { id: 'professional', header: 'الصفة المهنية', render: (row) => row.professionalStatus ? <StatusBadge className="teacher-directory__professional-badge" tone="neutral">{PROFESSIONAL_LABELS[row.professionalStatus]}</StatusBadge> : 'غير محددة' },
-    { id: 'institution', header: 'المؤسسة الحالية المعتمدة', render: (row) => row.currentInstitution ? <span className="teacher-directory__institution"><span className="teacher-directory__institution-name"><ShellIcon name="institutions" />{row.currentInstitution.name}</span>{row.currentInstitution.municipality ? <small className="teacher-directory__municipality">{row.currentInstitution.municipality}</small> : null}</span> : 'لم تُعتمد مؤسسة حالية' },
+    { id: 'teacher', header: 'الأستاذ / الصفة المهنية', render: (row) => <TeacherIdentity row={row} /> },
+    { id: 'institution', header: 'المؤسسة الحالية المعتمدة', render: (row) => <><TeacherWorkplace row={row} />{districts.length > 1 ? <small className="teacher-directory__district">{districts.find((district) => district.id === row.districtId)?.name ?? 'غير متاحة'}</small> : null}</> },
     { id: 'status', header: 'حالة السجل', render: (row) => <StatusBadge tone={row.recordStatus === 'ACTIVE' ? 'success' : 'neutral'}>{displayStatus(row.recordStatus)}</StatusBadge> },
-    { id: 'actions', header: 'الإجراءات', render: (row) => <span className="teacher-directory__actions"><Link className="teacher-directory__schedule-link" to={`/app/teachers/${encodeURIComponent(row.id)}/information-card`}><ShellIcon name="reports" />بطاقة معلومات الأستاذ</Link><Link className="teacher-directory__schedule-link" to={`/app/teachers/${encodeURIComponent(row.id)}/schedules`}><ShellIcon name="visits" />التوزيع الأسبوعي</Link></span> },
+    { id: 'actions', header: 'روابط مساندة', render: (row) => <TeacherActions row={row} /> },
   ], [districts]);
 
   function handleYearChange(event: ChangeEvent<HTMLInputElement>) {
@@ -197,14 +218,14 @@ export function TeacherDirectoryPage() {
   const filtered = [...params.keys()].some((key) => SEARCH_KEYS.includes(key as typeof SEARCH_KEYS[number]));
   const yearIsValid = validAcademicYear(yearDraft);
   const timeIsAvailable = yearIsValid && !!params.get('dayOfWeek');
+  const activeScheduleCount = ['dayOfWeek', 'minuteOfDay', 'worksToday', 'worksNow'].filter((key) => params.has(key)).length;
 
   return <section className="teacher-directory" dir="rtl">
-    <PageHeader className="teacher-directory__page-header" eyebrow="إدارة ملفات الأستاذ" title="دليل الأساتذة" description="مساحة عمل لمراجعة ملفات الأساتذة والانتقال إلى تفاصيلها ضمن نطاق المقاطعات المتاحة لك." />
-
-    <Card className="teacher-directory__filters-card teacher-directory__workspace-card">
-      <CardContent>
-        <FilterBar title="البحث والمرشحات" description="تُطبّق المرشحات على النتائج في الخادم."
-          actions={filtered ? <><Button variant="secondary" onClick={resetFilters}>مسح المرشحات</Button><span>تتغير النتائج وفق المرشحات المحددة.</span></> : null}>
+    <WorkspaceStack density="compact">
+    <PageHeader variant="compact" title="دليل الأساتذة" description="ابحث عن أستاذ وافتح ملفه المهني." />
+        <FilterBar variant="workspace" summary={<span aria-live="polite">إجمالي النتائج: {loading ? '…' : loadError ? 'غير متاح' : total}</span>}
+          activeFilters={filtered ? <span>مرشحات نشطة</span> : null}
+          actions={filtered ? <Button variant="secondary" onClick={resetFilters}>مسح المرشحات</Button> : null}>
         <div className="teacher-directory__filters">
           <Input id="teacher-directory-search" label="البحث عن أستاذ" placeholder="الاسم أو اللقب أو بيانات البحث المتاحة" value={searchDraft} onChange={(event) => setSearchDraft(event.currentTarget.value)} autoComplete="off" />
           {districts.length > 1 ? <div className="ui-field"><label className="ui-field__label" htmlFor="teacher-district-filter">المقاطعة</label><select id="teacher-district-filter" className="ui-input" value={params.get('districtId') ?? ''} onChange={(event) => applyChanges({ districtId: event.currentTarget.value || undefined, institutionId: undefined })}><option value="">كل المقاطعات المتاحة</option>{districts.map((district) => <option key={district.id} value={district.id}>{district.name}</option>)}</select></div> : null}
@@ -220,7 +241,8 @@ export function TeacherDirectoryPage() {
           <div className="ui-field"><label className="ui-field__label" htmlFor="teacher-professional-filter">الصفة المهنية</label><select id="teacher-professional-filter" className="ui-input" value={params.get('professionalStatus') ?? ''} onChange={(event) => applyChanges({ professionalStatus: event.currentTarget.value || undefined })}><option value="">كل الصفات</option><option value="PERMANENT">مرسم</option><option value="TRAINEE">متربص</option><option value="CONTRACT">متعاقد</option><option value="TEMPORARY_CONTRACT">متعاقد مؤقت</option><option value="SUBSTITUTE">مستخلف</option></select></div>
           <div className="ui-field"><label className="ui-field__label" htmlFor="teacher-record-filter">حالة السجل</label><select id="teacher-record-filter" className="ui-input" value={params.get('recordStatus') ?? 'ACTIVE'} onChange={(event) => applyChanges({ recordStatus: event.currentTarget.value === 'ACTIVE' ? undefined : event.currentTarget.value })}><option value="ACTIVE">نشط — الافتراضي</option><option value="INACTIVE">غير نشط</option></select></div>
         </div>
-        <fieldset className="teacher-directory__schedule-filters"><legend>مرشحات التوزيع الأسبوعي</legend>
+        <SecondaryControls label="مرشحات التوزيع الأسبوعي" defaultExpanded={params.has('academicYear') || activeScheduleCount > 0} hasErrors={Boolean(yearDraft && !yearIsValid)} activeIndicator={activeScheduleCount ? <span className="teacher-directory__hint">مرشحات جدول نشطة: {activeScheduleCount}</span> : null}>
+        <fieldset className="teacher-directory__schedule-filters"><legend>فترة العمل</legend>
           <div className="teacher-directory__schedule-grid">
             <Input id="teacher-academic-year" label="السنة الدراسية" placeholder="2026-2027" value={yearDraft} onChange={handleYearChange} hint="أدخل السنة صراحةً بصيغة YYYY-YYYY؛ لا تُختار تلقائيًا." error={yearDraft && !yearIsValid ? 'تحقق من صيغة السنة وأن تكون السنتان متتاليتين.' : undefined} />
             <div className="ui-field"><label className="ui-field__label" htmlFor="teacher-day-filter">يوم العمل</label><select id="teacher-day-filter" className="ui-input" disabled={!yearIsValid} value={params.get('dayOfWeek') ?? ''} onChange={handleDayChange}><option value="">كل الأيام</option>{DAYS.map((day, index) => <option key={day} value={index + 1}>{day}</option>)}</select>{!yearIsValid ? <span className="teacher-directory__hint">حدد سنة دراسية صحيحة أولًا.</span> : null}</div>
@@ -229,23 +251,18 @@ export function TeacherDirectoryPage() {
             <label className="teacher-directory__check"><input type="checkbox" checked={params.get('worksNow') === 'true'} disabled={!yearIsValid} onChange={(event) => applyChanges({ worksNow: event.currentTarget.checked ? 'true' : undefined })} /> يعمل الآن</label>
           </div>
         </fieldset>
+        </SecondaryControls>
         </FilterBar>
-      </CardContent>
-    </Card>
-
-    <Card className="teacher-directory__results-card">
-      <CardHeader title="النتائج" description="تُعرض بيانات القائمة المصرح بها فقط؛ التفاصيل الشخصية في ملف الأستاذ." />
-      <CardContent>
-        <p className="teacher-directory__total" aria-live="polite">إجمالي النتائج: {loading ? '…' : total}</p>
+    <div className="teacher-directory__results">
         {resetNotice ? <p className="teacher-directory__notice" role="status">{resetNotice}</p> : null}
-        {loading ? <LoadingState label="جارٍ تحميل دليل الأساتذة…" /> : null}
-        {!loading && loadError ? <ErrorState title="تعذر تحميل دليل الأساتذة" description="حدثت مشكلة أثناء جلب النتائج. أعد المحاولة." action={<Button variant="secondary" onClick={() => setRefreshKey((value) => value + 1)}>إعادة المحاولة</Button>} /> : null}
-        {!loading && !loadError && rows.length === 0 ? <div className="teacher-directory__empty"><h2>{filtered ? 'لا توجد نتائج مطابقة' : 'لا توجد سجلات أساتذة ظاهرة'}</h2><p>{filtered ? 'غيّر البحث أو المرشحات ثم حاول مجددًا.' : 'ستظهر هنا السجلات النشطة ضمن المقاطعات المصرح بها.'}</p>{filtered ? <Button variant="secondary" onClick={resetFilters}>مسح المرشحات</Button> : null}</div> : null}
-        {!loading && !loadError && rows.length > 0 ? <DataTable caption="دليل الأساتذة" columns={columns} rows={rows} rowKey={(row) => row.id} /> : null}
+        {loading ? <LoadingState compact label="جارٍ تحميل دليل الأساتذة…" /> : null}
+        {!loading && loadError ? <ErrorState compact title="تعذر تحميل دليل الأساتذة" description="حدثت مشكلة أثناء جلب النتائج. أعد المحاولة." action={<Button variant="secondary" onClick={() => setRefreshKey((value) => value + 1)}>إعادة المحاولة</Button>} /> : null}
+        {!loading && !loadError && rows.length === 0 ? <EmptyState compact kind={filtered ? 'no-results' : 'no-data'} title={filtered ? 'لا توجد نتائج مطابقة' : 'لا توجد سجلات أساتذة ظاهرة'} description={filtered ? 'غيّر البحث أو المرشحات ثم حاول مجددًا.' : 'ستظهر هنا السجلات النشطة ضمن المقاطعات المصرح بها.'} action={filtered ? <Button variant="secondary" onClick={resetFilters}>مسح المرشحات</Button> : undefined} /> : null}
+        {!loading && !loadError && rows.length > 0 ? structured ? <RecordList label="دليل الأساتذة" density="compact">{rows.map((row) => <RecordRow key={row.id} identity={<TeacherIdentity row={row} includeRecordState />} context={<TeacherWorkplace row={row} />} metadata={districts.length > 1 ? districts.find((district) => district.id === row.districtId)?.name ?? 'غير متاحة' : undefined} actions={<TeacherActions row={row} />} />)}</RecordList> : <DataTable caption="دليل الأساتذة" captionVisibility="accessible-only" columns={columns} rows={rows} rowKey={(row) => row.id} /> : null}
         {!loading && !loadError ? <Pagination label="التنقل بين نتائج الأساتذة" currentPage={pageIndex + 1}
           rangeStart={rows.length ? pageIndex * LIMIT + 1 : 0} rangeEnd={pageIndex * LIMIT + rows.length} total={total}
           hasPrevious={pageIndex > 0} hasNext={Boolean(nextCursor)} onPrevious={handlePrevious} onNext={handleNext} nextLabel="النتائج التالية" /> : null}
-      </CardContent>
-    </Card>
+    </div>
+    </WorkspaceStack>
   </section>;
 }

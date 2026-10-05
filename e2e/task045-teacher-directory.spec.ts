@@ -37,18 +37,18 @@ test('TASK-045 connected Arabic directory filters, cursor pages, profile and sch
   await page.goto('/app/teachers');
   await expect(page.getByRole('heading', { name: 'دليل الأساتذة' })).toBeVisible();
   await expect(page.getByText('إجمالي النتائج: 32')).toBeVisible();
-  await expect(page.getByRole('cell', { name: `${primary!.name} ${primary!.surname}` })).toBeVisible();
+  await expect(page.getByRole('link', { name: `${primary!.name} ${primary!.surname}`, exact: true })).toBeVisible();
   await expect(page.getByText(primary!.email!, { exact: true })).toHaveCount(0);
   await expect(page.getByText(primary!.phone!, { exact: true })).toHaveCount(0);
   await expect(page.getByRole('cell', { name: /غير نشط/ })).toHaveCount(0);
   await page.getByLabel('حالة السجل').selectOption('INACTIVE');
-  await expect(page.getByRole('cell', { name: new RegExp(`سجل`) })).toBeVisible();
+  await expect(page.getByRole('link', { name: /^غير نشط سجل /u })).toBeVisible();
   await page.getByLabel('حالة السجل').selectOption('ACTIVE');
   await expect(page.getByText('إجمالي النتائج: 32')).toBeVisible();
 
   const search = page.getByRole('textbox', { name: 'البحث عن أستاذ' });
   await search.fill(primary!.surname);
-  await expect(page.getByRole('cell', { name: `${primary!.name} ${primary!.surname}` })).toBeVisible();
+  await expect(page.getByRole('link', { name: `${primary!.name} ${primary!.surname}`, exact: true })).toBeVisible();
   await search.fill('');
   await expect(page.getByText('إجمالي النتائج: 32')).toBeVisible();
 
@@ -61,17 +61,19 @@ test('TASK-045 connected Arabic directory filters, cursor pages, profile and sch
 
   await page.getByLabel('البحث عن مؤسسة حالية معتمدة').fill(primary!.institution!.name);
   await page.getByRole('combobox', { name: 'نتائج المؤسسات' }).selectOption(primary!.institution!.id);
-  await expect(page.getByRole('cell', { name: `${primary!.name} ${primary!.surname}` })).toBeVisible();
+  await expect(page.getByRole('link', { name: `${primary!.name} ${primary!.surname}`, exact: true })).toBeVisible();
   const districtFilter = page.getByLabel('المقاطعة');
   if (await districtFilter.count()) await districtFilter.selectOption({ index: 0 });
 
+  await page.getByRole('button', { name: 'مرشحات التوزيع الأسبوعي' }).click();
   await page.getByLabel('السنة الدراسية').fill('2026-2027');
   await page.getByLabel('يوم العمل').selectOption('2');
   await page.getByLabel('وقت الحصة').fill('08:30');
-  await expect(page.getByRole('cell', { name: `${primary!.name} ${primary!.surname}` })).toBeVisible();
+  await expect(page.getByRole('link', { name: `${primary!.name} ${primary!.surname}`, exact: true })).toBeVisible();
   await expect(page.locator('.teacher-directory')).toHaveAttribute('dir', 'rtl');
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.getByRole('table', { name: 'دليل الأساتذة' })).toBeVisible();
+  await expect(page.getByRole('list', { name: 'دليل الأساتذة' })).toBeVisible();
+  await expect(page.getByRole('table', { name: 'دليل الأساتذة' })).toHaveCount(0);
   await page.setViewportSize({ width: 1440, height: 1000 });
 
   await page.getByRole('button', { name: 'مسح المرشحات' }).first().click();
@@ -82,11 +84,12 @@ test('TASK-045 connected Arabic directory filters, cursor pages, profile and sch
   await expect(page.getByText('النتائج 1–25 من 32')).toBeVisible();
 
   expect(requestUrls.some((url) => /\/api\/v1\/teachers\/[0-9a-f-]+(?:\?|$)/u.test(url))).toBe(false);
-  await page.getByRole('link', { name: `${primary!.name} ${primary!.surname}` }).click();
+  await page.getByRole('link', { name: `${primary!.name} ${primary!.surname}`, exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/app/teachers/${primary!.id}$`, 'u'));
-  await expect(page.getByRole('heading', { name: 'ملف الأستاذ' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'ملف الأستاذ', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: `${primary!.name} ${primary!.surname}`, level: 2 })).toBeVisible();
   await page.goto('/app/teachers');
-  await page.getByRole('link', { name: 'التوزيع الأسبوعي' }).first().click();
+  await page.getByRole('link', { name: /^التوزيع الأسبوعي —/u }).first().click();
   await expect(page).toHaveURL(/\/app\/teachers\/[0-9a-f-]+\/schedules$/u);
   await expect(page.getByRole('heading', { name: 'التوزيع الأسبوعي' })).toBeVisible();
 });
@@ -106,12 +109,12 @@ test('G8-05 directory and profile states remain composed at desktop, tablet, and
 
   await login(page);
   await page.goto('/app/teachers');
-  await expect(page.getByRole('cell', { name: `${primary.name} ${primary.surname}` })).toBeVisible();
+  await expect(page.getByRole('link', { name: `${primary.name} ${primary.surname}`, exact: true })).toBeVisible();
   await capture('directory-populated');
 
   const search = page.getByRole('textbox', { name: 'البحث عن أستاذ' });
   await search.fill(primary.surname);
-  await expect(page.getByRole('cell', { name: `${primary.name} ${primary.surname}` })).toBeVisible();
+  await expect(page.getByRole('link', { name: `${primary.name} ${primary.surname}`, exact: true })).toBeVisible();
   await expect(page.getByText('إجمالي النتائج: 1')).toBeVisible();
   await capture('directory-filtered');
 

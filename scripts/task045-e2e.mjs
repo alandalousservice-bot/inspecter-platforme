@@ -94,7 +94,12 @@ try {
     } });
     await db.weeklySchedule.create({ data: {
       teacherId: teachers[0].id, academicYear: '2026-2027',
-      slots: { create: [{ dayOfWeek: 2, startMinute: 480, endMinute: 540 }] },
+      // Exercise the current dated-workplace directory filter, not a legacy
+      // undated slot that deliberately cannot establish current work.
+      slots: { create: [{ dayOfWeek: 2, startMinute: 480, endMinute: 540,
+        teacherId: teachers[0].id, districtId: district.id, institutionId: institution.id,
+        workplaceBasis: 'HOME', validFrom: new Date(new Date().toISOString().slice(0, 10)),
+      }] },
     } });
     process.env.G3_E2E_DATABASE_URL = databaseUrl;
     process.env.G3_E2E_DISTRICT_ID = district.id;

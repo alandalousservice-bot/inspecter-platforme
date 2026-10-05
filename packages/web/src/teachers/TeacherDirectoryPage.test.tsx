@@ -25,22 +25,74 @@ beforeEach(() => {
   mocks.listInstitutions.mockResolvedValue({ data: [institution], page: { limit: 25, nextCursor: null, total: 1 } });
   mocks.listTeachers.mockResolvedValue(response());
 });
-afterEach(() => { cleanup(); vi.clearAllMocks(); vi.useRealTimers(); });
+afterEach(() => { cleanup(); vi.clearAllMocks(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 function renderPage(path = '/app/teachers') {
   return render(<MemoryRouter initialEntries={[path]}><Routes><Route path="/app/teachers" element={<TeacherDirectoryPage />} /></Routes></MemoryRouter>);
 }
 
 describe('TASK-045 Teacher directory', () => {
+  it('uses one compact header and an accessible-only caption without cards or result headings', async () => {
+    renderPage(); await screen.findByRole('link', { name: 'محمد علي' });
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.queryByRole('heading', { name: 'النتائج' })).toBeNull();
+    expect(document.querySelector('.ui-card')).toBeNull();
+    expect(document.querySelector('caption')?.className).toBe('ui-table__caption--accessible-only');
+    expect(screen.getByRole('link', { name: 'بطاقة معلومات الأستاذ — محمد علي' }).getAttribute('href')).toBe(`/app/teachers/${teacher.id}/information-card`);
+  });
+
+  it('keeps optional schedule filters collapsed, indicates active filters, and exposes invalid year errors', async () => {
+    renderPage(); await screen.findByRole('link', { name: 'محمد علي' });
+    const trigger = screen.getByRole('button', { name: 'مرشحات التوزيع الأسبوعي' });
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('textbox', { name: 'السنة الدراسية' })).toBeNull();
+    fireEvent.click(trigger);
+    fireEvent.change(screen.getByRole('textbox', { name: 'السنة الدراسية' }), { target: { value: 'invalid' } });
+    expect(screen.getByRole('alert').textContent).toContain('تحقق من صيغة السنة');
+    expect((trigger as HTMLButtonElement).disabled).toBe(true);
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    cleanup(); renderPage('/app/teachers?academicYear=2026-2027&worksNow=true');
+    expect(await screen.findByText('مرشحات جدول نشطة: 1')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'مرشحات التوزيع الأسبوعي' }));
+    expect(screen.queryByRole('textbox', { name: 'السنة الدراسية' })).toBeNull();
+    expect(screen.getByText('مرشحات جدول نشطة: 1')).toBeTruthy();
+    await waitFor(() => expect(mocks.listTeachers).toHaveBeenLastCalledWith({ academicYear: '2026-2027', worksNow: true, limit: 25 }));
+  });
+
+  it('mounts one structured list on narrow screens and switches without a duplicate or extra request', async () => {
+    let change!: () => void;
+    const media = { matches: true, addEventListener: vi.fn((_event, callback) => { change = callback; }), removeEventListener: vi.fn() };
+    vi.stubGlobal('matchMedia', () => media);
+    const longName = 'أستاذ باسم عربي طويل لاختبار القراءة دون قطع';
+    mocks.listTeachers.mockResolvedValue(response([{ ...teacher, name: longName, professionalStatus: 'SUBSTITUTE', recordStatus: 'INACTIVE', currentInstitution: { ...institution, name: 'ابتدائية ذات اسم عربي طويل جدًا لاختبار الالتفاف' } }]));
+    renderPage();
+    expect(await screen.findByRole('list', { name: 'دليل الأساتذة' })).toBeTruthy();
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.getAllByRole('link', { name: `${longName} علي` })).toHaveLength(1);
+    expect(screen.getByRole('listitem').hasAttribute('tabindex')).toBe(false);
+    expect(screen.getByText('مستخلف', { selector: 'span' })).toBeTruthy(); expect(screen.getByText('غير نشط', { selector: 'span' })).toBeTruthy();
+    expect(screen.getByText('ابتدائية ذات اسم عربي طويل جدًا لاختبار الالتفاف')).toBeTruthy();
+    act(() => { media.matches = false; change(); });
+    expect(screen.getByRole('table', { name: 'دليل الأساتذة' })).toBeTruthy();
+    expect(screen.queryByRole('list', { name: 'دليل الأساتذة' })).toBeNull();
+    expect(mocks.listTeachers).toHaveBeenCalledTimes(1);
+  });
+
+  it('never represents a failed load as a zero count', async () => {
+    mocks.listTeachers.mockRejectedValueOnce(new Error('sensitive internals'));
+    renderPage(); await screen.findByRole('heading', { name: 'تعذر تحميل دليل الأساتذة' });
+    expect(screen.getByText('إجمالي النتائج: غير متاح')).toBeTruthy();
+    expect(screen.queryByText('إجمالي النتائج: 0')).toBeNull();
+  });
   it('loads the ACTIVE-default server page, total, approved institution and supported navigation only', async () => {
     renderPage();
     expect(screen.getByText('جارٍ تحميل دليل الأساتذة…')).toBeTruthy();
-    expect(await screen.findByRole('cell', { name: 'محمد علي' })).toBeTruthy();
+    expect(await screen.findByRole('link', { name: 'محمد علي' })).toBeTruthy();
     expect(screen.getByText('إجمالي النتائج: 1')).toBeTruthy();
     expect(screen.getByText('مدرسة النور')).toBeTruthy();
     expect(screen.getByText('الجزائر')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'محمد علي' }).getAttribute('href')).toBe(`/app/teachers/${teacher.id}`);
-    expect(screen.getByRole('link', { name: 'التوزيع الأسبوعي' }).getAttribute('href')).toBe(`/app/teachers/${teacher.id}/schedules`);
+    expect(screen.getByRole('link', { name: 'التوزيع الأسبوعي — محمد علي' }).getAttribute('href')).toBe(`/app/teachers/${teacher.id}/schedules`);
     expect(mocks.listTeachers).toHaveBeenCalledWith({ limit: 25 });
     expect(screen.queryByRole('button', { name: /حذف|أرشفة|تعديل/ })).toBeNull();
   });
@@ -51,9 +103,9 @@ describe('TASK-045 Teacher directory', () => {
       ...teacher, id: `teacher-${index}`, professionalStatus, name: `أستاذ ${index}`,
     }))));
     renderPage();
-    await screen.findByRole('cell', { name: 'أستاذ 0 علي' });
+    await screen.findByRole('link', { name: 'أستاذ 0 علي' });
     for (const label of ['مرسم', 'متربص', 'متعاقد', 'متعاقد مؤقت', 'مستخلف']) expect(screen.getAllByText(label).length).toBeGreaterThan(0);
-    expect(screen.getByRole('link', { name: 'أستاذ 4 علي' }).querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+    expect(screen.getByRole('link', { name: 'أستاذ 4 علي' }).getAttribute('href')).toBe('/app/teachers/teacher-4');
   });
 
   it('shows an unassigned current-institution state and never displays phone or email columns', async () => {
@@ -80,21 +132,21 @@ describe('TASK-045 Teacher directory', () => {
     renderPage('/app/teachers?q=قديم');
     fireEvent.change(screen.getByRole('textbox', { name: 'البحث عن أستاذ' }), { target: { value: 'جديد' } });
     await new Promise((resolve) => window.setTimeout(resolve, 400));
-    expect(await screen.findByRole('cell', { name: 'أحدث علي' })).toBeTruthy();
+    expect(await screen.findByRole('link', { name: 'أحدث علي' })).toBeTruthy();
     await act(async () => { resolveOld(response([{ ...teacher, name: 'قديم' }])); });
-    expect(screen.queryByRole('cell', { name: 'قديم علي' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'قديم علي' })).toBeNull();
   });
 
   it('offers a District filter only for multiple current Districts and sends selected scope', async () => {
     mocks.getCurrentDistricts.mockResolvedValueOnce([districtA, districtB]);
     renderPage();
-    expect(await screen.findByRole('cell', { name: 'مقاطعة الشمال' })).toBeTruthy();
+    expect(await screen.findByText('مقاطعة الشمال', { selector: 'small' })).toBeTruthy();
     const filter = await screen.findByRole('combobox', { name: 'المقاطعة' });
     fireEvent.change(filter, { target: { value: districtB.id } });
     await waitFor(() => expect(mocks.listTeachers).toHaveBeenLastCalledWith({ districtId: districtB.id, limit: 25 }));
     mocks.getCurrentDistricts.mockResolvedValueOnce([districtA]);
     cleanup(); renderPage();
-    await screen.findByRole('cell', { name: 'محمد علي' });
+    await screen.findByRole('link', { name: 'محمد علي' });
     expect(screen.queryByRole('combobox', { name: 'المقاطعة' })).toBeNull();
   });
 
@@ -102,7 +154,7 @@ describe('TASK-045 Teacher directory', () => {
     mocks.getCurrentDistricts.mockRejectedValueOnce(new Error('private district error'));
     renderPage();
     expect(await screen.findByText('تعذر تحميل أسماء المقاطعات؛ تبقى صلاحية النطاق لدى الخادم.')).toBeTruthy();
-    expect(await screen.findByRole('cell', { name: 'محمد علي' })).toBeTruthy();
+    expect(await screen.findByRole('link', { name: 'محمد علي' })).toBeTruthy();
     expect(mocks.listTeachers).toHaveBeenCalledWith({ limit: 25 });
     expect(screen.queryByText(/private district error/)).toBeNull();
   });
@@ -133,6 +185,7 @@ describe('TASK-045 Teacher directory', () => {
 
   it('requires an explicit valid academic year before schedule filters and converts HH:mm', async () => {
     renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'مرشحات التوزيع الأسبوعي' }));
     const year = screen.getByRole('textbox', { name: 'السنة الدراسية' });
     const day = screen.getByRole('combobox', { name: 'يوم العمل' }) as HTMLSelectElement;
     expect(day.disabled).toBe(true);
@@ -160,13 +213,13 @@ describe('TASK-045 Teacher directory', () => {
     const nextId = '66666666-6666-4666-8666-666666666666';
     mocks.listTeachers.mockResolvedValueOnce(response([teacher], 30, nextId)).mockResolvedValueOnce(response([{ ...teacher, id: nextId, name: 'التالي' }], 30));
     renderPage();
-    await screen.findByRole('cell', { name: 'محمد علي' });
+    await screen.findByRole('link', { name: 'محمد علي' });
     expect(screen.getByText('النتائج 1–1 من 30')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'النتائج التالية' }));
-    expect(await screen.findByRole('cell', { name: 'التالي علي' })).toBeTruthy();
+    expect(await screen.findByRole('link', { name: 'التالي علي' })).toBeTruthy();
     await waitFor(() => expect(mocks.listTeachers).toHaveBeenLastCalledWith({ limit: 25, cursor: nextId }));
     fireEvent.click(screen.getByRole('button', { name: 'السابق' }));
-    expect(await screen.findByRole('cell', { name: 'محمد علي' })).toBeTruthy();
+    expect(await screen.findByRole('link', { name: 'محمد علي' })).toBeTruthy();
   });
 
   it('resets a stale cursor safely and reloads from the first page', async () => {
@@ -174,11 +227,11 @@ describe('TASK-045 Teacher directory', () => {
       .mockRejectedValueOnce(new ApiRequestError('not found', undefined, 404, 'NOT_FOUND'))
       .mockResolvedValue(response([teacher], 30));
     renderPage();
-    await screen.findByRole('cell', { name: 'محمد علي' });
+    await screen.findByRole('link', { name: 'محمد علي' });
     fireEvent.click(screen.getByRole('button', { name: 'النتائج التالية' }));
     expect(await screen.findByText('تغيّرت النتائج أو انتهت صلاحية مؤشر الصفحة؛ عُدنا إلى بداية القائمة.')).toBeTruthy();
     await waitFor(() => expect(mocks.listTeachers).toHaveBeenLastCalledWith({ limit: 25 }));
-    expect(screen.getByRole('cell', { name: 'محمد علي' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'محمد علي' })).toBeTruthy();
   });
 
   it('distinguishes default and filtered empty results and resets filters', async () => {
@@ -197,12 +250,12 @@ describe('TASK-045 Teacher directory', () => {
     expect(await screen.findByRole('heading', { name: 'تعذر تحميل دليل الأساتذة' })).toBeTruthy();
     expect(screen.queryByText(/raw server internals/)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'إعادة المحاولة' }));
-    expect(await screen.findByRole('cell', { name: 'محمد علي' })).toBeTruthy();
+    expect(await screen.findByRole('link', { name: 'محمد علي' })).toBeTruthy();
   });
 
   it('is RTL with associated labels and keyboard-focusable actions', async () => {
     renderPage();
-    expect(await screen.findByRole('cell', { name: 'محمد علي' })).toBeTruthy();
+    expect(await screen.findByRole('link', { name: 'محمد علي' })).toBeTruthy();
     expect(document.querySelector('.teacher-directory')?.getAttribute('dir')).toBe('rtl');
     const search = screen.getByRole('textbox', { name: 'البحث عن أستاذ' });
     search.focus(); expect(document.activeElement).toBe(search);
