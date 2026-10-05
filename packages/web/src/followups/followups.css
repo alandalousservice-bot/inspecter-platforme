@@ -1,5 +1,20 @@
 @media screen {
   .followups-page { display: grid; gap: var(--space-6); min-width: 0; }
+  .followups-page .ui-page-header { margin-block-end: 0; }
+  .followups-page .ui-filter-bar__controls { display: block; }
+  .followups-page .followups-filters { margin-block-end: 0; grid-template-columns: repeat(3, minmax(0, 16rem)); }
+  .followups-results { min-inline-size: 0; }
+  .followups-page .ui-record-row { background: var(--color-surface); padding-inline: var(--space-3); }
+  .followups-page .ui-record-row__body { flex-basis: 24rem; gap: var(--space-2); }
+  .followups-page .followup-note { display: block; max-inline-size: none; margin: 0; font-weight: var(--font-weight-semibold); color: var(--color-text-primary); }
+  .followups-page .followup-context { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); color: var(--color-text-secondary); }
+  .followups-page .followup-context > span { flex-basis: 100%; }
+  .followups-page .followup-teacher { font-weight: var(--font-weight-medium); }
+  .followups-page .ui-record-row__state { display: flex; flex-direction: column; align-items: start; gap: var(--space-2); }
+  .followup-due { display: grid; gap: var(--space-1); }
+  .followup-due > span, .followup-readonly { color: var(--color-text-secondary); font-size: var(--font-size-small); }
+  .followups-page .ui-record-row__actions .followup-actions { display: grid; }
+  .followups-page .ui-pagination { margin-block-start: var(--space-4); }
   .followups-page .ui-page-header__eyebrow { color: var(--color-primary); font-weight: var(--font-weight-semibold); }
   .followups-card { border-color: color-mix(in srgb, var(--color-primary) 17%, var(--color-border)); }
   .followups-card .ui-card__header { align-items: center; }
@@ -35,5 +50,15 @@
     .followup-dialog-context > div { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
     .followup-actions, .followup-actions .ui-button { width: 100%; }
     .followup-actions { display: grid; }
+  }
+  @media (max-width: 64rem) {
+    .followups-page .ui-record-row { flex-direction: column; align-items: stretch; }
+    .followups-page .ui-record-row__body { flex-basis: auto; }
+    .followups-page .ui-record-row__state { flex-direction: row; justify-content: start; align-items: center; }
+    .followups-page .ui-record-row__actions .followup-actions { display: flex; }
+  }
+  @media (max-width: 42rem) {
+    .followups-page .followups-filters { grid-template-columns: minmax(0, 1fr); }
+    .followups-page .ui-record-row__actions .followup-actions { display: grid; }
   }
 }

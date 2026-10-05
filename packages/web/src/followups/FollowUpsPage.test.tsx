@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { ApiRequestError } from '../auth/client';
@@ -22,12 +22,66 @@ describe('TASK-053 operational follow-up UI', () => {
     const { container } = renderPage(); await screen.findByText('متابعة إجراء');
     expect(container.querySelector('.followups-page')?.getAttribute('dir')).toBe('rtl'); expect(screen.getAllByText('متأخرة').length).toBeGreaterThan(0);
     expect(screen.getByText('ابتدائية تاريخية')).toBeTruthy(); expect(mocks.listFollowUps).toHaveBeenCalledWith({ status: 'OPEN', limit: 25 });
-    expect(container.querySelector('.followups-card__mark svg')?.getAttribute('aria-hidden')).toBe('true');
+    expect(screen.getByRole('list', { name: 'إجراءات المتابعة' })).toBeTruthy();
+    expect(screen.queryByRole('table')).toBeNull();
     expect(container.querySelector('.followup-teacher [dir="auto"]')?.textContent).toContain('أستاذ تجريبي');
     expect(screen.queryByText('غير مستحقة اليوم')).toBeNull();
     fireEvent.change(screen.getByLabelText('الاستحقاق'), { target: { value: 'DUE_TODAY' } });
     await waitFor(() => expect(mocks.listFollowUps).toHaveBeenLastCalledWith({ status: 'OPEN', alert: 'DUE_TODAY', limit: 25 }));
     expect(screen.getByRole('button', { name: 'تعديل الإجراء' })).toBeTruthy(); expect(screen.queryByRole('button', { name: /حذف|أرشفة|نقل الملكية/u })).toBeNull();
+  });
+  it('prioritizes full persisted content and links only teacher and source Visit, not a Report', async () => {
+    const longNote = 'إجراء بيداغوجي طويل دون تلخيص '.repeat(30);
+    mocks.listFollowUps.mockResolvedValue({ data: [{ ...item, note: longNote }], page: { limit: 25, total: 1, nextCursor: null } });
+    const { container } = renderPage(); await screen.findByText(longNote.trim());
+    expect(container.querySelector('.ui-record-row__identity')?.textContent).toBe(longNote);
+    expect(screen.getByRole('link', { name: 'أستاذ تجريبي' }).getAttribute('href')).toBe(`/app/teachers/${item.context.teacher.id}`);
+    expect(screen.getByRole('link', { name: 'الزيارة المصدر' }).getAttribute('href')).toBe(`/app/visits/${item.context.visitId}`);
+    expect(screen.queryByRole('link', { name: /تقرير/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /إضافة متابعة/ })).toBeNull();
+    expect(container.querySelector('.ui-record-row')?.tagName).toBe('LI');
+  });
+  it('uses server attention independently of dates and suppresses writes for non-owners', async () => {
+    mocks.listFollowUps.mockResolvedValue({ data: [item, { ...item, id: 'today', alertState: 'DUE_TODAY', ownerInspectorId: 'other', note: 'متابعة اليوم' }, { ...item, id: 'future', alertState: 'NONE', note: 'متابعة مستقبلية', dueDate: '2099-01-01' }], page: { limit: 25, total: 3, nextCursor: null } });
+    renderPage(); await screen.findByText('متابعة اليوم');
+    const records = within(screen.getByRole('list', { name: 'إجراءات المتابعة' })).getAllByRole('listitem');
+    expect(within(records[0]).getByText('متأخرة')).toBeTruthy();
+    expect(within(records[1]).getByText('مستحقة اليوم')).toBeTruthy();
+    expect(within(records[1]).queryByRole('button')).toBeNull();
+    expect(within(records[1]).getByText('للقراءة فقط')).toBeTruthy();
+    expect(within(records[2]).getByText('مفتوحة')).toBeTruthy();
+  });
+  it('preserves server cursor pagination and district/status filters without adding URL state', async () => {
+    mocks.listFollowUps.mockResolvedValue({ data: [item], page: { limit: 25, total: 26, nextCursor: item.id } });
+    renderPage(); await screen.findByText(item.note);
+    fireEvent.click(screen.getByRole('button', { name: /التالي/ }));
+    await waitFor(() => expect(mocks.listFollowUps).toHaveBeenLastCalledWith({ status: 'OPEN', limit: 25, cursor: item.id }));
+    fireEvent.change(screen.getByLabelText('المقاطعة'), { target: { value: item.context.districtId } });
+    await waitFor(() => expect(mocks.listFollowUps).toHaveBeenLastCalledWith({ status: 'OPEN', limit: 25, districtId: item.context.districtId }));
+    fireEvent.change(screen.getByLabelText('الحالة'), { target: { value: 'COMPLETED' } });
+    await waitFor(() => expect(mocks.listFollowUps).toHaveBeenLastCalledWith({ status: 'COMPLETED', limit: 25, districtId: item.context.districtId }));
+    expect(screen.queryByLabelText('الاستحقاق')).toBeNull();
+  });
+  it('distinguishes filtered empty, unavailable error count and successful retry', async () => {
+    mocks.listFollowUps.mockResolvedValueOnce({ data: [], page: { limit: 25, total: 0, nextCursor: null } });
+    renderPage(); await screen.findByText('لا توجد إجراءات مفتوحة');
+    mocks.listFollowUps.mockResolvedValueOnce({ data: [], page: { limit: 25, total: 0, nextCursor: null } });
+    fireEvent.change(screen.getByLabelText('الاستحقاق'), { target: { value: 'OVERDUE' } });
+    await screen.findByText('لا توجد إجراءات مطابقة');
+    mocks.listFollowUps.mockRejectedValueOnce(new Error('private'));
+    fireEvent.change(screen.getByLabelText('الاستحقاق'), { target: { value: '' } });
+    await screen.findByText('إجمالي الإجراءات: غير متاح');
+    fireEvent.click(screen.getByRole('button', { name: 'إعادة التحميل' }));
+    await screen.findByText(item.note);
+  });
+  it('completes only after explicit confirmation with the original revision contract', async () => {
+    renderPage(); await screen.findByText(item.note);
+    fireEvent.click(screen.getByRole('button', { name: 'إكمال الإجراء' }));
+    expect(mocks.patchFollowUp).not.toHaveBeenCalled();
+    expect(screen.getByText('بعد الإكمال تصبح المتابعة للقراءة فقط.')).toBeTruthy();
+    fireEvent.change(screen.getByRole('textbox', { name: 'نتيجة المتابعة' }), { target: { value: 'تمت المرافقة' } });
+    fireEvent.click(screen.getByRole('button', { name: 'تأكيد الإكمال' }));
+    await waitFor(() => expect(mocks.patchFollowUp).toHaveBeenCalledWith(item.id, { operation: 'COMPLETE', expectedRevision: 1, completionNote: 'تمت المرافقة' }));
   });
   it('shows empty and safe error states', async () => {
     mocks.listFollowUps.mockResolvedValueOnce({ data: [], page: { limit: 25, nextCursor: null, total: 0 } }); renderPage();
