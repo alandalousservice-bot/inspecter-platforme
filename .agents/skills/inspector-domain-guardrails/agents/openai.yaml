@@ -1,0 +1,6 @@
+interface:
+  display_name: "Inspector Domain Guardrails"
+  short_description: "Preserve Inspector domain, security and print contracts"
+  default_prompt: "Use $inspector-domain-guardrails to check this bounded Inspector change against its accepted contracts; stop on out-of-scope decisions."
+policy:
+  allow_implicit_invocation: true
