@@ -36,6 +36,7 @@ const updateSchema = z.object({
   ...workplaceFields,
 }).strict().refine((value) => Object.keys(value).length > 0, { message: 'يلزم حقل واحد على الأقل.' });
 const listSchema = z.object({
+  municipality: cleanText(150, true).optional(),
   districtId: uuid.optional(),
   q: z.string().trim().max(100).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(25),
@@ -148,6 +149,7 @@ export function registerInstitutionRoutes(
 
     const where: Prisma.InstitutionWhereInput = {
       districtId: { in: districtIds }, archivedAt: null,
+      ...(query.municipality ? { municipality: { equals: query.municipality, mode: 'insensitive' as const } } : {}),
       ...(query.q ? { name: { contains: query.q, mode: 'insensitive' as const } } : {}),
     };
     if (query.cursor) {

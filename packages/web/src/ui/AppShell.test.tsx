@@ -20,7 +20,7 @@ describe('G6-02 professional application shell', () => {
     renderShell();
     const primary = screen.getByRole('navigation', { name: 'مساحات العمل' });
     expect([...primary.querySelectorAll('a')].map((link) => link.getAttribute('aria-label'))).toEqual([
-      'لوحة المتابعة', 'دليل الأساتذة', 'طلبات الأساتذة', 'المؤسسات', 'الزيارات', 'إجراءات المتابعة',
+      'لوحة المتابعة', 'دليل الأساتذة', 'طلبات الأساتذة', 'التحديثات والانتقالات', 'المؤسسات', 'الزيارات', 'إجراءات المتابعة',
     ]);
     expect(screen.queryByRole('link', { name: 'الرئيسية' })).toBeNull();
     expect(screen.queryByRole('link', { name: /المرجع|المقترحات|النشاط/u })).toBeNull();
@@ -72,7 +72,7 @@ describe('G6-02 professional application shell', () => {
       'مساحة العمل', 'ملفات الإشراف', 'العمل الميداني والمتابعة',
     ]);
     expect(navigation.querySelectorAll('button')).toHaveLength(0);
-    expect(navigation.querySelectorAll('a')).toHaveLength(6);
+    expect(navigation.querySelectorAll('a')).toHaveLength(7);
   });
 
   it('closes the mobile drawer on route navigation and returns focus', async () => {

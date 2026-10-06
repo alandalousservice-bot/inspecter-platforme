@@ -140,6 +140,7 @@ export type SubmissionDetail = {
 };
 
 export type TeacherProfile = {
+  trainingStatus?: string | null; trainingVerifiedAt?: string | null;
   id: string; districtId: string; name: string; surname: string;
   birthDate: string | null; placeOfBirth: string | null; phone: string | null;
   email: string | null; professionalStatus: string | null; employedAt: string | null;
@@ -223,6 +224,10 @@ export type SupplementaryWorkplaceInput = { institutionId: string; validFrom: st
 export type SupplementaryWorkplacePatch = { validFrom?: string; validTo?: string | null };
 
 export type TeacherDirectoryItem = {
+  hasPhoto?: boolean;
+  hasSupplementaryWorkplaces?: boolean;
+  trainingStatus?: string | null;
+  trainingVerifiedAt?: string | null;
   id: string;
   districtId: string;
   name: string;
@@ -232,6 +237,7 @@ export type TeacherDirectoryItem = {
   currentInstitution: { id: string; name: string; municipality: string | null } | null;
 };
 export type TeacherDirectoryFilters = {
+  municipality?: string;
   districtId?: string;
   q?: string;
   institutionId?: string;
@@ -250,7 +256,7 @@ export type TeacherDirectoryPage = { limit: number; nextCursor: string | null; t
 
 export async function listTeachers(options: TeacherDirectoryFilters = {}) {
   const query = new URLSearchParams();
-  for (const key of ['districtId', 'q', 'institutionId', 'professionalStatus', 'recordStatus', 'academicYear', 'cursor'] as const) {
+  for (const key of ['districtId', 'q', 'municipality', 'institutionId', 'professionalStatus', 'recordStatus', 'academicYear', 'cursor'] as const) {
     const value = options[key];
     if (value !== undefined && value !== '') query.set(key, String(value));
   }
@@ -601,8 +607,9 @@ export async function getCurrentDistricts(): Promise<DistrictOption[]> {
   return body.items;
 }
 
-export async function listInstitutions(options: { q?: string; cursor?: string; limit?: number; districtId?: string } = {}) {
+export async function listInstitutions(options: { q?: string; cursor?: string; limit?: number; districtId?: string; municipality?: string } = {}) {
   const query = new URLSearchParams();
+  if (options.municipality) query.set('municipality', options.municipality);
   if (options.q) query.set('q', options.q);
   if (options.cursor) query.set('cursor', options.cursor);
   if (options.districtId) query.set('districtId', options.districtId);

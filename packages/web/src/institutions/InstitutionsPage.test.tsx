@@ -56,7 +56,7 @@ async function openCreate() {
 }
 
 describe('TASK-024 Institution list and create UI', () => {
-  it('uses a compact header and one results surface without redundant headings or detail links', async () => {
+  it('uses a compact header and one results surface with the approved Institution workspace link', async () => {
     listInstitutions.mockResolvedValueOnce(page([rowOne]));
     renderPage(); await screen.findByRole('row', { name: /مدرسة النور/u });
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
@@ -64,7 +64,7 @@ describe('TASK-024 Institution list and create UI', () => {
     expect(screen.queryByText(/في الخادم/)).toBeNull();
     expect(document.querySelector('.ui-card')).toBeNull();
     expect(document.querySelector('caption')?.className).toBe('ui-table__caption--accessible-only');
-    expect(screen.queryByRole('link')).toBeNull();
+    expect(screen.getByRole('link', { name: 'مدرسة النور' }).getAttribute('href')).toBe('/app/institutions/institution-1');
   });
 
   it('preserves URL q and distinguishes filtered empty from errors without a zero failure count', async () => {
@@ -88,7 +88,7 @@ describe('TASK-024 Institution list and create UI', () => {
     expect(screen.queryByRole('table')).toBeNull();
     expect(screen.getAllByText(longName)).toHaveLength(1);
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
-    expect(screen.getByText(longName).closest('a')).toBeNull();
+    expect(screen.getByText(longName).closest('a')?.getAttribute('href')).toBe('/app/institutions/institution-1');
     expect(screen.getByText('لا يوجد بريد مسجل')).toBeTruthy();
     expect(screen.getByText(rowOne.email).closest('bdi')).toHaveProperty('dir', 'ltr');
     expect(screen.getByText(rowOne.directorPhone).closest('bdi')).toHaveProperty('dir', 'ltr');
@@ -140,7 +140,7 @@ describe('TASK-024 Institution list and create UI', () => {
     expect(email.closest('bdi')?.getAttribute('dir')).toBe('ltr');
     const phone = screen.getByText('021234567');
     expect(phone.closest('bdi')?.getAttribute('dir')).toBe('ltr');
-    expect(screen.getByText('مدرسة النور').closest('a')).toBeNull();
+    expect(screen.getByText('مدرسة النور').closest('a')?.getAttribute('href')).toBe('/app/institutions/institution-1');
     expect(screen.getByText('مدرسة النور').closest('strong')).toBeTruthy();
   });
 

@@ -5,10 +5,12 @@ import { AppShell } from '../ui/AppShell';
 import type { DashboardSummary } from '../auth/client';
 import { DashboardPage } from './DashboardPage';
 
-const { getDashboardSummary } = vi.hoisted(() => ({ getDashboardSummary: vi.fn() }));
+const { getDashboardSummary, listTeachers } = vi.hoisted(() => ({ getDashboardSummary: vi.fn(), listTeachers: vi.fn(async () => ({ data: [], page: { total: 0, nextCursor: null, limit: 3 } })) }));
+vi.mock('../teacher-portal/client', async (original) => ({ ...await original<typeof import('../teacher-portal/client')>(), portalFetch: vi.fn(async (path: string) => ({ data: path === '/me/geography' ? { districts: [] } : { requests: [], corrections: 0, correctionItems: [] } })) }));
 vi.mock('../auth/client', async (importOriginal) => ({
   ...await importOriginal<typeof import('../auth/client')>(),
   getDashboardSummary,
+  listTeachers,
 }));
 
 const populated: DashboardSummary = {
@@ -86,7 +88,7 @@ describe('TASK-070B Dashboard presentation', () => {
     expect(screen.getByText('ابتدائية النور')).toBeTruthy();
     expect(screen.getAllByRole('link', { name: 'عرض تفاصيل الزيارة' })[0].getAttribute('href')).toBe('/app/visits/visit-next');
     const sectionNames = screen.getAllByRole('heading', { level: 2 }).map((item) => item.textContent);
-    expect(sectionNames).toEqual(['يحتاج انتباهك', 'الزيارات القادمة', 'إجراءات سريعة']);
+    expect(sectionNames).toEqual(['تحديثات الحسابات والتوزيع', 'ملفات الأساتذة', 'لا توجد ملفات نشطة في نطاقك', 'المقاطعات والبلديات', 'يحتاج انتباهك', 'الزيارات القادمة', 'إجراءات سريعة']);
     for (const [name, count] of [
       ['المتابعات المتأخرة', '4'], ['المتابعات المستحقة اليوم', '2'], ['طلبات الأساتذة المعلقة', '8'],
       ['مسودات التقارير', '1'], ['زيارات مكتملة بلا تقرير', '5'],

@@ -12,7 +12,7 @@ Start the existing isolated PostgreSQL cluster if needed; do not initialize a ne
 npm run local:uat:init
 ```
 
-The command uses `prisma migrate deploy` and verifies that all 19 repository migrations are applied. It never uses `db push`. The seed is explicit and repeatable:
+The command uses `prisma migrate deploy` and checks the migration count against the repository's migration directories instead of a stale hardcoded count. It never uses `db push`. Follow the ADR-041 operator boundary below before upgrading persistent UAT; initialization/seeding is not part of this implementation verification. The seed is explicit and repeatable:
 
 ```powershell
 npm run local:uat:seed
@@ -70,3 +70,11 @@ The seed includes ten synthetic Teachers across all five supported professional 
 ## Stop services
 
 Stop the API and web terminal with `Ctrl+C`. Stop only the existing isolated PostgreSQL cluster using its configured `pg_ctl` data directory if it was started for this session. No reset/cleanup operation is part of the guide; persistent UAT rows are intentionally retained.
+
+## Product evolution / ADR-041 operator boundary
+
+The Teacher portal evolution was verified in disposable owned test schemas only. The persistent `public` UAT schema has **not** been upgraded or reseeded. Do not start the evolved API against an older schema or silently run init/seed to make it work. Applying the additive migration to persistent UAT requires a separate deliberate operator instruction and backup/preservation check.
+
+Teacher photos require `PRIVATE_ASSET_DIR` pointing to an absolute private directory outside the repository, never a static web directory. Missing configuration fails closed. On Windows, establish owner/service-account-only ACLs explicitly; POSIX file modes do not establish Windows ACLs. Do not put credentials in this setting or tracked files. Prior photos remain retained; ADR-014 is still OPEN. Full image decoding/re-encoding and EXIF removal are outstanding hardening before real-data rollout.
+
+Teacher entry is `/teacher/login`, and account activation follows an Inspector-issued identity-confirmed invitation bound to the existing Teacher. Never seed another identity or infer account ownership from a public submission. Optional public build-time `VITE_EDUCATION_DIRECTORATE_LABEL` / `VITE_INSPECTION_DISTRICT_LABEL` affect presentation only, not routing/authorization or official adoption. No official logo is supplied or invented.

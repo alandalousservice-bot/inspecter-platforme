@@ -6,6 +6,8 @@ import { ShellIcon, type ShellIconName } from '../ui/ShellIcon';
 import { formatAlgiers } from '../visits/time';
 import { visitTypeLabel } from '../visits/visit-type-labels';
 import './dashboard.css';
+import { OperationalAlerts } from '../teacher-portal/OperationalAlerts';
+import { WorkspacePreviews } from '../teacher-portal/WorkspacePreviews';
 
 type CountCardProps = {
   title: string;
@@ -85,6 +87,8 @@ export function DashboardPage() {
         <div className="dashboard-hero__action">{refresh}</div>
         <span className="dashboard-hero__motif" aria-hidden="true"><ShellIcon name="shield" /></span>
       </header>
+      <OperationalAlerts refreshKey={refreshKey} />
+      <WorkspacePreviews refreshKey={refreshKey} />
 
       <section className="dashboard-section" aria-labelledby="dashboard-attention-title">
         <div className="dashboard-section__heading">

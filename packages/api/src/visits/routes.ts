@@ -6,6 +6,7 @@ import { ApiError } from '../http/api-error.js';
 import { requireAuthenticatedMutationCsrf } from '../identity/auth-routes.js';
 import { requireInspectorDistrictMembership } from '../policy/district-access.js';
 import { algiersLocalDate, parseOffsetTimestamp, scheduleWarning, yearSchemaValid, type ScheduleWarning } from './planning.js';
+import { requireTenureEligibility } from '../teacher-portal/contracts.js';
 
 const uuid = z.string().uuid();
 const visitType = z.enum(['GUIDANCE', 'TENURE_CONFIRMATION', 'PROMOTION_EVALUATION', 'MONITORING_FOLLOW_UP', 'EXCEPTIONAL']);
@@ -184,6 +185,7 @@ export function registerPedagogicalVisitRoutes(app: Express, database: PrismaCli
         if (!teacher) throw notFound();
         await requireInspectorDistrictMembership(tx, inspectorId, teacher.districtId, nowDate());
         if (teacher.recordStatus !== 'ACTIVE') throw conflict('TEACHER_INACTIVE');
+        requireTenureEligibility(teacher, input.visitType);
         const institution = await validateVisitInstitution(tx, teacher, input.institutionId, start);
         const warning = isScheduled ? await inspectSchedule(tx, teacher.id, input.academicYear, start, end, institution.id) : undefined;
         if (isScheduled) verifyAcknowledgement(warning, input.scheduleWarningAcknowledgement);
@@ -242,6 +244,9 @@ export function registerPedagogicalVisitRoutes(app: Express, database: PrismaCli
         await requireInspectorDistrictMembership(tx, inspectorId, current.districtId, nowDate());
         if (current.revision !== input.expectedRevision) throw conflict('VISIT_REVISION_CONFLICT');
         if (input.operation === 'SET_VISIT_TYPE') {
+          const eligibility = await tx.teacher.findUnique({ where: { id: current.teacherId } });
+          if (!eligibility) throw notFound();
+          requireTenureEligibility(eligibility, input.visitType);
           if (current.status === 'CANCELLED' || current.actualStartAt !== null || current.scheduledStartAt === null) throw conflict('VISIT_TYPE_LOCKED');
           const existingReport = await tx.inspectionReport.findUnique({ where: { visitId: current.id }, select: { id: true } });
           if (existingReport) throw conflict('VISIT_TYPE_LOCKED');
@@ -260,6 +265,7 @@ export function registerPedagogicalVisitRoutes(app: Express, database: PrismaCli
           if (current.scheduledStartAt === null || current.scheduledEndAt === null) throw conflict('VISIT_STATE_CONFLICT');
           const teacher = await tx.teacher.findUnique({ where: { id: current.teacherId } });
           if (!teacher || teacher.recordStatus !== 'ACTIVE') throw conflict('VISIT_WORKPLACE_CHANGED');
+          requireTenureEligibility(teacher, current.visitType);
           const start = parseOffsetTimestamp(input.scheduledStartAt);
           const end = parseOffsetTimestamp(input.scheduledEndAt);
           const institutionId = input.institutionId ?? current.institutionId;

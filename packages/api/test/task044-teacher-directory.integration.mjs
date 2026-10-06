@@ -223,7 +223,10 @@ test('TASK-044 authenticated scoped directory, search, schedule filters and stab
     assert.equal(response.status, 200);
     assert.equal(body.page.total, 1);
     assert.equal(body.data[0].currentInstitution, null);
-    assert.deepEqual(Object.keys(body.data[0]).sort(), ['currentInstitution', 'districtId', 'id', 'name', 'professionalStatus', 'recordStatus', 'surname']);
+    assert.deepEqual(Object.keys(body.data[0]).sort(), ['currentInstitution', 'districtId', 'hasPhoto', 'hasSupplementaryWorkplaces', 'id', 'name', 'professionalStatus', 'recordStatus', 'surname', 'trainingStatus', 'trainingVerifiedAt']);
+    assert.equal(body.data[0].hasPhoto, false);
+    assert.equal(body.data[0].trainingStatus, null);
+    assert.equal(body.data[0].trainingVerifiedAt, null);
     assert.equal(body.data[0].recordStatus, 'ACTIVE');
     const archivedActive = await list(`q=${encodeURIComponent('مع أرشفة مستقلة')}`);
     assert.equal(archivedActive.body.page.total, 1);
@@ -326,7 +329,7 @@ test('TASK-044 authenticated scoped directory, search, schedule filters and stab
   });
 
   await t.test('strict query validation, privacy, no AuditLog, and bounded query count for 180+ rows', async () => {
-    for (const query of ['unknown=1', 'municipality=الجزائر', 'sort=name', 'limit=1&limit=2', 'limit=0', 'limit=abc', `districtId=${districtA.id}&districtId=${districtB.id}`]) {
+    for (const query of ['unknown=1', 'municipality=' + 'أ'.repeat(151), 'sort=name', 'limit=1&limit=2', 'limit=0', 'limit=abc', `districtId=${districtA.id}&districtId=${districtB.id}`]) {
       assert.equal((await list(query)).response.status, 400, query);
     }
     const beforeAudit = await db.auditLog.count();
@@ -335,7 +338,12 @@ test('TASK-044 authenticated scoped directory, search, schedule filters and stab
     assert.equal(bulk.response.status, 200);
     assert.equal(bulk.body.page.total, 205);
     assert.equal(bulk.body.data.length, 100);
-    assert.ok(routeQueries <= 6, `Expected bounded DB query count, got ${routeQueries}.`);
+    // One additional batch reads photo presence, never one query per Teacher.
+    assert.ok(routeQueries <= 7, `Expected bounded DB query count, got ${routeQueries}.`);
+    const largePageQueries = routeQueries;
+    routeQueries = 0;
+    assert.equal((await list(`districtId=${districtA.id}&q=Demo&limit=1`)).response.status, 200);
+    assert.equal(routeQueries, largePageQueries, 'Photo presence must not produce N+1 queries at 205 Teachers');
     assert.equal(await db.auditLog.count(), beforeAudit);
     assert.equal(bulk.body.data.some((item) => 'phone' in item || 'email' in item || 'weeklySchedules' in item), false);
     const schedules = await list(`districtId=${districtA.id}&academicYear=${academicYear}&dayOfWeek=2&limit=100`);

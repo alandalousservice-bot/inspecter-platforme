@@ -10,7 +10,11 @@ import { TeacherProfilePage } from './teachers/TeacherProfilePage';
 import { TeacherInformationCardPage } from './teachers/TeacherInformationCardPage';
 import { TeacherInformationCardPrintPage } from './teachers/TeacherInformationCardPrintPage';
 import { TeacherDirectoryPage } from './teachers/TeacherDirectoryPage';
-import { WeeklySchedulePage } from './teachers/WeeklySchedulePage';
+import { InspectorSchedulePage } from './teacher-portal/InspectorSchedulePage';
+import { TeacherLoginPage } from './teacher-portal/TeacherLoginPage';
+import { TeacherPortalPage } from './teacher-portal/TeacherPortalPage';
+import { InspectorTeacherRequestsPage } from './teacher-portal/InspectorTeacherRequestsPage';
+import { InstitutionWorkspacePage } from './teacher-portal/InstitutionWorkspacePage';
 import { VisitCreatePage } from './visits/VisitCreatePage';
 import { VisitDetailPage } from './visits/VisitDetailPage';
 import { VisitListPage } from './visits/VisitListPage';
@@ -25,17 +29,21 @@ export function AppRoutes() {
     <Routes>
       <Route path="/public/d/:districtId/register" element={<PublicTeacherIntakePage />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/teacher/login" element={<TeacherLoginPage />} />
+      <Route path="/teacher" element={<TeacherPortalPage />} />
       <Route path="/" element={<LandingPage />} />
       <Route path="/app" element={<SessionPage />}>
         <Route index element={<DashboardPage />} />
         <Route path="institutions" element={<InstitutionsPage />} />
+        <Route path="institutions/:id" element={<InstitutionWorkspacePage />} />
         <Route path="submissions" element={<SubmissionsPage />} />
+        <Route path="teacher-requests" element={<InspectorTeacherRequestsPage />} />
         <Route path="submissions/:id" element={<SubmissionDetailPage />} />
         <Route path="teachers" element={<TeacherDirectoryPage />} />
         <Route path="teachers/:id" element={<TeacherProfilePage />} />
         <Route path="teachers/:id/information-card" element={<TeacherInformationCardPage />} />
         <Route path="teachers/:id/information-card/print" element={<TeacherInformationCardPrintPage />} />
-        <Route path="teachers/:id/schedules" element={<WeeklySchedulePage />} />
+        <Route path="teachers/:id/schedules" element={<InspectorSchedulePage />} />
         <Route path="visits" element={<VisitListPage />} />
         <Route path="visits/new" element={<VisitCreatePage />} />
         <Route path="visits/:id" element={<VisitDetailPage />} />

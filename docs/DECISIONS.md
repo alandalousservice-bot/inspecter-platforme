@@ -6,7 +6,7 @@
 |---|---|---|
 | ADR-001 | ACCEPTED | React/Vite + Express modular monolith TypeScript API؛ أبسط فصل للويب وأجهزة مستقبلية مقابل SSR/monolith متشابك |
 | ADR-002 | ACCEPTED | PostgreSQL + Prisma؛ علاقات وتاريخ ومعاملات وفهارس واضحة، قابل للنشر على مزودين |
-| ADR-003 | ACCEPTED | Teacher كيان مهني بلا login؛ Inspector فقط صاحب جلسة؛ submission لا ينشئ Teacher إلا بقرار transaction |
+| ADR-003 | ACCEPTED | تاريخي: no-login للأستاذ مستبدل صراحةً بـADR-041؛ قبول public submission بقرار المفتش وtransaction باقٍ |
 | ADR-004 | ACCEPTED | قرار G0 التاريخي بإسنادات متعددة مؤرخة؛ يستبدل ADR-029 نموذج العلاقة للمراحل اللاحقة لـG3. يبقى الجدول الأسبوعي منفصلًا |
 | ADR-005 | ACCEPTED | جلسات خادمية قابلة للإبطال في cookie مع CSRF/authorization على الخادم؛ تبسيط إبطال الجلسات مقارنة JWT مستقل |
 | ADR-006 | ACCEPTED | Official/reference منفصل عن InspectorProposal؛ revisions محفوظة وMemoTemplate ليس Visit/Report |
@@ -20,7 +20,7 @@
 | ADR-014 | OPEN | سياسة الخصوصية والاحتفاظ والأرشفة والحذف، ومن يرى المقترحات ومتى تُنشر للأساتذة: يقررها Product Owner/الجهة المعنية |
 | ADR-015 | ACCEPTED | عقد G3 التاريخي لـPublic Teacher Intake؛ يستبدل ADR-029 شكل مكان العمل للإرسالات الجديدة بعد TASK-041، مع بقاء snapshots القديمة كما أُرسلت |
 | ADR-016 | ACCEPTED | Inspector Platform Visual Identity: ArenaSPEX مرجع الهوية وUX الأول، Candidate مرجع هندسة النظام الثانوي؛ عقود المفتش والطباعة مرجعية؛ مواصفة G8 أدناه |
-| ADR-017 | OPEN | سياسة نقل أستاذ بين المقاطعات وتاريخ ملكية السجلات متعددة المفتشين؛ يُحسم قبل تنفيذ النقل |
+| ADR-017 | OPEN | ADR-041 يسمح بطلب الانتقال وقرار المصدر غير الفعّال فقط؛ قبول الوجهة وتاريخ التفعيل وملكية/رؤية التاريخ ما زالت مفتوحة قبل أي نقل فعلي |
 | ADR-018 | REJECTED | نسخ teacher-as-user وteacher.schoolId الوحيد من ArenaSPEX؛ يخالف Master ويكسر التاريخ والصلاحيات |
 | ADR-019 | REJECTED | بناء Windows/Mobile/offline sync في MVP؛ كلفة ومخاطر قبل ثبات API |
 | ADR-020 | REJECTED | استيراد مواد ArenaSPEX باعتبارها «رسمية» دون provenance مستقل؛ خطر دقة وحقوق |
@@ -44,6 +44,16 @@
 | ADR-038 | ACCEPTED | قرار Product Owner: استيراد JSON واحد كتعبئة محلية للاستمارة العامة فقط، عبر intake الحالي وبلا اعتماد أو مسار تخزين بديل؛ التفاصيل أدناه |
 | ADR-039 | ACCEPTED | قرار Product Owner: موقع المؤسسة بإحداثيي WGS84 يديرهما المفتش يدويًا؛ TASK-076A بلا مزود خرائط أو خريطة مقاطعة، وعرض المزود الصريح لمؤسسة مختارة مؤجل إلى TASK-076B |
 | ADR-040 | ACCEPTED | Product Owner LP-01..LP-04: مقترح موقع المؤسسة الأم على TeacherSubmission، إدخال يدوي وقرار مفتش مستقل؛ لا GPS أو خرائط مضمّنة؛ TASK-077A..077F |
+
+## ADR-041 — Comprehensive product evolution / Teacher self service
+
+Status: ACCEPTED for the explicit newer Product Owner Vision confirmed 2026-10-05; residual unresolved policies are OPEN, not automatically accepted.
+
+Contract: [Product evolution](architecture/PRODUCT_EVOLUTION_2026.md). Supersedes only old no-Teacher-account, directory-table-only and Inspector-entered-schedule assumptions. Preserves historical records, public intake review, existing Inspector permissions, report snapshots/printing and official curriculum deferral. Separate Teacher account/session; district-bound Inspector invitation; proposed vs canonical data; private photo; teacher-owned schedule initial/correction workflow; training declarations do not grant verified completion; prospective tenure eligibility; non-effective transfer request foundation. ADR-014 and residual ADR-017 remain OPEN. Verification status is recorded separately; acceptance of product direction is not completion of implementation.
+
+### ADR-041 evolution — PRODUCT-EVOLUTION-R2 (2026-10-05)
+
+ACCEPTED by explicit Product Owner R2 decisions, not inferred executor policy: Teacher owns initial and later schedule authoring. Initial becomes canonical immediately; later independent proposals require scoped Inspector acceptance. Shared correction lifecycle supports distinct origins, explicit reasoned REJECTED, retained history, revision concurrency and atomic audit; safe stale acceptance conflict never prevents explicit rejection. ALL Inspector direct schedule writes are closed, including unonboarded Teachers. Secure photo readiness requires mature sharp decoding/re-encoding/orientation normalization and metadata-free private output only; additive migration version-gates historical unsanitized assets without rewriting them. Exact API/persistence boundaries are centralized above in API_CONTRACTS/DATABASE. Training completion authority/evidence, final transfer/destination/effective date/historical access, exceptional override policy and ADR-014 stay OPEN. This accepts the contract, not unexecuted QA.
 
 ## ADR-016 — Inspector Platform Visual Identity
 
@@ -349,4 +359,4 @@ Visit type يصف **سبب الزيارة**؛ `InspectionReport.reportType/templ
 | ADR-014 | Product Owner والجهة المختصة بالخصوصية | DEFERRED | قبل سياسة حذف/احتفاظ الإنتاج في G7، وقبل أي نشر للمقترحات؛ لا مشاركة عامة ضمن المهام الحالية |
 | ADR-015 | Product Owner والجهة صاحبة الاستمارة الإدارية | RESOLVED / ACCEPTED | حُسمت الحقول والتحقق والتوجيه والتصحيح وحدود MVP قبل TASK-030/G3؛ لا يغيّر ذلك حالة TASK-030 |
 | ADR-016 | Product Owner للهوية البصرية؛ Architect لهندسة النظام | RESOLVED / ACCEPTED | حُسم في G8-VISUAL-A0؛ سجل G0 التاريخي لا يعني أن tokens الحالية طبّقت الهوية الجديدة |
-| ADR-017 | Product Owner والجهة الإدارية المالكة للسجلات | DEFERRED | قبل ميزة نقل الأستاذ بين المقاطعات؛ خارج TASK-010 وMVP المحدد حاليًا |
+| ADR-017 | Product Owner والجهة الإدارية المالكة للسجلات | DEFERRED | ADR-041 ينفذ الطلب وقرار المصدر فقط؛ سياسة الوجهة/التفعيل/التاريخ مطلوبة قبل النقل الفعلي |

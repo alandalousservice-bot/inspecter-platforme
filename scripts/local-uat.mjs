@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { spawn } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -82,7 +82,8 @@ async function seed() {
     await db.$connect();
     await assertTarget(db);
     const migrationRows = await db.$queryRawUnsafe('SELECT count(*)::int AS count FROM "_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL');
-    if (migrationRows[0]?.count !== 19) throw new Error('Expected all 19 committed migrations before seed.');
+    const expectedMigrations = readdirSync(resolve(root, 'packages/api/prisma/migrations'), { withFileTypes: true }).filter((entry) => entry.isDirectory() && /^\d{14}_/u.test(entry.name)).length;
+    if (migrationRows[0]?.count !== expectedMigrations) throw new Error('Expected all repository migrations before seed.');
     const { hashPassword } = await import('../packages/api/dist/identity/password.js');
     const passwordHash = await hashPassword(password);
     const now = new Date();

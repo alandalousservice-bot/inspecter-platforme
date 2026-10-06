@@ -1,5 +1,49 @@
 # API Contracts v0.1
 
+## Current Teacher/Inspector evolution — ADR-041
+
+This section supersedes the old blanket prohibition on Teacher sessions and Inspector-authored timetable UI. Historical public intake/accepted snapshots remain unchanged. Routes below are `/api/v1` relative; existing request IDs, safe error envelope, strict Zod validation, no body/PII logging and no-store contracts apply. [Domain/persistence](DATABASE.md#current-implemented-evolution--adr-041).
+
+| Route | Access / behavior |
+|---|---|
+| GET `/teacher/auth/csrf` | Pre-auth role-specific CSRF cookie, `{data:{ready:true}}`. No account enumeration. |
+| POST `/teachers/:id/account-invitation` | Inspector session+CSRF+current District scope. `{email,identityConfirmed:true}`; ACTIVE unarchived Teacher without account. 201 `{data:{activationToken}}`, single-use token shown once, stored hashed, 8h, private out-of-band delivery. |
+| POST `/teacher/auth/activate` | Pre-auth CSRF, existing trusted-IP limiter; `{token,password}` (12–128 characters). 201 creates only account for invitation's existing Teacher; checks expiry, issuer/current membership, bound district/current Teacher. No public signup/Teacher creation. |
+| POST `/teacher/auth/login` | Pre-auth CSRF+limiter; `{email,password}`; generic 401 for absent/wrong/inactive. 200 creates fixed 8h TeacherSession. |
+| POST `/teacher/auth/logout` | Teacher session+CSRF; revoke current session, clear role cookies. |
+| GET `/teacher/me` | Teacher ACTIVE/account ACTIVE/non-expired/non-revoked session; explicit own-profile allowlist. Never administrativeNote, password/hash/session/invitation data or another Teacher. |
+| GET `/teacher/workplaces` | Own approved home + current dated supplementary active institutions; IDs/names/municipality/role, no arbitrary Teacher selector. |
+| GET `/teacher/districts` | Destination context: ID/name only for districts with a current ACTIVE Inspector. Not Inspector scope expansion or authority to transfer. |
+| GET `/teacher/actions` | Own latest 10 reviews including ACCEPTED/REJECTED, ID/year/origin/status/note/decisionNote; explicit rejection reason. |
+| GET/POST `/teacher/requests` | Own cursor read (25 rows) / 201 typed proposal only; POST Teacher CSRF. No client teacherId/districtId/baseline/revision/status. |
+| GET `/teacher-requests` | Inspector current districts; status/kind/teacherId/cursor filters, stable createdAt DESC/id DESC, 25 rows, page.total/nextCursor. Minimized Teacher identity; authorized destination name and canonical location context when relevant. |
+| POST `/teacher-requests/:id/decision` | Inspector CSRF/current district; `{decision:ACCEPT|REJECT,expectedRevision,note?}`; WORKPLACE ACCEPT also requires resolvedInstitutionId. Atomic decision/canonical write/audit; stale/terminal 409. No implicit institution creation/match or effective transfer. |
+| POST/GET `/teacher/photo` | Own session. POST raw PNG/JPEG ≤2MiB; real sharp decode with strict truncation failure, decoded dimensions ≤4096 each / ≤16777216 pixels, orientation normalization, metadata-free PNG/JPEG re-encode, sanitized output ≤2MiB; CSRF; 201 `{data:{photoId}}`. GET sanitized version-1 authenticated image only, no-store/nosniff/CSP/inline Content-Disposition; optional `v` is a 1–10 digit cache revision only, never an identity selector; other query keys are rejected. Prior unsanitized assets are retained but never served. No filename/storageKey/path response. |
+| GET `/teachers/:id/photo` | Inspector current district only; same private serving. Generic absent/out-of-scope 404. |
+| GET/POST `/teacher/schedules` | Own year read `{data:{schedule,correction,reviews}}` (latest25 reviews). POST `{academicYear,slots,expectedRevision?}`: initial 201 canonical immediately; subsequent POST requires canonical expectedRevision and creates SUBMITTED TEACHER_UPDATE review, returning unchanged canonical + correction. One open review/year. Teacher CSRF and dated workplace validation. |
+| GET/POST `/teachers/:id/schedule-corrections` | Inspector current scope; latest25 independent updates plus own issued corrections / `{academicYear,note,expectedRevision}` creates REQUESTED INSPECTOR_CORRECTION. One open review/year. |
+| POST `/teacher/schedule-corrections/:id` | Bound Teacher+CSRF; `{academicYear,slots,expectedRevision}`, REQUESTED→SUBMITTED, effective schedule unchanged. |
+| POST `/schedule-corrections/:id/accept` | Current scoped Inspector (issuer for INSPECTOR_CORRECTION)+CSRF; `{expectedRevision}`; SUBMITTED only; rechecks canonical revision and workplace/overlap validity, saves prior snapshot, increments revision and audits atomically. Invalid/stale proposal returns safe 409 without auto-rejection. |
+| POST `/schedule-corrections/:id/reject` | Same scoped Inspector/issuer+CSRF; `{expectedRevision,reason}` (NFC nonblank ≤500). SUBMITTED→REJECTED, decisionInspectorId/reason/proposal retained; canonical untouched; atomic audit. Reject does not require stale workplace/canonical validation; replay/concurrent decisions 409. Fresh Teacher revision allowed afterward. |
+| GET `/me/geography` | Current Inspector districts; names/IDs and municipality groups with active institutionCount. Existing text, not official registry. |
+| GET `/institutions/:id/workspace` | Current scoped Institution context. Teacher links use existing server directory. |
+| GET `/me/work-alerts` | Pending request counts by kind, submitted correction count and first5 relevant Teacher/year links. Not generic notifications. |
+| GET `/teachers/:id/evolution-history` | Current scoped Teacher's latest25 request/correction summaries and related audit ID/action/time, plus latest5 current Inspector-owned Visit summaries with historical institution name, report ID/status and follow-up count. Existing Visit/Report ownership remains; no report prose or another Inspector's records. Bounded recent summary, not complete history. |
+
+### Typed proposal bodies
+
+`{kind,payload}` is a strict discriminated union; unsupported keys/nulls/invalid values reject safely. PROFILE: optional name/surname (100), birthDate, placeOfBirth (150), existing five professionalStatus values, employedAt, confirmedAt, qualifications (1000); at least one field and existing resulting-date chronology. CONTACT: phone/email/personalAddress (300), at least one field, existing phone/email normalization. TRAINING: four explicit states, note≤500 optional. TRANSFER: destinationDistrictId UUID and reason≤500; self-district invalid. WORKPLACE: declared institutionName≤200, municipality≤150/reason≤500 optional; no auto match. LOCATION: own approved institutionId + numeric latitude/longitude at existing bounds, ≤6 decimal places; converted to exact existing Decimal storage on explicit acceptance. NFC/Unicode bounded validation uses existing intake conventions or stricter control-character rejection. Global JSON body bound remains existing 32KiB; slots≤100 with original slot/date/time/overlap rules.
+
+PROFILE/CONTACT and non-COMPLETED training acceptance change current data only after review. COMPLETED declaration stays pending: acceptance returns policy-required 409 until verification authority/evidence is decided. TRANSFER ACCEPT returns APPROVED_PENDING_DESTINATION and no district mutation. WORKPLACE ACCEPT acknowledges an explicit existing approved relationship; new institution/home/supplementary creation stays in existing Inspector workflows. LOCATION replaces canonical location only after baseline/concurrency/ownership recheck and an explicit decision; never rewrites historical Visit snapshots.
+
+### Security / audit deltas
+
+Teacher cookies are `teacher_session` (HttpOnly, Path `/api/v1/teacher`) and `teacher_csrf` (Path `/`), SameSite=Strict, production Secure, expiration no later than fixed 8h Session.expiresAt. Separate CSRF HMAC namespace prevents cross-role reuse. Teacher authentication does not satisfy Inspector middleware. Existing public trusted-IP limiter applies to login/claim (10 attempts/15min, bounded memory); distributed production rate limiting remains a deployment gate. No password reset/OTP/email service/OAuth invented.
+
+New atomic actions: TEACHER_INVITATION_ISSUED, TEACHER_ACCOUNT_ACTIVATED, TEACHER_REQUEST_CREATED, TEACHER_REQUEST_DECIDED, TEACHER_PHOTO_REPLACED, TEACHER_SCHEDULE_SUBMITTED, TEACHER_SCHEDULE_CORRECTION_REQUESTED, TEACHER_SCHEDULE_CORRECTION_SUBMITTED, TEACHER_SCHEDULE_CORRECTION_ACCEPTED, TEACHER_SCHEDULE_CORRECTION_REJECTED, TEACHER_SCHEDULE_UPDATE_SUBMITTED, TEACHER_SCHEDULE_UPDATE_ACCEPTED, TEACHER_SCHEDULE_UPDATE_REJECTED. Reuse central append service; Inspector HTTP and Teacher HTTP have separate actor allowlists. Metadata only contracted kind/status and resolvedInstitutionId for WORKPLACE ACCEPT; no note, coordinates, photo key, email, password, token, cookie or full proposal. LOCATION canonical mutation additionally uses existing coordinate-free INSTITUTION_UPDATED.
+
+GET `/teachers` now adds hasPhoto, hasSupplementaryWorkplaces (current dated, unarchived supplementary relationship only), trainingStatus/trainingVerifiedAt; accepts municipality≤150; institution filtering includes approved home OR current supplementary workplace, no implicit hasCurrentInstitution=true. Existing q/cursor/schedule filters remain. Photo presence is one batched relation query (bounded seven for the existing no-cursor bulk test, equal query count at1/100 rows); supplementary presence is selected in the bounded directory query, not fetched per card. GET `/institutions` accepts municipality filter with existing server q/cursor/count. All existing Inspector timetable creation/slot POST/PATCH/DELETE routes reject writes for every Teacher, including unonboarded records (409 within scope, cross-scope 404); reads remain. No exceptional administrative override. New TENURE_CONFIRMATION create/type-change/reschedule checks prohibit CONTRACT and TRAINEE without verified COMPLETED, never alter old visits/reports.
+
 HTTP JSON `/api/v1`. هذه عقود الموارد والسلوك؛ schemas التفصيلية تتبع حقول [DATABASE](DATABASE.md)، ولا يجوز للمنفذ اختراع حقول بيداغوجية رسمية. كل request/response متحقق بـZod؛ unknown input rejected أو stripped وفق schema منشور، لا mass assignment. `Id` UUID، تواريخ ISO 8601 UTC؛ `dayOfWeek` للجدول الأسبوعي 1 الاثنين .. 7 الأحد وفق `Africa/Algiers`. الحقول الناقصة في API تُعالج بإصدار contract موثق، لا بافتراض صامت.
 
 ## غلاف واستعمال مشترك
@@ -10,7 +54,7 @@ HTTP JSON `/api/v1`. هذه عقود الموارد والسلوك؛ schemas ا�
 
 جلسة المفتش في cookie آمنة `HttpOnly`, و`Secure` في production، و`SameSite=Strict`. يقبل `POST /auth/login` جسم `{email,password}`؛ الحساب `ACTIVE` فقط يستطيع الدخول. تنشأ Session ثابتة لمدة 8 ساعات من `createdAt` (`expiresAt = createdAt + 8h`) دون sliding expiration أو Remember Me، وعمر cookie لا يتجاوز `expiresAt`. يخزن الخادم hashًا لرمز الجلسة مع `tokenHash` فريد؛ `GET /auth/me` يتحقق من عدم انتهاء الجلسة أو إبطالها ومن بقاء Inspector بحالة `ACTIVE`. `POST /auth/logout` يبطل الجلسة الحالية فقط.
 
-تتطلب cookie mutations قيمة CSRF في cookie `inspector_csrf` ورأس `X-CSRF-Token` مطابق. `GET /auth/me` غير المصادق عليه يهيئ CSRF cookie ثم يعيد 401؛ بعد login ترتبط قيمة CSRF بالجلسة. لا تميّز ردود فشل login بين حساب مفقود أو كلمة مرور خاطئة أو حساب `INACTIVE`. فحص district membership وملكية كل مورد في service. لا JWT/teacher session ولا endpoints عامة لملفات Teacher. حماية public intake في TASK-030 بمحدد معدل وstrict validation وحد JSON؛ تحدٍ أو CAPTCHA/WAF تقوية مستقبلية فقط عند ثبوت الحاجة، وليست شرطًا في TASK-030. لا تعرض duplicate candidates للمُرسل.
+تتطلب cookie mutations قيمة CSRF في cookie `inspector_csrf` ورأس `X-CSRF-Token` مطابق. `GET /auth/me` غير المصادق عليه يهيئ CSRF cookie ثم يعيد 401؛ بعد login ترتبط قيمة CSRF بالجلسة. لا تميّز ردود فشل login بين حساب مفقود أو كلمة مرور خاطئة أو حساب `INACTIVE`. فحص district membership وملكية كل مورد في service. لا JWT ولا endpoints عامة لملفات Teacher؛ جلسة الأستاذ المنفصلة موثقة في ADR-041 أعلاه وتحل محل منعها التاريخي. حماية public intake في TASK-030 بمحدد معدل وstrict validation وحد JSON؛ تحدٍ أو CAPTCHA/WAF تقوية مستقبلية فقط عند ثبوت الحاجة، وليست شرطًا في TASK-030. لا تعرض duplicate candidates للمُرسل.
 
 ## الموارد
 
@@ -23,7 +67,7 @@ HTTP JSON `/api/v1`. هذه عقود الموارد والسلوك؛ schemas ا�
 | `/institutions` | GET/POST | district-scoped، q/pagination؛ create للمفتش المصرح |
 | `/institutions/:id` | GET/PATCH — TASK-042 مكتملة | تفاصيل مؤسسة مصرح بها وتعديل صريح لبياناتها؛ لا archive endpoint ضمن المرحلة |
 | `/teachers` | GET — TASK-044 مكتملة | بحث ومرشحات وترقيم خادمي وفق عقد TASK-044 أدناه؛ لا مرشحات visit قبل مجال الزيارات |
-| `/teachers/:id` | GET/PATCH | ملف مهني حالي وفق عقد TASK-035 أدناه؛ لا حساب مستخدم أو تحرير إسنادات/زيارات |
+| `/teachers/:id` | GET/PATCH | ملف مهني للمفتش وفق عقد TASK-035؛ حساب الأستاذ ومساراته منفصلة وفق ADR-041، ولا يُحرر هذا endpoint إسنادات/زيارات |
 | `/teachers/:id/current-institution` | PUT — TASK-043 مكتملة | اختيار مؤسسة حالية واحدة أو إنشاؤها صراحةً وربطها ذريًا؛ `expectedInstitutionId` يمنع قرارًا مبنيًا على رابط تغيّر |
 | `/teachers/:id/schedules` | GET/POST — TASK-048 مكتملة | سنة دراسية canonical وجدول حالي واحد لها؛ GET structured slots/revision |
 | `/schedules/:id/slots` | POST — TASK-048 مكتملة | dayOfWeek/startMinute/endMinute وlabels/notes اختيارية؛ بلا institutionId/assignmentId |

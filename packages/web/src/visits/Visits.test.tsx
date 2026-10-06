@@ -11,7 +11,7 @@ import { VisitTypeBadge } from './VisitTypeBadge';
 const mocks = vi.hoisted(() => ({
   getCurrentDistricts: vi.fn(), listTeachers: vi.fn(), listInstitutions: vi.fn(), getValidWorkplaces: vi.fn(),
   listPedagogicalVisits: vi.fn(), getPedagogicalVisit: vi.fn(), createPedagogicalVisit: vi.fn(), patchPedagogicalVisit: vi.fn(),
-  getInspectionReport: vi.fn(),
+  getInspectionReport: vi.fn(), getTeacherProfile: vi.fn(),
 }));
 vi.mock('../auth/client', async (importOriginal) => ({ ...(await importOriginal<typeof import('../auth/client')>()), ...mocks }));
 
@@ -32,6 +32,7 @@ const districts = [district];
 
 beforeEach(() => {
   mocks.getCurrentDistricts.mockResolvedValue(districts);
+  mocks.getTeacherProfile.mockResolvedValue({ data: { ...teacher, trainingStatus: null, trainingVerifiedAt: null } });
   mocks.getValidWorkplaces.mockResolvedValue({ data: { items: [
     { id: institution.id, name: institution.name, municipality: institution.municipality, role: 'HOME' },
     { id: '77777777-7777-4777-8777-777777777777', name: 'ابتدائية تكملة', municipality: null, role: 'SUPPLEMENTARY' },
@@ -371,6 +372,7 @@ describe('TASK-051 visit management UI', () => {
   it('uses the visit revision to correct a type and hides correction when server locks it', async () => {
     renderRoute(`/app/visits/${visit.id}`); await screen.findByRole('heading', { name: 'تفاصيل الزيارة' });
     fireEvent.click(screen.getByRole('button', { name: 'تصحيح نوع الزيارة' }));
+    await waitFor(() => expect(screen.getByLabelText(/نوع الزيارة/u)).toHaveProperty('disabled', false));
     fireEvent.change(screen.getByLabelText(/نوع الزيارة/u), { target: { value: 'TENURE_CONFIRMATION' } });
     fireEvent.click(screen.getByRole('button', { name: 'حفظ نوع الزيارة' }));
     await waitFor(() => expect(mocks.patchPedagogicalVisit).toHaveBeenCalledWith(visit.id, { operation: 'SET_VISIT_TYPE', expectedRevision: 3, visitType: 'TENURE_CONFIRMATION' }));
@@ -384,6 +386,7 @@ describe('TASK-051 visit management UI', () => {
     mocks.patchPedagogicalVisit.mockRejectedValueOnce(new ApiRequestError('private server detail', undefined, 409, 'VISIT_TYPE_LOCKED'));
     renderRoute(`/app/visits/${visit.id}`); await screen.findByRole('heading', { name: 'تفاصيل الزيارة' });
     fireEvent.click(screen.getByRole('button', { name: 'تصحيح نوع الزيارة' }));
+    await waitFor(() => expect(screen.getByLabelText(/نوع الزيارة/u)).toHaveProperty('disabled', false));
     fireEvent.change(screen.getByLabelText(/نوع الزيارة/u), { target: { value: 'GUIDANCE' } });
     fireEvent.click(screen.getByRole('button', { name: 'حفظ نوع الزيارة' }));
     expect(await screen.findByText(/لا يمكن تغيير نوع الزيارة في حالتها الحالية/u)).toBeTruthy();
@@ -422,7 +425,7 @@ describe('TASK-051 visit management UI', () => {
     fireEvent.click(screen.getByRole('button', { name: 'إلغاء الزيارة' }));
     fireEvent.click(screen.getByRole('button', { name: 'تأكيد إلغاء الزيارة' }));
     expect(await screen.findByRole('button', { name: 'تحديث البيانات' })).toBeTruthy();
-    expect(screen.queryByRole('dialog', { name: 'إلغاء الزيارة' })).toBeNull();
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'إلغاء الزيارة' })).toBeNull());
     expect(mocks.patchPedagogicalVisit).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('button', { name: 'تحديث البيانات' }));
     await waitFor(() => expect(mocks.getPedagogicalVisit).toHaveBeenCalledTimes(2));

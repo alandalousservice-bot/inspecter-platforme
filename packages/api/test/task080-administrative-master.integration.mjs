@@ -101,7 +101,8 @@ before(async () => {
   cpSync(join(migrationsDir, migrationName), join(tempMigrations, migrationName), { recursive: true });
   runPrisma(['migrate', 'deploy'], upgradeUrl, tempSchema);
   const upgraded = await connectClient(upgradeUrl);
-  const upgradedTeacher = await upgraded.teacher.findUniqueOrThrow({ where: { id: savedIds.teacher } });
+  // The upgrade fixture intentionally stops at TASK-080, not the latest schema.
+  const upgradedTeacher = (await upgraded.$queryRaw`SELECT * FROM "Teacher" WHERE "id"=${savedIds.teacher}::uuid`)[0];
   const upgradedInstitution = await upgraded.$queryRaw`SELECT "email" FROM "Institution" WHERE "id"=${savedIds.institution}::uuid`;
   assert.equal(upgradedTeacher.professionalStatus, 'TEMPORARY_CONTRACT');
   assert.equal(upgradedTeacher.qualifications, 'legacy free text');

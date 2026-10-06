@@ -13,6 +13,8 @@
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "test:db": "npm run test:db --workspace @inspector/api",
+    "test:evolution": "npm run build --workspace @inspector/api && node --test --test-concurrency=1 packages/api/test/product-evolution.integration.mjs packages/api/test/product-evolution-upgrade.integration.mjs",
+    "e2e:evolution": "npm run build && node scripts/product-evolution-e2e.mjs",
     "e2e:g3": "node scripts/g3-e2e.mjs",
     "e2e:task075": "node scripts/task075-e2e.mjs",
     "e2e:task045": "node scripts/task045-e2e.mjs",

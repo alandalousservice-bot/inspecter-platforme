@@ -8,36 +8,42 @@ datasource db {
 }
 
 model District {
-  id           String                        @id @default(uuid()) @db.Uuid
-  name         String
-  externalCode String?
-  createdAt    DateTime                      @default(now())
-  updatedAt    DateTime                      @updatedAt
-  memberships  InspectorDistrictMembership[]
-  institutions Institution[]
-  auditEvents  AuditLog[]
-  submissions  TeacherSubmission[]
-  teachers     Teacher[]
-  visits       PedagogicalVisit[]
+  invitations     TeacherInvitation[]
+  id              String                        @id @default(uuid()) @db.Uuid
+  name            String
+  externalCode    String?
+  createdAt       DateTime                      @default(now())
+  updatedAt       DateTime                      @updatedAt
+  memberships     InspectorDistrictMembership[]
+  institutions    Institution[]
+  auditEvents     AuditLog[]
+  submissions     TeacherSubmission[]
+  teachers        Teacher[]
+  visits          PedagogicalVisit[]
+  teacherRequests TeacherChangeRequest[]
 }
 
 model Inspector {
-  id                 String                        @id @default(uuid()) @db.Uuid
-  email              String                        @unique
-  name               String?
-  surname            String?
-  passwordHash       String
-  status             String
-  createdAt          DateTime                      @default(now())
-  updatedAt          DateTime                      @updatedAt
-  memberships        InspectorDistrictMembership[]
-  sessions           Session[]
-  auditEvents        AuditLog[]
-  decidedSubmissions TeacherSubmission[]           @relation("TeacherSubmissionDecider")
-  locationProposalDecisions TeacherSubmission[]     @relation("LocationProposalDecider")
-  visits             PedagogicalVisit[]
-  finalizedReports   InspectionReport[]
-  ownedFollowUps     FollowUp[]
+  teacherInvitations        TeacherInvitation[]
+  teacherRequestDecisions   TeacherChangeRequest[]
+  scheduleCorrections       ScheduleCorrection[] @relation("ScheduleCorrectionIssuer")
+  scheduleDecisions         ScheduleCorrection[] @relation("ScheduleCorrectionDecision")
+  id                        String                        @id @default(uuid()) @db.Uuid
+  email                     String                        @unique
+  name                      String?
+  surname                   String?
+  passwordHash              String
+  status                    String
+  createdAt                 DateTime                      @default(now())
+  updatedAt                 DateTime                      @updatedAt
+  memberships               InspectorDistrictMembership[]
+  sessions                  Session[]
+  auditEvents               AuditLog[]
+  decidedSubmissions        TeacherSubmission[]           @relation("TeacherSubmissionDecider")
+  locationProposalDecisions TeacherSubmission[]           @relation("LocationProposalDecider")
+  visits                    PedagogicalVisit[]
+  finalizedReports          InspectionReport[]
+  ownedFollowUps            FollowUp[]
 }
 
 model InspectorDistrictMembership {
@@ -89,7 +95,7 @@ model Institution {
   visits                  PedagogicalVisit[]
   supplementaryWorkplaces TeacherSupplementaryWorkplace[]
   scheduleSlots           WeeklyScheduleSlot[]
-  locationProposals       TeacherSubmission[]               @relation("LocationProposalInstitution")
+  locationProposals       TeacherSubmission[]             @relation("LocationProposalInstitution")
 
   @@unique([id, districtId])
   @@index([districtId, name])
@@ -194,6 +200,8 @@ model Teacher {
   personalAddress                           String?                         @db.VarChar(300)
   administrativeNote                        String?                         @db.VarChar(1000)
   recordStatus                              String                          @default("ACTIVE")
+  trainingStatus                            String?
+  trainingVerifiedAt                        DateTime?
   archivedAt                                DateTime?
   createdAt                                 DateTime                        @default(now())
   updatedAt                                 DateTime                        @updatedAt
@@ -205,6 +213,12 @@ model Teacher {
   qualificationsStructured                  TeacherQualification[]
   supplementaryWorkplaces                   TeacherSupplementaryWorkplace[]
   weeklyScheduleSlots                       WeeklyScheduleSlot[]
+  account                                   TeacherAccount?
+  scheduleCorrections                       ScheduleCorrection[]
+  invitations                               TeacherInvitation[]
+  changeRequests                            TeacherChangeRequest[]
+  photos                                    TeacherPhoto[]
+  teacherAuditEvents                        AuditLog[]                      @relation("TeacherAuditActor")
 
   @@unique([id, districtId])
   @@index([institutionId])
@@ -411,6 +425,7 @@ model WeeklyScheduleSlot {
 model AuditLog {
   id               String     @id @default(uuid()) @db.Uuid
   actorInspectorId String?    @db.Uuid
+  actorTeacherId   String?    @db.Uuid
   districtId       String?    @db.Uuid
   action           String
   entityType       String
@@ -420,6 +435,106 @@ model AuditLog {
   metadata         Json?
   actorInspector   Inspector? @relation(fields: [actorInspectorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   district         District?  @relation(fields: [districtId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  actorTeacher     Teacher?   @relation("TeacherAuditActor", fields: [actorTeacherId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
   @@index([districtId, occurredAt])
+}
+
+model TeacherAccount {
+  id           String           @id @default(uuid()) @db.Uuid
+  teacherId    String           @unique @db.Uuid
+  loginEmail   String           @unique @db.VarChar(254)
+  passwordHash String
+  status       String           @default("ACTIVE")
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  teacher      Teacher          @relation(fields: [teacherId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  sessions     TeacherSession[]
+}
+
+model TeacherSession {
+  id        String         @id @default(uuid()) @db.Uuid
+  accountId String         @db.Uuid
+  tokenHash String         @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  account   TeacherAccount @relation(fields: [accountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([accountId])
+}
+
+model TeacherInvitation {
+  district    District  @relation(fields: [districtId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  inspector   Inspector @relation(fields: [inspectorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  id          String    @id @default(uuid()) @db.Uuid
+  teacherId   String    @db.Uuid
+  districtId  String    @db.Uuid
+  inspectorId String    @db.Uuid
+  loginEmail  String    @db.VarChar(254)
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  teacher     Teacher   @relation(fields: [teacherId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([teacherId, expiresAt])
+}
+
+model TeacherChangeRequest {
+  decisionInspector   Inspector? @relation(fields: [decisionInspectorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  id                  String     @id @default(uuid()) @db.Uuid
+  teacherId           String     @db.Uuid
+  districtId          String     @db.Uuid
+  kind                String
+  status              String     @default("PENDING")
+  payload             Json
+  baselineUpdatedAt   DateTime
+  revision            Int        @default(1)
+  decisionInspectorId String?    @db.Uuid
+  decisionNote        String?    @db.VarChar(500)
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+  teacher             Teacher    @relation(fields: [teacherId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  district            District   @relation(fields: [districtId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([districtId, status, createdAt, id])
+  @@index([teacherId, createdAt, id])
+}
+
+model TeacherPhoto {
+  id          String   @id @default(uuid()) @db.Uuid
+  teacherId   String   @db.Uuid
+  contentType String   @db.VarChar(32)
+  byteLength  Int
+  sanitizationVersion Int?
+  storageKey  String   @unique @db.Uuid
+  createdAt   DateTime @default(now())
+  teacher     Teacher  @relation(fields: [teacherId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([teacherId, createdAt(sort: Desc), id(sort: Desc)])
+}
+
+model ScheduleCorrection {
+  inspector        Inspector? @relation("ScheduleCorrectionIssuer", fields: [inspectorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  decisionInspector Inspector? @relation("ScheduleCorrectionDecision", fields: [decisionInspectorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  id               String    @id @default(uuid()) @db.Uuid
+  teacherId        String    @db.Uuid
+  inspectorId      String?   @db.Uuid
+  decisionInspectorId String? @db.Uuid
+  origin           String    @default("INSPECTOR_CORRECTION")
+  academicYear     String
+  note             String?   @db.VarChar(500)
+  decisionNote     String?   @db.VarChar(500)
+  status           String    @default("REQUESTED")
+  scheduleRevision Int
+  revision         Int       @default(1)
+  proposedSlots    Json?
+  previousSlots    Json?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  teacher          Teacher   @relation(fields: [teacherId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([teacherId, academicYear, createdAt])
 }

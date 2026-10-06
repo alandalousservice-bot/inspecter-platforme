@@ -1,5 +1,15 @@
 # Design System — accepted visual direction / staged implementation
 
+## Explicit product evolution presentation override — 2026-10-05 / ADR-041
+
+The new Product Owner instruction replaces only the previous teacher-directory hybrid-table mandate with **compact professional responsive cards**, and authorizes Teacher portal/Institution workspace. It does not authorize a new palette, font, icon system or decorative theme. Existing ArenaSPEX-family tokens and shared components remain the sole implementation source. Cards paginate25 server-side, keep identity dominant and meaningful status/action hierarchy; no giant card per Teacher or duplicate mobile tree.
+
+Teacher portal is role-isolated, Arabic RTL and responsive, sharing primitives rather than another design system. Approved facts, proposed updates and decision states are visually/textually distinct. Dashboard preserves the accepted strong Hero/attention presentation and uses limited previews/action links, not every directory as a chart. Dossier remains DOCUMENT density; operational request/workplace spaces remain compact.
+
+Weekly board selectively rebuilds ArenaSPEX day-column/session ordering patterns in the existing stack: chronological sessions, time/Institution/level context, recorded duration summary. No fixed reference-source school hours, copied branding/signature, fake official workload or runtime import. Effective versus proposed timetable explicitly labelled. Photo/avatar sizing is consistent, lazy, with safe fallback; private photo styles never change protected document print templates.
+
+All new `portal.css` styles are screen-scoped and use defined token roles only. Required QA:1440/1280/768/390, actual browser200% zoom, no horizontal document overflow, one h1/main, native labels/links, keyboard focus/confirmation, RTL/bidi and reduced motion. No claim of full WCAG conformance from unit tests alone. See [actual evidence](architecture/PRODUCT_EVOLUTION_REPORT.md).
+
 **Current authority: ADR-016 ACCEPTED, G8-VISUAL-A0 (2026-10-04).** الهوية المعتمدة هي **ArenaSPEX-family Professional Inspector Theme**؛ ArenaSPEX مرجع الهوية وUX الأول، Candidate مرجع هندسة النظام الثانوي، والمفتش مرجع المجال والأمن والطباعة. [المواصفة النهائية](G8-VISUAL-A0-REPORT.md) تشمل palette وtokens ومصفوفة الشاشات وبوابات التنفيذ.
 
 **G8-01 foundation status:** semantic screen tokens, Arabic-oriented font stack, spacing/geometry/elevation/focus/motion roles and shared primitive styling are implemented in `packages/web/src/ui/tokens.css`, `shell.css` and `primitives.css`. No approved local Alexandria binary was available in the project, so the screen stack falls back through Tajawal/Noto Sans Arabic/system fonts without a network font dependency. `--font-sans` remains the legacy print stack; TASK-086's independent typography and layout are unchanged. This foundation is not a full screen redesign or a claim of final visual parity.

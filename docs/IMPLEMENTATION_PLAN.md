@@ -1,6 +1,14 @@
 # Implementation Plan v0.1
 
-خطط المهام تنفيذ لاحق، لا إذن بالبرمجة الآن. كل Task ID ثابت ويُنفذ وحده وفق [CODEX_RULES](CODEX_RULES.md). `Gate` رقم المرحلة؛ لا يبدأ التالي قبل تحقق معاييرها. اقرأ وثائق النوع من قواعد Codex. `Tests` تشير إلى [TEST_STRATEGY](TEST_STRATEGY.md). إذا احتاجت المهمة قرارًا OPEN، توقف عند الحدود الواضحة. ملفات/مسارات `src/...` متوقعة فقط، لا توجد الآن.
+## Current comprehensive evolution — explicit execution authority (2026-10-05)
+
+The confirmed Product Vision/SOL master task authorizes one coherent additive implementation, not repeated per-feature approval gates. [ADR-041 contract](architecture/PRODUCT_EVOLUTION_2026.md) supersedes the historical no-account/directory-table/Inspector-input assumptions. Existing closed task/gate records below remain historical; TASK-060 does not start. Current delivery/evidence lives in [PRODUCT_EVOLUTION_REPORT](architecture/PRODUCT_EVOLUTION_REPORT.md); no claim of release approval merely from coding.
+
+Implemented areas: separate Teacher account/session/invitation; typed reviewed proposals and private photo; Teacher timetable initial/independent update/correction/atomic accept-reject with rejection reason; training declaration/prospective tenure guard; non-effective transfer foundation; municipality/Institution/Teacher navigation; cards/dossier/actionable Dashboard. New migration is additive, forward-only, tested in owned schemas; no public/UAT rollout.
+
+Deferred policy gates (not silently accepted): evidence/authority to verify training completion, receiving Inspector/transfer effective date/historical permissions, retention/asset deletion. Exact follow-up work and actual validation outcomes are centralized in the delivery report; there is no authority to execute those deferred transitions without a decision.
+
+السجل التاريخي التالي بدأ كخطة تنفيذ لاحق في مرحلة Architecture، ثم وُثقت فيه المهام المنجزة؛ ليس وصفًا لغياب التطبيق الحالي. كل Task ID ثابت ويُنفذ وفق [CODEX_RULES](CODEX_RULES.md) والتكليف المعتمد. `Gate` رقم المرحلة؛ لا يبدأ التالي قبل تحقق معاييرها. اقرأ وثائق النوع من قواعد Codex. `Tests` تشير إلى [TEST_STRATEGY](TEST_STRATEGY.md). القرارات OPEN لا تُحسم ضمن التنفيذ. إذن التطوير الشامل الحالي وحدوده موثقان أعلى هذه الصفحة.
 
 ## Phase 0 — Architecture gate G0
 

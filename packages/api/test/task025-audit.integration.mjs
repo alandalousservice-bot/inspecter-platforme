@@ -88,9 +88,9 @@ after(async () => {
 test('clean migration creates exact AuditLog columns, FKs, index and complete history', async () => {
   const columns = await db.$queryRaw`SELECT column_name, is_nullable, data_type, column_default FROM information_schema.columns WHERE table_schema=${schemaName} AND table_name='AuditLog'`;
   assert.deepEqual(columns.map((row) => row.column_name).sort(), [
-    'id', 'actorInspectorId', 'districtId', 'action', 'entityType', 'entityId', 'occurredAt', 'requestId', 'metadata',
+    'id', 'actorInspectorId', 'actorTeacherId', 'districtId', 'action', 'entityType', 'entityId', 'occurredAt', 'requestId', 'metadata',
   ].sort());
-  for (const name of ['actorInspectorId', 'districtId', 'requestId', 'metadata']) {
+  for (const name of ['actorInspectorId', 'actorTeacherId', 'districtId', 'requestId', 'metadata']) {
     assert.equal(columns.find((row) => row.column_name === name).is_nullable, 'YES');
   }
   for (const name of ['id', 'action', 'entityType', 'entityId', 'occurredAt']) {
@@ -101,9 +101,12 @@ test('clean migration creates exact AuditLog columns, FKs, index and complete hi
   const index = await db.$queryRaw`SELECT indexdef FROM pg_catalog.pg_indexes WHERE schemaname=${schemaName} AND tablename='AuditLog' AND indexname='AuditLog_districtId_occurredAt_idx'`;
   assert.equal(index.length, 1);
   assert.match(index[0].indexdef, /"districtId", "occurredAt"/);
-  const fks = await db.$queryRaw`SELECT confdeltype, confupdtype FROM pg_catalog.pg_constraint WHERE conrelid=to_regclass(${`${schemaName}."AuditLog"`}) AND contype='f'`;
-  assert.equal(fks.length, 2);
-  assert.ok(fks.every(({ confdeltype, confupdtype }) => confdeltype === 'r' && confupdtype === 'c'));
+  const fks = await db.$queryRaw`SELECT conname, confdeltype, confupdtype FROM pg_catalog.pg_constraint WHERE conrelid=to_regclass(${`${schemaName}."AuditLog"`}) AND contype='f' ORDER BY conname`;
+  assert.deepEqual(fks, [
+    { conname: 'AuditLog_actorInspectorId_fkey', confdeltype: 'r', confupdtype: 'c' },
+    { conname: 'AuditLog_actorTeacherId_fkey', confdeltype: 'r', confupdtype: 'r' },
+    { conname: 'AuditLog_districtId_fkey', confdeltype: 'r', confupdtype: 'c' },
+  ]);
   const history = await db.$queryRawUnsafe(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL)::int AS applied FROM "${schemaName}"."_prisma_migrations"`);
   assert.equal(history[0].total, history[0].applied);
 });

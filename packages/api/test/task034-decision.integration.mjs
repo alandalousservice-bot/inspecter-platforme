@@ -175,7 +175,7 @@ test('clean chain creates Teacher columns, indexes, and restricted FKs', async (
     'firstEducationAppointmentDecisionNumber', 'firstInstallationDate', 'traineeshipDate', 'institutionAppointmentDate',
     'institutionAppointmentNumber', 'financialControllerVisaNumber', 'administrativeCategory', 'administrativeSection',
     'administrativeGrade', 'administrativeClassificationEffectiveDate', 'birthProvince', 'personalAddress', 'administrativeNote',
-    'recordStatus', 'archivedAt', 'createdAt', 'updatedAt',
+    'recordStatus', 'archivedAt', 'createdAt', 'updatedAt', 'trainingStatus', 'trainingVerifiedAt',
   ].sort());
   for (const field of ['id', 'districtId', 'name', 'surname', 'recordStatus', 'createdAt', 'updatedAt']) {
     assert.equal(columns.find((row) => row.column_name === field)?.is_nullable, 'NO');

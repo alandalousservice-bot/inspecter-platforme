@@ -117,7 +117,7 @@ before(async () => {
   cpSync(join(migrationsDir, migrationName), join(tempMigrations, migrationName), { recursive: true });
   runPrisma(['migrate', 'deploy'], upgradeUrl, tempSchema);
   upgradeDb = new PrismaClient({ datasources: { db: { url: upgradeUrl } } }); await upgradeDb.$connect();
-  const upgradedTeacher = await upgradeDb.teacher.findUniqueOrThrow({ where: { id: ids.teacher } });
+  const upgradedTeacher = await upgradeDb.teacher.findUniqueOrThrow({ where: { id: ids.teacher }, select: { qualifications: true } });
   assert.equal(upgradedTeacher.qualifications, 'legacy qualifications — keep exactly');
   for (const [model, id] of [
     ['district', ids.district], ['inspector', ids.inspector], ['institution', ids.institution], ['teacher', ids.teacher],

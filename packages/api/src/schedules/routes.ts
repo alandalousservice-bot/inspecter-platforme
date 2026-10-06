@@ -21,7 +21,7 @@ const slotSchema = z.object({
 }).strict().refine((slot) => slot.startMinute < slot.endMinute, { message: 'وقت البداية يجب أن يسبق وقت النهاية.' })
   .refine((slot) => validDate(slot.validFrom) && (slot.validTo === undefined || slot.validTo === null || validDate(slot.validTo))
     && (slot.validTo == null || slot.validTo > slot.validFrom), { message: 'تحقق من فترة سريان الحصة.' });
-const createSchema = z.object({ academicYear: academicYearSchema, slots: z.array(slotSchema) }).strict();
+export const createSchema = z.object({ academicYear: academicYearSchema, slots: z.array(slotSchema).max(100) }).strict();
 const expectedRevision = z.number().int().positive();
 const addSlotSchema = z.object({ expectedRevision, slot: slotSchema }).strict();
 const patchSlotSchema = z.object({
@@ -39,6 +39,9 @@ const deleteSlotSchema = z.object({ expectedRevision }).strict();
 type SlotInput = z.infer<typeof slotSchema>;
 
 const notFound = () => new ApiError(404, 'NOT_FOUND', 'المورد غير موجود ضمن نطاق الوصول.');
+async function requireLegacyInspectorWrite() {
+  throw new ApiError(409, 'CONFLICT', 'التوزيع يُدخل من حساب الأستاذ؛ استخدم مراجعة المقترح أو طلب التصحيح.');
+}
 function validDate(value: string) { const date = new Date(`${value}T00:00:00.000Z`); return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value; }
 const staleRevision = () => new ApiError(409, 'WEEKLY_SCHEDULE_REVISION_CONFLICT', 'تغير التوزيع الأسبوعي. حدّث البيانات ثم أعد المحاولة.');
 const overlapError = () => new ApiError(400, 'WEEKLY_SCHEDULE_SLOT_OVERLAP', 'تتداخل هذه الحصة مع حصة أخرى في اليوم نفسه.');
@@ -47,7 +50,7 @@ type ScheduleSlotRead = WeeklyScheduleSlot & {
   institution?: { id: string; name: string; municipality: string | null; archivedAt: Date | null } | null;
   consistency?: { status: 'CONSISTENT' | 'NEEDS_CORRECTION' | 'LEGACY_UNKNOWN'; reasonCode: string | null };
 };
-function canonical(schedule: WeeklySchedule & { slots: ScheduleSlotRead[] }) {
+export function canonical(schedule: WeeklySchedule & { slots: ScheduleSlotRead[] }) {
   return {
     id: schedule.id, teacherId: schedule.teacherId, academicYear: schedule.academicYear, revision: schedule.revision,
     slots: [...schedule.slots].sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.startMinute - b.startMinute || a.endMinute - b.endMinute || a.id.localeCompare(b.id))
@@ -61,7 +64,7 @@ function canonical(schedule: WeeklySchedule & { slots: ScheduleSlotRead[] }) {
   };
 }
 
-function slotData(slot: SlotInput) {
+export function slotData(slot: SlotInput) {
   return { institutionId: slot.institutionId, validFrom: new Date(`${slot.validFrom}T00:00:00.000Z`), validTo: slot.validTo ? new Date(`${slot.validTo}T00:00:00.000Z`) : null,
     dayOfWeek: slot.dayOfWeek, startMinute: slot.startMinute, endMinute: slot.endMinute,
     levelLabel: slot.levelLabel ?? null, groupLabel: slot.groupLabel ?? null, notes: slot.notes ?? null };
@@ -98,14 +101,14 @@ async function scopedTeacher(tx: Prisma.TransactionClient, teacherId: string, in
   return teacher;
 }
 
-async function fetchSchedule(tx: Prisma.TransactionClient, id: string) {
+export async function fetchSchedule(tx: Prisma.TransactionClient, id: string) {
   const schedule = await tx.weeklySchedule.findUnique({ where: { id }, include: { slots: { include: { institution: { select: { id: true, name: true, municipality: true, archivedAt: true } } } } } });
   if (!schedule) throw notFound();
   const teacher = await tx.teacher.findUnique({ where: { id: schedule.teacherId }, select: { institutionId: true, supplementaryWorkplaces: { select: { institutionId: true, validFrom: true, validTo: true } } } });
   return { ...schedule, slots: applyScheduleConsistency(schedule.slots, teacher ?? { institutionId: null, supplementaryWorkplaces: [] }, algiersCalendarDate()) };
 }
 
-async function validateWorkplace(tx: Prisma.TransactionClient, teacher: { id: string; districtId: string; institutionId: string | null }, institutionId: string,
+export async function validateWorkplace(tx: Prisma.TransactionClient, teacher: { id: string; districtId: string; institutionId: string | null }, institutionId: string,
   validFrom: string, validTo: string | null): Promise<'HOME' | 'SUPPLEMENTARY'> {
   await tx.$queryRaw`SELECT id FROM "Institution" WHERE id = ${institutionId}::uuid FOR SHARE`;
   const institution = await tx.institution.findUnique({ where: { id: institutionId } });
@@ -191,6 +194,7 @@ export function registerWeeklyScheduleRoutes(app: Express, database: PrismaClien
       const schedule = await database.$transaction(async (tx) => {
         await tx.$queryRaw`SELECT id FROM "Teacher" WHERE id = ${params.data}::uuid FOR UPDATE`;
         const teacher = await scopedTeacher(tx, params.data, inspectorId);
+        await requireLegacyInspectorWrite();
         const prior = await tx.weeklySchedule.findUnique({ where: { teacherId_academicYear: { teacherId: teacher.id, academicYear: input.academicYear } }, select: { id: true } });
         if (prior) throw new ApiError(409, 'WEEKLY_SCHEDULE_ALREADY_EXISTS', 'يوجد توزيع أسبوعي مسجل لهذه السنة.');
         const initialSlots: Array<Pick<WeeklyScheduleSlot, 'id' | 'dayOfWeek' | 'startMinute' | 'endMinute' | 'validFrom' | 'validTo'>> = [];
@@ -230,6 +234,7 @@ export function registerWeeklyScheduleRoutes(app: Express, database: PrismaClien
         if (!first) throw notFound();
         await tx.$queryRaw`SELECT id FROM "Teacher" WHERE id = ${first.teacherId}::uuid FOR UPDATE`;
         const teacher = await scopedTeacher(tx, first.teacherId, inspectorId);
+        await requireLegacyInspectorWrite();
         await tx.$queryRaw`SELECT id FROM "WeeklySchedule" WHERE id = ${scheduleId.data}::uuid FOR UPDATE`;
         const current = await fetchSchedule(tx, scheduleId.data);
         if (current.teacherId !== teacher.id) throw notFound();
@@ -263,6 +268,7 @@ export function registerWeeklyScheduleRoutes(app: Express, database: PrismaClien
         if (!initial) throw notFound();
         await tx.$queryRaw`SELECT id FROM "Teacher" WHERE id = ${initial.teacherId}::uuid FOR UPDATE`;
         const teacher = await scopedTeacher(tx, initial.teacherId, inspectorId);
+        await requireLegacyInspectorWrite();
         await tx.$queryRaw`SELECT id FROM "WeeklySchedule" WHERE id = ${slot.scheduleId}::uuid FOR UPDATE`;
         const current = await fetchSchedule(tx, slot.scheduleId);
         if (current.teacherId !== teacher.id) throw notFound();
@@ -325,6 +331,7 @@ export function registerWeeklyScheduleRoutes(app: Express, database: PrismaClien
       if (!initial) throw notFound();
       await tx.$queryRaw`SELECT id FROM "Teacher" WHERE id = ${initial.teacherId}::uuid FOR UPDATE`;
       const teacher = await scopedTeacher(tx, initial.teacherId, inspectorId);
+      await requireLegacyInspectorWrite();
       await tx.$queryRaw`SELECT id FROM "WeeklySchedule" WHERE id = ${slot.scheduleId}::uuid FOR UPDATE`;
       const current = await fetchSchedule(tx, slot.scheduleId);
       if (current.teacherId !== teacher.id) throw notFound();

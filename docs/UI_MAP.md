@@ -1,5 +1,27 @@
 # UI Map v0.1
 
+## Current product routes — ADR-041 evolution
+
+Later explicit Product Vision authorizes responsive Teacher cards, Teacher portal and Institution detail; the earlier G9 hybrid-table/no-account/no-detail prohibitions are historical, not current policy. Shared Arabic tokens/primitives, screen-only styles and print isolation remain mandatory.
+
+| Route / composition | Current UX and authority |
+|---|---|
+| `/teacher/login` | Separate role-specific login or invitation-fragment activation; token removed from URL immediately, no public signup or Inspector shell. |
+| `/teacher` | Own approved profile/workplaces/qualifications/photo; proposals and statuses; review alerts/outcomes/rejection reason; Teacher-owned initial schedule and later independent proposals, canonical unchanged until accepted. Separate logout/session, no Inspector navigation or administrative notes. |
+| `/app` | Preserve accepted Hero and existing attention/visits/reports/follow-up; add categorized proposal/correction actions, bounded Teacher previews and municipality links. No timetable dashboard wall or fictitious counts. |
+| `/app/teachers` | Responsive professional cards, one interactive DOM tree, avatar/identity/dossier dominant, municipality/current home/status; server q/cursor/filters retained for205+. No local filtering or public PII. |
+| `/app/teachers/:id` | Approved personal/professional/qualifications/workplaces, private administrative details, invitation panel, training/proposal/history context, timetable and existing Visit/report/follow-up navigation. Declared versus approved remains explicit. |
+| `/app/teachers/:id/schedules` | New Inspector read/correction workflow; explicit Teacher/year/origin, current canonical vs pending proposal, correction note, one confirmation dialog, accept/reject with required Arabic reason; rejected history retained. Inspector does not enter Teacher slots in the new workflow. |
+| `/app/teacher-requests` | Typed account proposals, kind/status/Teacher filters, server pagination/count; explicit reviewed decision and optional reason. Separate link to existing initial submissions. COMPLETED verification/effective transfer are visibly unavailable pending policy. |
+| `/app/institutions` | Current district/municipality navigation, server q/count/cursor; existing create/update preserved. |
+| `/app/institutions/:id` | Scoped context and approved home/current supplementary Teachers, bounded server search/pagination. No auto matching, archive policy or map SDK. |
+
+Initial timetable has no artificial approval step. During correction, effective and proposed boards have separate headings; only explicit Inspector acceptance replaces effective slots and retains the old snapshot. Seven chronological day columns adapt to narrower screens; durations are recorded session minutes, not official workload. Teacher cannot type arbitrary Institution UUIDs. Visit create/type correction filters prospective tenure eligibility but never hides historical type labels; server rechecks eligibility.
+
+States remain loading/empty/error/retry/success; failed data is not zero. IDs are only opaque routing values, not user labels. Mixed emails/date/time use bidi isolation. Shared Dialog keeps confirmation/focus/Escape/return behavior. Photo fallback is initials and never a public file URL. Existing A4 document routes/styles and shell exclusions remain unchanged.
+
+Landing also links to `/teacher/login`; no open signup. InstitutionalContext presents configurable public directorate/district labels plus the Republic/Ministry reference with an explicit non-adoption disclaimer. Teacher district context comes from the authenticated profile. These labels never determine scope or routing and no official logo is invented.
+
 جميع شاشات المفتش authenticated وباتجاه RTL وفق [DESIGN_SYSTEM](DESIGN_SYSTEM.md). paths مقترحة ثابتة للـMVP؛ تغييرها قرار عقد. تستخدم شاشات البيانات حالات loading وempty/no-results وerror مع retry حيث يدعمه المستهلك، وsuccess feedback بعد mutation؛ لا Skeleton مشتركًا لأن G6-03 لم يجد شكل تحميل موحدًا مبررًا. Query filters في URL حيث يفيد الرجوع والمشاركة الداخلية، دون بيانات حساسة فيه.
 
 ضمن G6-04/G6-05، `AppShell` يحتفظ بـmain والحشو الرأسي فقط، ويملك `PageContainer` عرض الشاشة الأقصى والـgutters الأفقية. شاشات المفتش المصادق عليها المنفذة تستخدم الآن نظام الصفحة المشترك حيث يلائم معناها: PageHeader/Breadcrumbs، FilterBar، FormSection، DetailList، DataTable وPagination، مع إبقاء حالات المجال والأفعال وعقود API كما هي. دليل الأساتذة وملفه كانا الترحيل التمثيلي الأول في G6-04؛ أكمل G6-05 الاتساق عبر المؤسسات، الطلبات وتفاصيلها، بطاقة المعلومات داخل التطبيق، الجدول الأسبوعي، الزيارات وتقاريرها، المتابعات، والهوية المهنية. اكتمل G6-06 لنقل الدخول والاستمارة العامة إلى نفس tokens وحقول/حالات G6 مع إبقائهما خارج AppShell. مسار `/app/teachers/:id/information-card/print` استثناء مقصود خارج shell/page container ونظام صفحات التطبيق؛ اجتازت جميع المسارات المنفذة بوابة G6-07 النهائية عند أحجام desktop/tablet/mobile، والطباعة A4 بقيت معزولة.

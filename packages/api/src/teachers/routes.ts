@@ -75,7 +75,7 @@ const invalidDate = (field: string) => new ApiError(400, 'VALIDATION_ERROR', 'ت
 const toCalendar = (date: Date | null) => date?.toISOString().slice(0, 10) ?? null;
 const toDate = (value: string | null) => value === null ? null : new Date(`${value}T00:00:00.000Z`);
 
-function validateResultingDates(teacher: Teacher, patch: Patch): void {
+export function validateResultingDates(teacher: Teacher, patch: Patch): void {
   const today = new Date().toISOString().slice(0, 10);
   const birthDate = patch.birthDate === undefined ? toCalendar(teacher.birthDate) : patch.birthDate;
   const employedAt = patch.employedAt === undefined ? toCalendar(teacher.employedAt) : patch.employedAt;

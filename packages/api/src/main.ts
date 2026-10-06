@@ -18,6 +18,11 @@ import { registerPedagogicalVisitRoutes } from './visits/routes.js';
 import { registerInspectionReportRoutes } from './reports/routes.js';
 import { registerFollowUpRoutes } from './followups/routes.js';
 import { registerDashboardRoutes } from './dashboard/routes.js';
+import { registerTeacherAuth } from './teacher-portal/auth.js';
+import { registerTeacherPortal } from './teacher-portal/routes.js';
+import { registerTeacherPhotos } from './teacher-portal/photos.js';
+import { registerTeacherSchedules } from './teacher-portal/schedules.js';
+import { registerEvolutionWorkspace } from './teacher-portal/workspace.js';
 
 const port = Number(process.env.PORT ?? 3001);
 const prisma = new PrismaClient();
@@ -25,6 +30,11 @@ const prisma = new PrismaClient();
 createApp((app) => {
   registerAuthRoutes(app, prisma);
   const requireInspector = requireAuthenticatedInspector(prisma);
+  registerTeacherAuth(app, prisma, requireInspector);
+  registerTeacherPortal(app, prisma, requireInspector);
+  registerTeacherPhotos(app, prisma, requireInspector);
+  registerTeacherSchedules(app, prisma, requireInspector);
+  registerEvolutionWorkspace(app, prisma, requireInspector);
   registerDistrictContextRoute(app, prisma, requireInspector);
   registerProfessionalIdentityRoutes(app, prisma, requireInspector);
   registerInstitutionRoutes(app, prisma, requireInspector);

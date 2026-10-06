@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
-import { ApiRequestError, getPedagogicalVisit, getValidWorkplaces, patchPedagogicalVisit, type PedagogicalVisit, type PedagogicalVisitPatch, type PedagogicalVisitType, type ScheduleWarningCode, type ValidWorkplaceOption } from '../auth/client';
+import { ApiRequestError, getPedagogicalVisit, getTeacherProfile, getValidWorkplaces, patchPedagogicalVisit, type PedagogicalVisit, type PedagogicalVisitPatch, type PedagogicalVisitType, type ScheduleWarningCode, type ValidWorkplaceOption } from '../auth/client';
 import { Button, Card, CardContent, CardHeader, DetailList, Dialog, ErrorState, Input, LoadingState, PageHeader, SuccessState } from '../ui';
 import { formatAlgiers, localDateTimeToOffset, utcToLocalDateTime } from './time';
 import { VisitStatusBadge } from './VisitStatusBadge';
@@ -28,6 +28,7 @@ function friendlyError(error: unknown) {
     VISIT_STATE_CONFLICT: 'تغيّرت الزيارة أو حالتها منذ تحميلها. حدّث البيانات لمراجعة الإجراء المتاح.',
     VISIT_TYPE_LOCKED: 'لا يمكن تغيير نوع الزيارة في حالتها الحالية أو بعد إنشاء تقرير مرتبط بها.',
     VALIDATION_ERROR: 'تحقق من الوقت المدخل ثم أعد المحاولة.',
+    TENURE_ELIGIBILITY_REQUIRED: 'الحالة المهنية أو إثبات التكوين لا يسمح حاليًا بزيارة تثبيت.',
   };
   return map[error.code ?? ''] ?? 'تعذر تنفيذ العملية. أعد المحاولة بعد مراجعة البيانات.';
 }
@@ -56,6 +57,17 @@ export function VisitDetailPage() {
   const [occurredAt, setOccurredAt] = useState('');
   const [editingVisitType, setEditingVisitType] = useState(false);
   const [nextVisitType, setNextVisitType] = useState<PedagogicalVisitType | ''>('');
+  const [tenureAllowed, setTenureAllowed] = useState(false);
+  const [eligibilityLoading, setEligibilityLoading] = useState(false);
+  useEffect(() => {
+    if (!editingVisitType || !visit) return;
+    let active = true; setEligibilityLoading(true); setTenureAllowed(false);
+    void getTeacherProfile(visit.teacher.id).then(({ data }) => {
+      if (active) setTenureAllowed(data.professionalStatus !== 'CONTRACT' && (data.professionalStatus !== 'TRAINEE' || (data.trainingStatus === 'COMPLETED' && Boolean(data.trainingVerifiedAt))));
+    }).catch(() => { if (active) setOperationError('تعذر التحقق من أهلية التثبيت. أعد فتح تصحيح النوع.'); })
+      .finally(() => { if (active) setEligibilityLoading(false); });
+    return () => { active = false; };
+  }, [editingVisitType, visit?.teacher.id]);
 
   const load = useCallback(async () => {
     setLoading(true); setLoadError(false);
@@ -150,7 +162,7 @@ export function VisitDetailPage() {
         ]} /></CardContent>
       </Card>
       {visit.visitTypeEditable ? <Card className="visit-card"><CardHeader title="نوع الزيارة" description="يمكن تصحيح النوع حتى إنشاء أي تقرير مرتبط، باستخدام رقم المراجعة الحالي." /><CardContent>
-        {editingVisitType ? <div className="visit-field"><label className="ui-field__label" htmlFor="visit-detail-type">نوع الزيارة</label><select id="visit-detail-type" className="ui-input" value={nextVisitType} disabled={busy} onChange={(event) => setNextVisitType(event.currentTarget.value as PedagogicalVisitType | '')}><option value="">اختر نوع الزيارة</option>{Object.entries(visitTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><div className="visit-actions"><Button disabled={busy || !nextVisitType} onClick={() => void saveVisitType()}>{busy ? 'جارٍ الحفظ…' : 'حفظ نوع الزيارة'}</Button><Button variant="secondary" disabled={busy} onClick={() => { setEditingVisitType(false); setNextVisitType(visit.visitType ?? ''); }}>إلغاء</Button></div></div> : <Button variant="secondary" disabled={busy} onClick={() => setEditingVisitType(true)}>تصحيح نوع الزيارة</Button>}
+        {editingVisitType ? <div className="visit-field"><label className="ui-field__label" htmlFor="visit-detail-type">نوع الزيارة</label><select id="visit-detail-type" className="ui-input" value={nextVisitType} disabled={busy || eligibilityLoading} onChange={(event) => setNextVisitType(event.currentTarget.value as PedagogicalVisitType | '')}><option value="">اختر نوع الزيارة</option>{Object.entries(visitTypeLabels).filter(([value]) => value !== 'TENURE_CONFIRMATION' || tenureAllowed || visit.visitType === value).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><div className="visit-actions"><Button disabled={busy || eligibilityLoading || !nextVisitType || (nextVisitType === 'TENURE_CONFIRMATION' && !tenureAllowed)} onClick={() => void saveVisitType()}>{busy ? 'جارٍ الحفظ…' : 'حفظ نوع الزيارة'}</Button><Button variant="secondary" disabled={busy} onClick={() => { setEditingVisitType(false); setNextVisitType(visit.visitType ?? ''); }}>إلغاء</Button></div></div> : <Button variant="secondary" disabled={busy} onClick={() => setEditingVisitType(true)}>تصحيح نوع الزيارة</Button>}
       </CardContent></Card> : null}
       {visit.status === 'PLANNED' ? <Card className="visit-card visit-card--actions"><CardHeader title="إجراءات الزيارة" description="تُحفظ الزيارة التاريخية؛ لا يمكن إعادة فتح الحالة النهائية." /><CardContent>
         {!rescheduling ? <div className="visit-actions"><Button variant="secondary" disabled={busy} onClick={startReschedule}>إعادة جدولة</Button><Button disabled={busy} onClick={() => { setDialogAction('complete'); setFormError(''); }}>إكمال الزيارة</Button><Button variant="danger" disabled={busy} onClick={() => { setDialogAction('cancel'); setFormError(''); }}>إلغاء الزيارة</Button></div> : null}

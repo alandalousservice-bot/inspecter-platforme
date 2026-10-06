@@ -9,6 +9,10 @@ import { ShellIcon, type ShellIconName } from '../ui/ShellIcon';
 import { TeacherQualificationsSection } from './TeacherQualificationsSection';
 import { TeacherSupplementaryWorkplacesSection } from './TeacherSupplementaryWorkplacesSection';
 import './teacher-profile.css';
+import { TeacherAvatar } from '../teacher-portal/TeacherAvatar';
+import { TeacherAccountPanel } from '../teacher-portal/TeacherAccountPanel';
+import { DossierUpdates } from '../teacher-portal/DossierUpdates';
+import { DossierWeeklyReference } from '../teacher-portal/DossierWeeklyReference';
 
 const labels: Record<keyof TeacherProfilePatch, string> = {
   name: 'الاسم', surname: 'اللقب', birthDate: 'تاريخ الميلاد', placeOfBirth: 'مكان الميلاد',
@@ -351,12 +355,16 @@ export function TeacherProfilePage() {
       {successMessage ? <SuccessState title={successMessage} /> : null}
       {!editing ? <WorkspaceStack density="document">
         <section className="teacher-profile__identity" aria-label="الوضعية الحالية للأستاذ">
+          <TeacherAvatar teacherId={profile.id} name={profile.name} />
           <div className="teacher-profile__identity-statuses">
             <span>الصفة المهنية: <StatusBadge tone="neutral">{profile.professionalStatus ? statusLabels[profile.professionalStatus] ?? 'صفة مهنية غير محددة' : 'غير محددة'}</StatusBadge></span>
             <span>حالة السجل: <StatusBadge tone={profile.recordStatus === 'ACTIVE' ? 'success' : 'neutral'}>{statusLabels[profile.recordStatus] ?? 'حالة غير محددة'}</StatusBadge></span>
           </div>
           <div className="teacher-profile__identity-context"><ShellIcon name="institutions" /><div><bdi dir="auto">{profile.currentInstitution?.name ?? 'لم تُعتمد مؤسسة حالية'}</bdi>{profile.currentInstitution?.municipality ? <p>البلدية: <bdi dir="auto">{profile.currentInstitution.municipality}</bdi></p> : null}</div></div>
         </section>
+        <TeacherAccountPanel key={`account-${profile.id}`} teacherId={profile.id} />
+        <DossierUpdates teacherId={profile.id} trainingStatus={profile.trainingStatus} verifiedAt={profile.trainingVerifiedAt} />
+        <DossierWeeklyReference key={`schedule-${profile.id}`} teacherId={profile.id} />
         <div className="teacher-profile__sections">
         <Card className="teacher-profile__home-card">
           <ProfileSectionHeader icon="institutions" title="المؤسسة الحالية المعتمدة"

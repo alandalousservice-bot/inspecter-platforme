@@ -2,6 +2,19 @@ import { Prisma, type AuditLog } from '@prisma/client';
 import { z } from 'zod';
 
 export const AuditAction = {
+  TEACHER_INVITATION_ISSUED: 'TEACHER_INVITATION_ISSUED',
+  TEACHER_ACCOUNT_ACTIVATED: 'TEACHER_ACCOUNT_ACTIVATED',
+  TEACHER_REQUEST_CREATED: 'TEACHER_REQUEST_CREATED',
+  TEACHER_REQUEST_DECIDED: 'TEACHER_REQUEST_DECIDED',
+  TEACHER_PHOTO_REPLACED: 'TEACHER_PHOTO_REPLACED',
+  TEACHER_SCHEDULE_SUBMITTED: 'TEACHER_SCHEDULE_SUBMITTED',
+  TEACHER_SCHEDULE_CORRECTION_REQUESTED: 'TEACHER_SCHEDULE_CORRECTION_REQUESTED',
+  TEACHER_SCHEDULE_CORRECTION_SUBMITTED: 'TEACHER_SCHEDULE_CORRECTION_SUBMITTED',
+  TEACHER_SCHEDULE_CORRECTION_ACCEPTED: 'TEACHER_SCHEDULE_CORRECTION_ACCEPTED',
+  TEACHER_SCHEDULE_CORRECTION_REJECTED: 'TEACHER_SCHEDULE_CORRECTION_REJECTED',
+  TEACHER_SCHEDULE_UPDATE_SUBMITTED: 'TEACHER_SCHEDULE_UPDATE_SUBMITTED',
+  TEACHER_SCHEDULE_UPDATE_ACCEPTED: 'TEACHER_SCHEDULE_UPDATE_ACCEPTED',
+  TEACHER_SCHEDULE_UPDATE_REJECTED: 'TEACHER_SCHEDULE_UPDATE_REJECTED',
   TEACHER_SUBMISSION_ACCEPTED: 'TEACHER_SUBMISSION_ACCEPTED',
   TEACHER_SUBMISSION_REJECTED: 'TEACHER_SUBMISSION_REJECTED',
   TEACHER_SUBMISSION_INTERNAL_REVIEW: 'TEACHER_SUBMISSION_INTERNAL_REVIEW',
@@ -34,6 +47,19 @@ export const AuditAction = {
 } as const;
 
 const eventContracts = {
+  [AuditAction.TEACHER_INVITATION_ISSUED]: { entityType: 'Teacher', metadata: z.object({}).strict() },
+  [AuditAction.TEACHER_ACCOUNT_ACTIVATED]: { entityType: 'Teacher', metadata: z.object({}).strict() },
+  [AuditAction.TEACHER_REQUEST_CREATED]: { entityType: 'TeacherChangeRequest', metadata: z.object({ kind: z.enum(['PROFILE', 'CONTACT', 'TRAINING', 'TRANSFER', 'WORKPLACE', 'LOCATION']) }).strict() },
+  [AuditAction.TEACHER_REQUEST_DECIDED]: { entityType: 'TeacherChangeRequest', metadata: z.object({ kind: z.enum(['PROFILE', 'CONTACT', 'TRAINING', 'TRANSFER', 'WORKPLACE', 'LOCATION']), status: z.enum(['ACCEPTED', 'REJECTED', 'APPROVED_PENDING_DESTINATION']), resolvedInstitutionId: z.string().uuid().optional() }).strict().refine((m) => m.resolvedInstitutionId === undefined || (m.kind === 'WORKPLACE' && m.status === 'ACCEPTED')) },
+  [AuditAction.TEACHER_PHOTO_REPLACED]: { entityType: 'TeacherPhoto', metadata: z.object({}).strict() },
+  [AuditAction.TEACHER_SCHEDULE_SUBMITTED]: { entityType: 'WeeklySchedule', metadata: z.object({}).strict() },
+  [AuditAction.TEACHER_SCHEDULE_CORRECTION_REQUESTED]: { entityType: 'ScheduleCorrection', metadata: z.object({}).strict() },
+  [AuditAction.TEACHER_SCHEDULE_CORRECTION_SUBMITTED]: { entityType: 'ScheduleCorrection', metadata: z.object({}).strict() },
+  [AuditAction.TEACHER_SCHEDULE_CORRECTION_ACCEPTED]: { entityType: 'ScheduleCorrection', metadata: z.object({}).strict() },
+  [AuditAction.TEACHER_SCHEDULE_CORRECTION_REJECTED]: { entityType: 'ScheduleCorrection', metadata: z.object({}).strict() },
+  [AuditAction.TEACHER_SCHEDULE_UPDATE_SUBMITTED]: { entityType: 'ScheduleCorrection', metadata: z.object({}).strict() },
+  [AuditAction.TEACHER_SCHEDULE_UPDATE_ACCEPTED]: { entityType: 'ScheduleCorrection', metadata: z.object({}).strict() },
+  [AuditAction.TEACHER_SCHEDULE_UPDATE_REJECTED]: { entityType: 'ScheduleCorrection', metadata: z.object({}).strict() },
   [AuditAction.TEACHER_SUBMISSION_ACCEPTED]: {
     entityType: 'TeacherSubmission',
     metadata: z.object({ resultingTeacherId: z.string().uuid().optional() }).strict(),
@@ -149,8 +175,9 @@ const eventContracts = {
 } as const;
 
 const inputSchema = z.object({
-  source: z.enum(['HTTP', 'SYSTEM']),
+  source: z.enum(['HTTP', 'SYSTEM', 'TEACHER_HTTP']),
   actorInspectorId: z.string().uuid().nullable(),
+  actorTeacherId: z.string().uuid().optional(),
   districtId: z.string().uuid().nullable(),
   action: z.enum(AuditAction),
   entityType: z.string(),
@@ -166,6 +193,13 @@ export async function appendAuditEvent(transaction: Prisma.TransactionClient, in
   if (parsed.source === 'HTTP' && (parsed.requestId === null || parsed.actorInspectorId === null)) {
     throw new Error('HTTP audit events require a request ID and an Inspector actor.');
   }
+  if (parsed.source === 'TEACHER_HTTP' && (!parsed.actorTeacherId || parsed.actorInspectorId !== null || parsed.requestId === null)) throw new Error('Teacher HTTP audit requires one Teacher actor and a request ID.');
+  if (parsed.source !== 'TEACHER_HTTP' && parsed.actorTeacherId !== undefined) throw new Error('Teacher actor is reserved for Teacher HTTP audit.');
+  if (parsed.source === 'TEACHER_HTTP' && ![
+    AuditAction.TEACHER_ACCOUNT_ACTIVATED, AuditAction.TEACHER_REQUEST_CREATED,
+    AuditAction.TEACHER_PHOTO_REPLACED, AuditAction.TEACHER_SCHEDULE_SUBMITTED,
+    AuditAction.TEACHER_SCHEDULE_CORRECTION_SUBMITTED, AuditAction.TEACHER_SCHEDULE_UPDATE_SUBMITTED,
+  ].some((action) => action === parsed.action)) throw new Error('This audit action requires an Inspector actor.');
   const contract = eventContracts[parsed.action];
   if (parsed.entityType !== contract.entityType) throw new Error('Audit event entity type does not match its action.');
   if (parsed.districtId === null && parsed.action !== AuditAction.INSPECTOR_PROFESSIONAL_IDENTITY_UPDATED) {
@@ -175,6 +209,7 @@ export async function appendAuditEvent(transaction: Prisma.TransactionClient, in
   return transaction.auditLog.create({
     data: {
       actorInspectorId: parsed.actorInspectorId,
+      ...(parsed.actorTeacherId ? { actorTeacherId: parsed.actorTeacherId } : {}),
       districtId: parsed.districtId,
       action: parsed.action,
       entityType: parsed.entityType,

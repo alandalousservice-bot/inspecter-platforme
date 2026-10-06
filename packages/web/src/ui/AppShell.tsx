@@ -18,6 +18,7 @@ const navigation: Array<{ label: string; items: Array<{ to: string; label: strin
   { label: 'ملفات الإشراف', items: [
     { to: '/app/teachers', label: 'دليل الأساتذة', icon: 'teachers' },
     { to: '/app/submissions', label: 'طلبات الأساتذة', icon: 'submissions' },
+    { to: '/app/teacher-requests', label: 'التحديثات والانتقالات', icon: 'submissions' },
     { to: '/app/institutions', label: 'المؤسسات', icon: 'institutions' },
   ] },
   { label: 'العمل الميداني والمتابعة', items: [

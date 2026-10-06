@@ -210,9 +210,15 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
     'InspectorDistrictMembership',
     'Institution',
     'PedagogicalVisit',
+    'ScheduleCorrection',
     'Session',
     'Teacher',
+    'TeacherAccount',
+    'TeacherChangeRequest',
+    'TeacherInvitation',
+    'TeacherPhoto',
     'TeacherQualification',
+    'TeacherSession',
     'TeacherSubmission',
     'TeacherSubmissionQualificationDeclaration',
     'TeacherSubmissionSupplementaryWorkplaceDeclaration',
@@ -264,7 +270,7 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
   `;
   const primaryKeys = constraints.filter((constraint) => constraint.contype === 'p');
   assert.deepEqual(primaryKeys.map(({ source_table }) => source_table).sort(), [
-    'AuditLog', 'District', 'FollowUp', 'InspectionReport', 'InspectionReportObservation', 'Inspector', 'InspectorDistrictMembership', 'Institution', 'PedagogicalVisit', 'Session', 'Teacher', 'TeacherQualification', 'TeacherSubmission', 'TeacherSubmissionQualificationDeclaration', 'TeacherSubmissionSupplementaryWorkplaceDeclaration', 'TeacherSupplementaryWorkplace', 'WeeklySchedule', 'WeeklyScheduleSlot',
+    'AuditLog', 'District', 'FollowUp', 'InspectionReport', 'InspectionReportObservation', 'Inspector', 'InspectorDistrictMembership', 'Institution', 'PedagogicalVisit', 'ScheduleCorrection', 'Session', 'Teacher', 'TeacherAccount', 'TeacherChangeRequest', 'TeacherInvitation', 'TeacherPhoto', 'TeacherQualification', 'TeacherSession', 'TeacherSubmission', 'TeacherSubmissionQualificationDeclaration', 'TeacherSubmissionSupplementaryWorkplaceDeclaration', 'TeacherSupplementaryWorkplace', 'WeeklySchedule', 'WeeklyScheduleSlot',
   ]);
   const foreignKeys = constraints.filter((constraint) => constraint.contype === 'f');
   assert.deepEqual(foreignKeys.map(({ source_table, target_table, confdeltype, confupdtype }) => ({
@@ -272,6 +278,7 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
   })).sort((a, b) => a.source_table.localeCompare(b.source_table) || a.target_table.localeCompare(b.target_table)), [
     { source_table: 'AuditLog', target_table: 'District', confdeltype: 'r', confupdtype: 'c' },
     { source_table: 'AuditLog', target_table: 'Inspector', confdeltype: 'r', confupdtype: 'c' },
+    { source_table: 'AuditLog', target_table: 'Teacher', confdeltype: 'r', confupdtype: 'r' },
     { source_table: 'FollowUp', target_table: 'InspectionReport', confdeltype: 'r', confupdtype: 'r' },
     { source_table: 'FollowUp', target_table: 'Inspector', confdeltype: 'r', confupdtype: 'r' },
     { source_table: 'InspectionReport', target_table: 'Inspector', confdeltype: 'r', confupdtype: 'r' },
@@ -284,10 +291,22 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
     { source_table: 'PedagogicalVisit', target_table: 'Inspector', confdeltype: 'r', confupdtype: 'r' },
     { source_table: 'PedagogicalVisit', target_table: 'Institution', confdeltype: 'r', confupdtype: 'r' },
     { source_table: 'PedagogicalVisit', target_table: 'Teacher', confdeltype: 'r', confupdtype: 'r' },
+    { source_table: 'ScheduleCorrection', target_table: 'Inspector', confdeltype: 'r', confupdtype: 'r' },
+    { source_table: 'ScheduleCorrection', target_table: 'Inspector', confdeltype: 'r', confupdtype: 'r' },
+    { source_table: 'ScheduleCorrection', target_table: 'Teacher', confdeltype: 'r', confupdtype: 'r' },
     { source_table: 'Session', target_table: 'Inspector', confdeltype: 'r', confupdtype: 'c' },
     { source_table: 'Teacher', target_table: 'District', confdeltype: 'r', confupdtype: 'c' },
     { source_table: 'Teacher', target_table: 'Institution', confdeltype: 'r', confupdtype: 'c' },
+    { source_table: 'TeacherAccount', target_table: 'Teacher', confdeltype: 'r', confupdtype: 'r' },
+    { source_table: 'TeacherChangeRequest', target_table: 'District', confdeltype: 'r', confupdtype: 'r' },
+    { source_table: 'TeacherChangeRequest', target_table: 'Inspector', confdeltype: 'r', confupdtype: 'r' },
+    { source_table: 'TeacherChangeRequest', target_table: 'Teacher', confdeltype: 'r', confupdtype: 'r' },
+    { source_table: 'TeacherInvitation', target_table: 'District', confdeltype: 'r', confupdtype: 'r' },
+    { source_table: 'TeacherInvitation', target_table: 'Inspector', confdeltype: 'r', confupdtype: 'r' },
+    { source_table: 'TeacherInvitation', target_table: 'Teacher', confdeltype: 'r', confupdtype: 'r' },
+    { source_table: 'TeacherPhoto', target_table: 'Teacher', confdeltype: 'r', confupdtype: 'r' },
     { source_table: 'TeacherQualification', target_table: 'Teacher', confdeltype: 'r', confupdtype: 'c' },
+    { source_table: 'TeacherSession', target_table: 'TeacherAccount', confdeltype: 'r', confupdtype: 'r' },
     { source_table: 'TeacherSubmission', target_table: 'District', confdeltype: 'r', confupdtype: 'c' },
     { source_table: 'TeacherSubmission', target_table: 'Inspector', confdeltype: 'r', confupdtype: 'c' },
     { source_table: 'TeacherSubmission', target_table: 'Inspector', confdeltype: 'r', confupdtype: 'c' },
@@ -339,7 +358,7 @@ test('TASK-020 isolated PostgreSQL migration and Inspector core constraints', as
   assert.match(emailUniqueIndex.indexdef, /\bemail\b/i);
   const uniqueIndexes = indexes.filter((index) => index.indexdef.includes('UNIQUE') && !index.indexname.endsWith('_pkey'));
   assert.deepEqual(uniqueIndexes.map(({ indexname }) => indexname), [
-    'InspectionReportObservation_reportId_criterionKey_key', 'InspectionReport_id_reportType_templateVersion_key', 'InspectionReport_visitId_key', 'Inspector_email_key', 'Institution_id_districtId_key', 'Session_tokenHash_key', 'TeacherSubmission_acceptedTeacherId_key', 'Teacher_id_districtId_key', 'WeeklySchedule_id_teacherId_key', 'WeeklySchedule_teacherId_academicYear_key', 'tsq_submission_position_key', 'tsw_submission_position_key',
+    'InspectionReportObservation_reportId_criterionKey_key', 'InspectionReport_id_reportType_templateVersion_key', 'InspectionReport_visitId_key', 'Inspector_email_key', 'Institution_id_districtId_key', 'ScheduleCorrection_one_open_year', 'Session_tokenHash_key', 'TeacherAccount_loginEmail_key', 'TeacherAccount_teacherId_key', 'TeacherChangeRequest_one_pending_kind', 'TeacherInvitation_tokenHash_key', 'TeacherPhoto_storageKey_key', 'TeacherSession_tokenHash_key', 'TeacherSubmission_acceptedTeacherId_key', 'Teacher_id_districtId_key', 'WeeklySchedule_id_teacherId_key', 'WeeklySchedule_teacherId_academicYear_key', 'tsq_submission_position_key', 'tsw_submission_position_key',
   ]);
 
   const migrationHistory = await prismaClient.$queryRawUnsafe(`

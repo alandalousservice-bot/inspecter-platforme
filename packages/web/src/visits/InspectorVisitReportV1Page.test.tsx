@@ -200,6 +200,7 @@ describe('Inspector Visit Report V1 editor', () => {
     expect(await screen.findByText(/احتفظنا بكتابتك/u)).toBeTruthy();
     expect(screen.getByRole('textbox', { name: 'العلامة البيداغوجية (اختيارية من 0 إلى 20)' })).toHaveProperty('value', '14.25');
     expect(mocks.saveInspectorVisitReport).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('button', { name: 'تحميل النسخة الأحدث' })).toBeTruthy();
+    // Native Dialog.showModal runs in an effect after the conflict feedback renders.
+    expect(await screen.findByRole('button', { name: 'تحميل النسخة الأحدث' })).toBeTruthy();
   });
 });

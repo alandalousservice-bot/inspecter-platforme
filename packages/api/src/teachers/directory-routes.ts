@@ -20,6 +20,7 @@ const academicYearQuery = z.string().regex(/^\d{4}-\d{4}$/u, 'قيمة غير ص
 const listQuerySchema = z.object({
   districtId: uuid.optional(),
   q: normalizedQuery.optional(),
+  municipality: z.string().normalize().trim().min(1).max(150).optional(),
   institutionId: uuid.optional(),
   hasCurrentInstitution: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),
   professionalStatus: z.enum(['PERMANENT', 'TRAINEE', 'CONTRACT', 'TEMPORARY_CONTRACT', 'SUBSTITUTE']).optional(),
@@ -106,7 +107,10 @@ function buildWhere(query: ListQuery, districtIds: string[], instant: Date): Pri
       ],
     });
   }
-  if (query.institutionId) conditions.push({ institutionId: query.institutionId });
+  const currentDate = new Date(`${currentAlgiersDayAndMinute(instant).date}T00:00:00.000Z`);
+  const currentSupplementary = { validFrom: { lte: currentDate }, OR: [{ validTo: null }, { validTo: { gt: currentDate } }] };
+  if (query.institutionId) conditions.push({ OR: [{ institutionId: query.institutionId }, { supplementaryWorkplaces: { some: { ...currentSupplementary, institutionId: query.institutionId } } }] });
+  if (query.municipality) conditions.push({ OR: [{ institution: { is: { municipality: { equals: query.municipality, mode: 'insensitive' } } } }, { supplementaryWorkplaces: { some: { ...currentSupplementary, institution: { municipality: { equals: query.municipality, mode: 'insensitive' }, archivedAt: null } } } }] });
   if (query.hasCurrentInstitution !== undefined) {
     conditions.push({ institutionId: query.hasCurrentInstitution ? { not: null } : null });
   }
@@ -180,6 +184,7 @@ export function registerTeacherDirectoryRoutes(
     }
 
     const where = buildWhere(query, districtIds, instant);
+    const currentDate = new Date(`${currentAlgiersDayAndMinute(instant).date}T00:00:00.000Z`);
     if (query.cursor) {
       const cursorRecord = await database.teacher.findFirst({ where: { ...where, id: query.cursor }, select: { id: true } });
       if (!cursorRecord) throw genericNotFound();
@@ -196,15 +201,21 @@ export function registerTeacherDirectoryRoutes(
           name: true,
           surname: true,
           professionalStatus: true,
+          trainingStatus: true,
+          trainingVerifiedAt: true,
           recordStatus: true,
+          photos: { where: { sanitizationVersion: 1 }, take: 1, select: { id: true }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] },
+          _count: { select: { supplementaryWorkplaces: { where: { validFrom: { lte: currentDate }, OR: [{ validTo: null }, { validTo: { gt: currentDate } }], institution: { archivedAt: null } } } } },
           institution: { select: { id: true, name: true, municipality: true } },
         },
       }),
       database.teacher.count({ where }),
     ]);
     const hasNext = rows.length > query.limit;
-    const data = (hasNext ? rows.slice(0, query.limit) : rows).map(({ institution, ...teacher }) => ({
+    const data = (hasNext ? rows.slice(0, query.limit) : rows).map(({ institution, photos, _count, ...teacher }) => ({
       ...teacher,
+      hasPhoto: photos.length > 0,
+      hasSupplementaryWorkplaces: _count.supplementaryWorkplaces > 0,
       currentInstitution: institution,
     }));
     response.json({

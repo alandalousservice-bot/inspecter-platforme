@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { ApiRequestError, getCurrentDistricts, listInstitutions, listTeachers, type DistrictOption, type Institution, type TeacherDirectoryFilters, type TeacherDirectoryItem } from '../auth/client';
-import { Button, DataTable, EmptyState, ErrorState, FilterBar, Input, LoadingState, PageHeader, Pagination, RecordList, RecordRow, SecondaryControls, StatusBadge, WorkspaceStack, type DataTableColumn } from '../ui';
+import { Button, EmptyState, ErrorState, FilterBar, Input, LoadingState, PageHeader, Pagination, SecondaryControls, StatusBadge, WorkspaceStack } from '../ui';
+import { TeacherAvatar } from '../teacher-portal/TeacherAvatar';
 import './teacher-directory.css';
 
 const LIMIT = 25;
 const PROFESSIONAL_LABELS = { PERMANENT: 'مرسم', TRAINEE: 'متربص', CONTRACT: 'متعاقد', TEMPORARY_CONTRACT: 'متعاقد مؤقت', SUBSTITUTE: 'مستخلف' } as const;
 const DAYS = ['الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد'];
-const SEARCH_KEYS = ['q', 'districtId', 'institutionId', 'hasCurrentInstitution', 'professionalStatus', 'recordStatus', 'academicYear', 'dayOfWeek', 'minuteOfDay', 'worksToday', 'worksNow'] as const;
+const SEARCH_KEYS = ['q', 'municipality', 'districtId', 'institutionId', 'hasCurrentInstitution', 'professionalStatus', 'recordStatus', 'academicYear', 'dayOfWeek', 'minuteOfDay', 'worksToday', 'worksNow'] as const;
 
 function validAcademicYear(value: string) {
   return /^\d{4}-\d{4}$/u.test(value) && Number(value.slice(5)) === Number(value.slice(0, 4)) + 1;
@@ -72,7 +73,7 @@ function displayStatus(status: TeacherDirectoryItem['recordStatus']) {
 
 function TeacherIdentity({ row, includeRecordState = false }: { row: TeacherDirectoryItem; includeRecordState?: boolean }) {
   return <div className="teacher-directory__identity"><Link className="teacher-directory__identity-link" to={`/app/teachers/${encodeURIComponent(row.id)}`}><bdi dir="auto">{row.name} {row.surname}</bdi></Link>
-    <div className="teacher-directory__record-context"><span className="teacher-directory__professional">{row.professionalStatus ? PROFESSIONAL_LABELS[row.professionalStatus] : 'غير محددة'}</span>{includeRecordState ? <span role="group" aria-label="حالة السجل"><StatusBadge tone={row.recordStatus === 'ACTIVE' ? 'success' : 'neutral'}>{displayStatus(row.recordStatus)}</StatusBadge></span> : null}</div></div>;
+    <div className="teacher-directory__record-context"><span className="teacher-directory__professional">{row.professionalStatus ? PROFESSIONAL_LABELS[row.professionalStatus] : 'غير محددة'}</span>{row.hasSupplementaryWorkplaces ? <StatusBadge tone="info">تكملة نصاب سارية</StatusBadge> : null}{includeRecordState ? <span role="group" aria-label="حالة السجل"><StatusBadge tone={row.recordStatus === 'ACTIVE' ? 'success' : 'neutral'}>{displayStatus(row.recordStatus)}</StatusBadge></span> : null}</div></div>;
 }
 
 function TeacherActions({ row }: { row: TeacherDirectoryItem }) {
@@ -85,16 +86,7 @@ function TeacherWorkplace({ row }: { row: TeacherDirectoryItem }) {
 }
 
 export function TeacherDirectoryPage() {
-  // Mount one representation only, including at real browser zoom. No duplicate
-  // interactive records or off-screen desktop links in the accessibility tree.
-  const [structured, setStructured] = useState(() => window.matchMedia?.('(max-width: 64rem)').matches ?? false);
-  useEffect(() => {
-    const media = window.matchMedia?.('(max-width: 64rem)');
-    if (!media) return;
-    const update = () => setStructured(media.matches);
-    media.addEventListener('change', update);
-    return () => media.removeEventListener('change', update);
-  }, []);
+  // One responsive card tree; server search/cursor and history synchronization remain authoritative.
   const [params, setParams] = useSearchParams();
   const [searchDraft, setSearchDraft] = useState(params.get('q') ?? '');
   const searchTimer = useRef<number | undefined>(undefined);
@@ -211,13 +203,6 @@ export function TeacherDirectoryPage() {
     return () => { active = false; };
   }, [searchKey, activeCursor, refreshKey]);
 
-  const columns = useMemo<DataTableColumn<TeacherDirectoryItem>[]>(() => [
-    { id: 'teacher', header: 'الأستاذ / الصفة المهنية', render: (row) => <TeacherIdentity row={row} /> },
-    { id: 'institution', header: 'المؤسسة الحالية المعتمدة', render: (row) => <><TeacherWorkplace row={row} />{districts.length > 1 ? <small className="teacher-directory__district">{districts.find((district) => district.id === row.districtId)?.name ?? 'غير متاحة'}</small> : null}</> },
-    { id: 'status', header: 'حالة السجل', render: (row) => <StatusBadge tone={row.recordStatus === 'ACTIVE' ? 'success' : 'neutral'}>{displayStatus(row.recordStatus)}</StatusBadge> },
-    { id: 'actions', header: 'روابط مساندة', render: (row) => <TeacherActions row={row} /> },
-  ], [districts]);
-
   function handleYearChange(event: ChangeEvent<HTMLInputElement>) {
     const value = event.currentTarget.value;
     setYearDraft(value);
@@ -265,12 +250,13 @@ export function TeacherDirectoryPage() {
           actions={filtered ? <Button variant="secondary" onClick={resetFilters}>مسح المرشحات</Button> : null}>
         <div className="teacher-directory__filters">
           <Input id="teacher-directory-search" label="البحث عن أستاذ" placeholder="الاسم أو اللقب أو بيانات البحث المتاحة" value={searchDraft} onChange={(event) => { searchEditPending.current = true; setSearchDraft(event.currentTarget.value); }} autoComplete="off" />
+          <Input id="teacher-municipality-filter" label="البلدية" value={params.get('municipality') ?? ''} maxLength={150} onChange={(event) => applyChanges({ municipality: event.currentTarget.value || undefined })} />
           {districts.length > 1 ? <div className="ui-field"><label className="ui-field__label" htmlFor="teacher-district-filter">المقاطعة</label><select id="teacher-district-filter" className="ui-input" value={params.get('districtId') ?? ''} onChange={(event) => applyChanges({ districtId: event.currentTarget.value || undefined, institutionId: undefined })}><option value="">كل المقاطعات المتاحة</option>{districts.map((district) => <option key={district.id} value={district.id}>{district.name}</option>)}</select></div> : null}
           {districtError ? <p className="teacher-directory__hint" role="status">تعذر تحميل أسماء المقاطعات؛ تبقى صلاحية النطاق لدى الخادم.</p> : null}
           <div className="teacher-directory__institution-filter"><Input id="teacher-institution-search" label="البحث عن مؤسسة حالية معتمدة" value={institutionDraft} onChange={(event) => { setInstitutionDraft(event.currentTarget.value); setInstitutionQuery(event.currentTarget.value); }} placeholder="اكتب للبحث في المؤسسات المتاحة" autoComplete="off" />
             {institutionLoading ? <span className="teacher-directory__hint" role="status">جارٍ البحث عن المؤسسات…</span> : null}
             {institutionError ? <span className="teacher-directory__hint" role="alert">تعذر تحميل المؤسسات المطابقة.</span> : null}
-            {institutionOptions.length ? <select aria-label="نتائج المؤسسات" className="ui-input" value={params.get('institutionId') ?? ''} onChange={(event) => { const selected = institutionOptions.find((item) => item.id === event.currentTarget.value); setInstitutionDraft(selected?.name ?? ''); applyChanges({ institutionId: selected?.id, hasCurrentInstitution: selected ? 'true' : undefined }); }}><option value="">كل المؤسسات الحالية</option>{institutionOptions.map((institution) => <option value={institution.id} key={institution.id}>{institution.name}</option>)}</select> : null}
+            {institutionOptions.length ? <select aria-label="نتائج المؤسسات" className="ui-input" value={params.get('institutionId') ?? ''} onChange={(event) => { const selected = institutionOptions.find((item) => item.id === event.currentTarget.value); setInstitutionDraft(selected?.name ?? ''); applyChanges({ institutionId: selected?.id, hasCurrentInstitution: undefined }); }}><option value="">كل أماكن العمل المعتمدة</option>{institutionOptions.map((institution) => <option value={institution.id} key={institution.id}>{institution.name}</option>)}</select> : null}
             {params.has('institutionId') && !institutionDraft ? <span className="teacher-directory__hint" role="status">هناك تصفية محفوظة حسب مؤسسة حالية.</span> : null}
             {params.has('institutionId') ? <Button variant="secondary" onClick={() => { setInstitutionDraft(''); setInstitutionQuery(''); applyChanges({ institutionId: undefined }); }}>مسح اختيار المؤسسة</Button> : null}
           </div>
@@ -295,7 +281,7 @@ export function TeacherDirectoryPage() {
         {loading ? <LoadingState compact label="جارٍ تحميل دليل الأساتذة…" /> : null}
         {!loading && loadError ? <ErrorState compact title="تعذر تحميل دليل الأساتذة" description="حدثت مشكلة أثناء جلب النتائج. أعد المحاولة." action={<Button variant="secondary" onClick={() => setRefreshKey((value) => value + 1)}>إعادة المحاولة</Button>} /> : null}
         {!loading && !loadError && rows.length === 0 ? <EmptyState compact kind={filtered ? 'no-results' : 'no-data'} title={filtered ? 'لا توجد نتائج مطابقة' : 'لا توجد سجلات أساتذة ظاهرة'} description={filtered ? 'غيّر البحث أو المرشحات ثم حاول مجددًا.' : 'ستظهر هنا السجلات النشطة ضمن المقاطعات المصرح بها.'} action={filtered ? <Button variant="secondary" onClick={resetFilters}>مسح المرشحات</Button> : undefined} /> : null}
-        {!loading && !loadError && rows.length > 0 ? structured ? <RecordList label="دليل الأساتذة" density="compact">{rows.map((row) => <RecordRow key={row.id} identity={<TeacherIdentity row={row} includeRecordState />} context={<TeacherWorkplace row={row} />} metadata={districts.length > 1 ? districts.find((district) => district.id === row.districtId)?.name ?? 'غير متاحة' : undefined} actions={<TeacherActions row={row} />} />)}</RecordList> : <DataTable caption="دليل الأساتذة" captionVisibility="accessible-only" columns={columns} rows={rows} rowKey={(row) => row.id} /> : null}
+        {!loading && !loadError && rows.length > 0 ? <ul className="teacher-directory__cards" aria-label="دليل الأساتذة">{rows.map((row) => <li className="teacher-directory__card" key={row.id}><div className="teacher-directory__card-header"><Link to={`/app/teachers/${encodeURIComponent(row.id)}`} aria-label={`فتح ملف الأستاذ — ${row.name} ${row.surname}`}><TeacherAvatar teacherId={row.id} name={row.name} available={row.hasPhoto ?? false} /></Link><TeacherIdentity row={row} includeRecordState /></div><TeacherWorkplace row={row} />{districts.length > 1 ? <small>{districts.find((d) => d.id === row.districtId)?.name ?? 'غير متاحة'}</small> : null}<TeacherActions row={row} /></li>)}</ul> : null}
         {!loading && !loadError ? <Pagination label="التنقل بين نتائج الأساتذة" currentPage={pageIndex + 1}
           rangeStart={rows.length ? pageIndex * LIMIT + 1 : 0} rangeEnd={pageIndex * LIMIT + rows.length} total={total}
           hasPrevious={pageIndex > 0} hasNext={Boolean(nextCursor)} onPrevious={handlePrevious} onNext={handleNext} nextLabel="النتائج التالية" /> : null}

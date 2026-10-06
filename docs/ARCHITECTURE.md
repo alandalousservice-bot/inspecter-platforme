@@ -1,5 +1,17 @@
 # Architecture v0.1
 
+## Current product evolution — ADR-041 (2026-10-05)
+
+The explicitly confirmed comprehensive Product Vision supersedes the original **no Teacher account** and **Inspector-entered timetable** assumptions. Original Master remains an immutable historical requirements artifact; no wholesale architecture replacement. [Current evolution contract](architecture/PRODUCT_EVOLUTION_2026.md) defines the precise changes; older task descriptions below retain their historical context.
+
+React/Vite, Express modular monolith, PostgreSQL/Prisma, Zod, existing Inspector authentication, district policy and append service remain shared. `teacher-portal` is a bounded API module, not another backend/database. Separate TeacherAccount/TeacherSession credentials, role-specific CSRF and `/teacher` UX grant only own-resource access. Never infer Inspector authority from a Teacher session or mutable contact email. Public intake stays a declaration channel; manual Inspector acceptance and separate identity-confirmed invitation are prerequisites to onboarding.
+
+Typed proposals separate self-service declarations from current professional/institutional data. Accept/reject, canonical mutation and minimal audit run in one Prisma transaction under Teacher locks and revision/baseline checks. Photo metadata and private storage remain separate from professional fields. sharp 0.35.5 is the bounded native PNG/JPEG decoding/re-encoding adapter; bytes/decoded pixels/dimensions/time are bounded, orientation normalized and EXIF/GPS/other metadata discarded before storage. Only sanitized-version output is served; no raw-asset backfill. Local private filesystem adapter is the initial implementation of ADR-009's provider-neutral interface, **not a public directory**; outside-repository absolute `PRIVATE_ASSET_DIR`, operator-restricted ACLs, no-store authenticated serving, and fail-closed when missing. S3/provider deployment is not implemented.
+
+Timetable initial Teacher submission writes canonical immediately. Independent later update → SUBMITTED proposal; Inspector correction REQUESTED → Teacher replacement SUBMITTED. Both origins share ScheduleCorrection, explicit ACCEPTED/REJECTED with required rejection reason, revision locks, history and atomic minimal audit. Canonical changes only upon successful acceptance; invalid/stale acceptance returns safe 409, explicit rejection closes it without revalidating old workplaces. ALL legacy Inspector writes are closed regardless of TeacherAccount; reads/review remain. No exceptional override is invented. Prospective visit eligibility checks do not reinterpret history. Transfer approval from the originating Inspector does not activate transfer or widen access; ADR-017's receiving authority/history policy remains OPEN.
+
+Operational alerts are bounded read models from pending proposals/corrections, not a generic messaging/notification platform. Geography derives existing Institution municipality text; no official administrative registry or map/geocoding dependency. Dossier history is a recent ID/action/time projection, not fabricated professional events. Migration rollout to persistent UAT or production requires a separate explicit operator action; comprehensive test schemas are owned and disposable.
+
 العقود التابعة: [DATABASE](DATABASE.md)، [API](API_CONTRACTS.md)، [UI](UI_MAP.md)، [DECISIONS](DECISIONS.md). سجل إعادة الاستخدام: [TASK-000](audits/ARENASPEX_REUSE_AUDIT.md).
 
 ## البدائل والاختيار

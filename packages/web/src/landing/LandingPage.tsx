@@ -1,6 +1,7 @@
 import { Link } from 'react-router';
 import { ShellIcon, type ShellIconName } from '../ui/ShellIcon';
 import './LandingPage.css';
+import { InstitutionalContext } from '../teacher-portal/InstitutionalContext';
 
 const capabilities: { icon: ShellIconName; companionIcon?: ShellIconName; title: string; description: string }[] = [
   { icon: 'teachers', title: 'ملفات الأساتذة', description: 'تنظيم البيانات المهنية ومتابعة ملفات الأساتذة.' },
@@ -31,6 +32,7 @@ export function LandingPage() {
           </p>
           <div className="landing-hero__actions">
             <Link className="ui-button ui-button--primary ui-button--normal landing-primary-action" to="/login">دخول فضاء المفتش<ShellIcon name="login" /></Link>
+            <Link className="landing-secondary-action" to="/teacher/login">دخول مساحة الأستاذ<ShellIcon name="teachers" /></Link>
             <a className="landing-secondary-action" href="#landing-capabilities">اكتشف مساحات العمل<ShellIcon name="arrow-down" /></a>
           </div>
           <p className="landing-hero__note"><ShellIcon name="lock" /> فضاء الدخول مخصص للمفتشين المسجلين.</p>
@@ -69,6 +71,7 @@ export function LandingPage() {
       </section>
 
       <footer className="landing-footer">
+        <InstitutionalContext />
         <span>منصة مفتش التربية البدنية والرياضية</span>
         <span>فضاء مهني للمرافقة البيداغوجية</span>
       </footer>

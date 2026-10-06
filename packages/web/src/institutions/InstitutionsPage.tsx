@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { Button, DataTable, Dialog, EmptyState, ErrorState, FilterBar, Input, LoadingState, PageHeader, Pagination, RecordList, RecordRow, Select, SuccessState, WorkspaceStack, type DataTableColumn } from '../ui';
 import { ApiRequestError, createInstitution, getCurrentDistricts, listInstitutions, updateInstitution, type DistrictOption, type Institution } from '../auth/client';
 import { ShellIcon } from '../ui/ShellIcon';
 import './institutions.css';
+import { GeographyNavigator } from '../teacher-portal/GeographyNavigator';
 
 const PAGE_SIZE = 25;
 
 function InstitutionIdentity({ row }: { row: Institution }) {
-  return <span className="institutions-identity"><strong><bdi dir="auto">{row.name}</bdi></strong>{row.externalCode ? <small>الرمز الخارجي: <bdi dir="auto">{row.externalCode}</bdi></small> : null}</span>;
+  return <span className="institutions-identity"><Link to={`/app/institutions/${row.id}`}><strong><bdi dir="auto">{row.name}</bdi></strong></Link>{row.externalCode ? <small>الرمز الخارجي: <bdi dir="auto">{row.externalCode}</bdi></small> : null}</span>;
 }
 
 function InstitutionLocation({ row, districtName }: { row: Institution; districtName?: string }) {
@@ -35,6 +36,7 @@ export function InstitutionsPage() {
   }, []);
   const [searchParams, setSearchParams] = useSearchParams();
   const activeQuery = searchParams.get('q') ?? '';
+  const districtFilter = searchParams.get('districtId') ?? ''; const municipalityFilter = searchParams.get('municipality') ?? '';
   const [searchText, setSearchText] = useState(activeQuery);
   const [cursorHistory, setCursorHistory] = useState<string[]>(['']);
   const [pageIndex, setPageIndex] = useState(0);
@@ -82,7 +84,7 @@ export function InstitutionsPage() {
     let active = true;
     setListLoading(true);
     setListError(false);
-    void listInstitutions({ q: activeQuery, cursor: currentCursor || undefined, limit: PAGE_SIZE })
+    void listInstitutions({ q: activeQuery, cursor: currentCursor || undefined, limit: PAGE_SIZE, ...(districtFilter ? { districtId: districtFilter } : {}), ...(municipalityFilter ? { municipality: municipalityFilter } : {}) })
       .then((result) => {
         if (!active) return;
         setRows(result.data);
@@ -92,7 +94,8 @@ export function InstitutionsPage() {
       .catch(() => { if (active) setListError(true); })
       .finally(() => { if (active) setListLoading(false); });
     return () => { active = false; };
-  }, [activeQuery, currentCursor, refreshKey]);
+  }, [activeQuery, currentCursor, refreshKey, districtFilter, municipalityFilter]);
+  useEffect(() => { setCursorHistory(['']); setPageIndex(0); }, [districtFilter, municipalityFilter]);
 
   useEffect(() => { setSearchText(activeQuery); }, [activeQuery]);
 
@@ -112,7 +115,7 @@ export function InstitutionsPage() {
     setCursorHistory(['']);
     setPageIndex(0);
     setSuccessMessage('');
-    setSearchParams(q ? { q } : {});
+    const updated = new URLSearchParams(searchParams); if (q) updated.set('q', q); else updated.delete('q'); setSearchParams(updated);
   }
 
   function openCreateDialog() {
@@ -216,6 +219,7 @@ export function InstitutionsPage() {
         primaryAction={<Button disabled={!canCreate} onClick={openCreateDialog}>إضافة مؤسسة</Button>} />
 
       {successMessage ? <SuccessState title={successMessage} /> : null}
+      <GeographyNavigator />
 
       {districtsError ? (
         <ErrorState title="تعذر تحميل المقاطعات المتاحة" description="لم نتمكن من تجهيز اختيار المقاطعة. أعد المحاولة." action={<Button variant="secondary" onClick={() => void loadDistricts()}>إعادة المحاولة</Button>} />

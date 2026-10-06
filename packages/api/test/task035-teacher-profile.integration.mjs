@@ -162,10 +162,12 @@ test('GET returns scoped current profile and minimal accepted declarations witho
     'firstEducationAppointmentDecisionNumber', 'firstInstallationDate', 'traineeshipDate', 'institutionAppointmentDate',
     'institutionAppointmentNumber', 'financialControllerVisaNumber', 'administrativeCategory', 'administrativeSection',
     'administrativeGrade', 'administrativeClassificationEffectiveDate', 'birthProvince', 'personalAddress', 'administrativeNote',
-    'recordStatus', 'archivedAt', 'createdAt', 'updatedAt', 'declaredInstitutions', 'declaredWorkplace', 'currentInstitution',
+    'recordStatus', 'archivedAt', 'createdAt', 'updatedAt', 'declaredInstitutions', 'declaredWorkplace', 'currentInstitution', 'trainingStatus', 'trainingVerifiedAt',
   ].sort());
   assert.equal(data.birthDate, '1985-03-04');
   assert.equal(data.recordStatus, 'ACTIVE');
+  assert.equal(data.trainingStatus, null);
+  assert.equal(data.trainingVerifiedAt, null);
   assert.deepEqual(data.declaredInstitutions, { primaryInstitutionName: 'ابتدائية النور', additionalInstitutionNames: ['ابتدائية الفجر'] });
   assert.deepEqual(data.declaredWorkplace, { institutionName: 'ابتدائية النور', municipality: null, institutionAddress: null, directorPhone: null, legacyAdditionalInstitutionNames: ['ابتدائية الفجر'] });
   assert.equal(data.currentInstitution, null);

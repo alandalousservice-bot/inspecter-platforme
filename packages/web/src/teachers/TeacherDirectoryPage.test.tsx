@@ -33,6 +33,12 @@ function renderPage(path = '/app/teachers') {
 }
 
 describe('TASK-045 Teacher directory', () => {
+  it('photo/identity links open the dossier and current supplementary work has an explicit server-backed indicator', async () => {
+    mocks.listTeachers.mockResolvedValue(response([{ ...teacher, hasSupplementaryWorkplaces: true }]));
+    renderPage(); await screen.findByRole('link', { name: 'محمد علي' });
+    expect(screen.getByRole('link', { name: 'فتح ملف الأستاذ — محمد علي' }).getAttribute('href')).toBe(`/app/teachers/${teacher.id}`);
+    expect(screen.getByText('تكملة نصاب سارية')).toBeTruthy();
+  });
   it('reconciles native Back before a search transition commits, then restores Forward without stale replay', async () => {
     window.history.replaceState(null, '', '/app/teachers?professionalStatus=SUBSTITUTE&recordStatus=INACTIVE');
     let releaseTransition!: () => void;
@@ -153,12 +159,13 @@ describe('TASK-045 Teacher directory', () => {
     expect(mocks.listTeachers).toHaveBeenLastCalledWith({ q: 'AB عربي', limit: 25 });
   });
 
-  it('uses one compact header and an accessible-only caption without cards or result headings', async () => {
+  it('uses one compact header and one responsive card list without redundant result headings', async () => {
     renderPage(); await screen.findByRole('link', { name: 'محمد علي' });
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     expect(screen.queryByRole('heading', { name: 'النتائج' })).toBeNull();
     expect(document.querySelector('.ui-card')).toBeNull();
-    expect(document.querySelector('caption')?.className).toBe('ui-table__caption--accessible-only');
+    expect(screen.getAllByRole('list', { name: 'دليل الأساتذة' })).toHaveLength(1);
+    expect(document.querySelectorAll('.teacher-directory__card')).toHaveLength(1);
     expect(screen.getByRole('link', { name: 'بطاقة معلومات الأستاذ — محمد علي' }).getAttribute('href')).toBe(`/app/teachers/${teacher.id}/information-card`);
   });
 
@@ -180,9 +187,8 @@ describe('TASK-045 Teacher directory', () => {
     await waitFor(() => expect(mocks.listTeachers).toHaveBeenLastCalledWith({ academicYear: '2026-2027', worksNow: true, limit: 25 }));
   });
 
-  it('mounts one structured list on narrow screens and switches without a duplicate or extra request', async () => {
-    let change!: () => void;
-    const media = { matches: true, addEventListener: vi.fn((_event, callback) => { change = callback; }), removeEventListener: vi.fn() };
+  it('keeps one card tree across widths without duplicate records or an extra request', async () => {
+    const media = { matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() };
     vi.stubGlobal('matchMedia', () => media);
     const longName = 'أستاذ باسم عربي طويل لاختبار القراءة دون قطع';
     mocks.listTeachers.mockResolvedValue(response([{ ...teacher, name: longName, professionalStatus: 'SUBSTITUTE', recordStatus: 'INACTIVE', currentInstitution: { ...institution, name: 'ابتدائية ذات اسم عربي طويل جدًا لاختبار الالتفاف' } }]));
@@ -193,9 +199,9 @@ describe('TASK-045 Teacher directory', () => {
     expect(screen.getByRole('listitem').hasAttribute('tabindex')).toBe(false);
     expect(screen.getByText('مستخلف', { selector: 'span' })).toBeTruthy(); expect(screen.getByText('غير نشط', { selector: 'span' })).toBeTruthy();
     expect(screen.getByText('ابتدائية ذات اسم عربي طويل جدًا لاختبار الالتفاف')).toBeTruthy();
-    act(() => { media.matches = false; change(); });
-    expect(screen.getByRole('table', { name: 'دليل الأساتذة' })).toBeTruthy();
-    expect(screen.queryByRole('list', { name: 'دليل الأساتذة' })).toBeNull();
+    act(() => { media.matches = false; window.dispatchEvent(new Event('resize')); });
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.getAllByRole('list', { name: 'دليل الأساتذة' })).toHaveLength(1);
     expect(mocks.listTeachers).toHaveBeenCalledTimes(1);
   });
 
@@ -287,7 +293,8 @@ describe('TASK-045 Teacher directory', () => {
     expect(await screen.findByRole('combobox', { name: 'نتائج المؤسسات' })).toBeTruthy();
     fireEvent.change(screen.getByRole('combobox', { name: 'نتائج المؤسسات' }), { target: { value: institution.id } });
     await waitFor(() => expect(mocks.listInstitutions).toHaveBeenCalledWith({ q: 'مدرسة النور', districtId: undefined, limit: 25 }));
-    await waitFor(() => expect(mocks.listTeachers).toHaveBeenLastCalledWith({ institutionId: institution.id, hasCurrentInstitution: true, limit: 25 }));
+    // Institution filter includes approved supplementary workplaces, not only home assignments.
+    await waitFor(() => expect(mocks.listTeachers).toHaveBeenLastCalledWith({ institutionId: institution.id, limit: 25 }));
   });
 
   it('composes unassigned, professional and record status filters using canonical values', async () => {
@@ -380,7 +387,7 @@ describe('TASK-045 Teacher directory', () => {
     expect(document.querySelector('.teacher-directory')?.getAttribute('dir')).toBe('rtl');
     const search = screen.getByRole('textbox', { name: 'البحث عن أستاذ' });
     search.focus(); expect(document.activeElement).toBe(search);
-    expect(screen.getByRole('table', { name: 'دليل الأساتذة' })).toBeTruthy();
+    expect(screen.getByRole('list', { name: 'دليل الأساتذة' })).toBeTruthy();
     expect(screen.queryByRole('columnheader', { name: /البلدية/ })).toBeNull();
   });
 });

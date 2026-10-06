@@ -95,7 +95,7 @@ before(async () => {
   const oldFollowUp = await oldDb.followUp.create({ data: { reportId: oldReport.id, ownerInspectorId: oldInspector.id, note: 'preserved follow-up', dueDate: new Date('2027-02-01T00:00:00.000Z') } });
   const oldSubmissionId = randomUUID();
   await oldDb.$executeRaw`INSERT INTO "TeacherSubmission" ("id","districtId","submittedProfile") VALUES (${oldSubmissionId}::uuid,${oldDistrict}::uuid,'{"purpose":"migration-preservation-test"}'::jsonb)`;
-  const oldAudit = await oldDb.auditLog.create({ data: { actorInspectorId: oldInspector.id, districtId: oldDistrict, action: 'TASK082_UPGRADE_SENTINEL', entityType: 'Teacher', entityId: oldTeacher } });
+  const oldAudit = await oldDb.auditLog.create({ data: { actorInspectorId: oldInspector.id, districtId: oldDistrict, action: 'TASK082_UPGRADE_SENTINEL', entityType: 'Teacher', entityId: oldTeacher }, select: { id: true } });
   await oldDb.$disconnect();
   cpSync(join(migrationsDir, migrationName), join(tempMigrations, migrationName), { recursive: true });
   runPrisma(['migrate', 'deploy'], upgradeUrl, tempSchema);

@@ -21,6 +21,7 @@ function readableError(error: unknown): string {
   if (!(error instanceof ApiRequestError)) return 'تعذر الاتصال بالخدمة. أعد المحاولة.';
   const messages: Record<string, string> = {
     TEACHER_INACTIVE: 'الأستاذ غير نشط؛ لم تُنشأ الزيارة.',
+    TENURE_ELIGIBILITY_REQUIRED: 'زيارة التثبيت غير متاحة: يلزم وضع مهني مؤهل وإتمام تكوين موثق للمتربص.',
     TEACHER_CURRENT_INSTITUTION_REQUIRED: 'لم تُعتمد مؤسسة حالية للأستاذ. راجع ملفه قبل التخطيط.',
     VISIT_WORKPLACE_UNAVAILABLE: 'المؤسسة الحالية غير متاحة للتخطيط. راجع ملف الأستاذ.',
     VISIT_OVERLAP_CONFLICT: 'يتعارض هذا الموعد مع زيارة أخرى. اختر فترة مختلفة.',
@@ -62,7 +63,7 @@ export function VisitCreatePage() {
     return () => { active = false; };
   }, []);
 
-  const chooseTeacher = useCallback((value: TeacherDirectoryItem | null) => { setTeacher(value); setInstitutionId(''); setWarning(null); setFormError(''); }, []);
+  const chooseTeacher = useCallback((value: TeacherDirectoryItem | null) => { setTeacher(value); setInstitutionId(''); setSelectedVisitType(''); setWarning(null); setFormError(''); }, []);
   useEffect(() => {
     const date = start.slice(0, 10);
     if (!teacher || !/^\d{4}-\d{2}-\d{2}$/u.test(date)) { setWorkplaces([]); return undefined; }
@@ -111,6 +112,8 @@ export function VisitCreatePage() {
   }
 
   const canCreate = districts.length > 0 && !districtLoading && !districtError;
+  const tenureAllowed = Boolean(teacher) && teacher?.professionalStatus !== 'CONTRACT'
+    && (teacher?.professionalStatus !== 'TRAINEE' || (teacher?.trainingStatus === 'COMPLETED' && teacher?.trainingVerifiedAt));
   const warningDialog = warning;
   return <section className="visit-page" dir="rtl">
     <PageHeader title="زيارة جديدة" description="أدخل الموعد صراحةً. التوزيع الأسبوعي مرجع استشاري."
@@ -127,7 +130,7 @@ export function VisitCreatePage() {
           : teacher ? <p className="visit-inline-note">لم تُعتمد مؤسسة حالية لهذا الأستاذ. <Link to={`/app/teachers/${encodeURIComponent(teacher.id)}`}>مراجعة ملف الأستاذ</Link></p> : null}
         {teacher ? <p><Link to={`/app/teachers/${encodeURIComponent(teacher.id)}/schedules`}>عرض التوزيع الأسبوعي للأستاذ</Link></p> : null}
         <Input id="visit-academic-year" label="السنة الدراسية" required value={academicYear} onChange={(event) => { setAcademicYear(event.currentTarget.value); setWarning(null); }} hint="أدخلها صراحةً بصيغة YYYY-YYYY، مثل 2026-2027." aria-describedby={formError ? 'visit-create-error' : undefined} />
-        <div className="visit-field"><label className="ui-field__label" htmlFor="visit-create-type">نوع الزيارة <span aria-hidden="true">*</span></label><select id="visit-create-type" className="ui-input" required value={selectedVisitType} disabled={saving} aria-describedby={formError ? 'visit-create-error' : undefined} onChange={(event) => { setSelectedVisitType(event.currentTarget.value as PedagogicalVisitType | ''); setExceptionalMode('SCHEDULED'); setInstitutionContextConfirmed(false); setWarning(null); setFormError(''); }}><option value="">اختر نوع الزيارة</option>{Object.entries(visitTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
+        <div className="visit-field"><label className="ui-field__label" htmlFor="visit-create-type">نوع الزيارة <span aria-hidden="true">*</span></label><select id="visit-create-type" className="ui-input" required value={selectedVisitType} disabled={saving} aria-describedby={formError ? 'visit-create-error' : undefined} onChange={(event) => { setSelectedVisitType(event.currentTarget.value as PedagogicalVisitType | ''); setExceptionalMode('SCHEDULED'); setInstitutionContextConfirmed(false); setWarning(null); setFormError(''); }}><option value="">اختر نوع الزيارة</option>{Object.entries(visitTypeLabels).filter(([value]) => value !== 'TENURE_CONFIRMATION' || tenureAllowed).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
         {selectedVisitType === 'EXCEPTIONAL' ? <div className="visit-field"><label className="ui-field__label" htmlFor="visit-exceptional-mode">طريقة تسجيل الزيارة الاستثنائية</label><select id="visit-exceptional-mode" className="ui-input" value={exceptionalMode} disabled={saving} onChange={(event) => { setExceptionalMode(event.currentTarget.value as 'SCHEDULED' | 'RETROSPECTIVE'); setWarning(null); setInstitutionContextConfirmed(false); }}><option value="SCHEDULED">زيارة مجدولة</option><option value="RETROSPECTIVE">تسجيل زيارة وقعت سابقًا</option></select></div> : null}
         <Input id="visit-start" label={selectedVisitType === 'EXCEPTIONAL' && exceptionalMode === 'RETROSPECTIVE' ? 'بداية الفترة الفعلية — توقيت الجزائر' : 'بداية الزيارة — توقيت الجزائر'} type="datetime-local" required value={start} onChange={(event) => { setStart(event.currentTarget.value); setInstitutionId(''); setWarning(null); }} aria-describedby={formError ? 'visit-create-error' : undefined} />
         <Input id="visit-end" label={selectedVisitType === 'EXCEPTIONAL' && exceptionalMode === 'RETROSPECTIVE' ? 'نهاية الفترة الفعلية — توقيت الجزائر' : 'نهاية الزيارة — توقيت الجزائر'} type="datetime-local" required value={end} onChange={(event) => { setEnd(event.currentTarget.value); setWarning(null); }} aria-describedby={formError ? 'visit-create-error' : undefined} />

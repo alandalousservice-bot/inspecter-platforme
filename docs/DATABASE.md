@@ -1,5 +1,26 @@
 # Database v0.1
 
+## Current implemented evolution — ADR-041
+
+This section supersedes only older no-login/schedule-authoring assumptions. Existing Teacher, Institution, dated supplementary workplace, Visit/Report/FollowUp and snapshot rules remain authoritative. Two additive migrations: `20261005180000_product_evolution_teacher_portal`, then `20261005220000_product_evolution_r2_schedule_review`. **No old migration edits or legacy backfills**. [Behavior and unresolved policies](architecture/PRODUCT_EVOLUTION_2026.md).
+
+| Addition | Persistence and invariant |
+|---|---|
+| Teacher | Nullable `trainingStatus` (NOT_STARTED, IN_PROGRESS, INCOMPLETE, COMPLETED), nullable `trainingVerifiedAt`; verification timestamp requires COMPLETED. Unknown legacy stays NULL. Declaration alone never verifies completion. |
+| TeacherAccount | UUID; unique Teacher FK (permanent 1:1), unique normalized loginEmail, existing scrypt passwordHash, ACTIVE/INACTIVE, createdAt/updatedAt. Login identity is independent of proposed contact email. |
+| TeacherSession | UUID; account FK, unique tokenHash, expiresAt, revokedAt, createdAt/updatedAt. Fixed 8h from explicit createdAt in service; DB expiry-after-creation CHECK. |
+| TeacherInvitation | UUID; Teacher/District/issuing Inspector FKs, loginEmail, unique tokenHash, expiresAt, consumedAt, createdAt. Immutable claim record except consumedAt; service serializes issuance/activation on Teacher and consumes prior unused invitations. |
+| TeacherChangeRequest | UUID; Teacher/District/decision Inspector FKs; kind PROFILE/CONTACT/TRAINING/TRANSFER/WORKPLACE/LOCATION; status PENDING/ACCEPTED/REJECTED/APPROVED_PENDING_DESTINATION; strict typed JSON payload, baselineUpdatedAt, positive revision, optional bounded decisionNote, createdAt/updatedAt. Partial unique one pending Teacher/kind. Destination-pending status only for TRANSFER. |
+| TeacherPhoto | UUID; Teacher FK, MIME, positive byteLength ≤2097152, unique generated UUID storageKey, createdAt. New row per replacement; prior assets/metadata retained pending ADR-014. Latest by createdAt DESC/id DESC. Nullable sanitizationVersion: NULL historical raw assets cannot be served; 1 means new fully decoded/re-encoded metadata-free output. No filesystem path or raw image in DB/API. |
+| ScheduleCorrection | UUID; Teacher FK; origin INSPECTOR_CORRECTION (issuer/note required) or TEACHER_UPDATE (issuer/note NULL, never REQUESTED); optional decisionInspectorId FK; academicYear, REQUESTED/SUBMITTED/ACCEPTED/REJECTED, canonical scheduleRevision and positive review revision, proposedSlots JSON, previousSlots JSON, nullable bounded decisionNote, createdAt/updatedAt. Partial unique one REQUESTED/SUBMITTED per Teacher/year; submitted/terminal requires proposal, accepted requires previous snapshot, rejected requires nonblank reason. REJECTED is terminal and excluded from one-open index. Additive upgrade preserves historical origin and snapshots, no destructive cleanup. |
+| AuditLog | Nullable actorTeacherId FK in addition to actorInspectorId; CHECK prevents both actors on the same event. Existing nullable trusted-system actor convention is unchanged. No new update/delete service. |
+
+New FKs use ON DELETE RESTRICT / ON UPDATE RESTRICT; existing FK actions stay unchanged. Existing UUID and timestamp conventions apply; mutable records use Prisma @updatedAt, immutable photo/invitation creation records do not invent updatedAt. Indexes cover session account, invitation Teacher/expiry, request district/status/time/id and Teacher/time/id, photo Teacher/time/id, and correction Teacher/year/time. Database invariants are complemented by server locks, ownership checks and CAS; no pair membership uniqueness or automatic transfer.
+
+PROFILE/CONTACT/TRAINING canonical acceptance compares Teacher.updatedAt with the proposal baseline. LOCATION holds an additional **server-sourced** Institution.updatedAt baseline and locks/rechecks the approved workplace before replacing exact Decimal coordinates. WORKPLACE declaration is not an Assignment: acceptance must explicitly refer to an already-approved home/current supplementary Institution using existing canonical workflows. TRANSFER source acceptance preserves Teacher.districtId and historical ownership. Qualification free text does not generate structured qualification records.
+
+Municipality remains existing nullable normalized Institution text. Directory municipality/institution predicates include current dated supplementary relationships. There is no fabricated Municipality master table or duplicate event-history table. Effective WeeklySchedule remains single Teacher/year with the existing constraints; correction JSON is not another effective timetable.
+
 تصميم منطقي؛ لا migrations في هذه المراجعة. PostgreSQL/Prisma وفق [ARCHITECTURE](ARCHITECTURE.md). `id` UUID، `createdAt/updatedAt` وFKs مسماة لكل سجل قابل للتعديل. تواريخ الأحداث UTC، واليوم/الساعة التشغيلية وفق `Africa/Algiers`. أسماء الحقول التالية عقود مبدئية، وليست استمارة رسمية.
 
 ## الكيانات (23 أساسية بعد ADR-029)
